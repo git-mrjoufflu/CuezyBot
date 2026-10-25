@@ -104,6 +104,19 @@ public sealed partial class MainWindow : Window
             : (_english ? "■  Stop" : "■  Arrêter");
     }
 
+    private void OnLibraryActionPressed(object? sender, PointerPressedEventArgs eventArgs)
+    {
+        if (eventArgs.Source is Border border && border.Classes.Contains("libraryItem"))
+        {
+            var label = border.Child is TextBlock textBlock ? textBlock.Text : null;
+            if (!string.IsNullOrWhiteSpace(label))
+            {
+                TestStatus.Text = _english ? $"Action selected: {label}" : $"Action sélectionnée : {label}";
+                eventArgs.Handled = true;
+            }
+        }
+    }
+
     internal void SetConnectionStatus(string message) => TestStatus.Text = message;
 
     internal void UpdateIntegrationCount(bool obsConnected, bool twitchConnected)

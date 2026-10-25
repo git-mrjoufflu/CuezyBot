@@ -341,7 +341,7 @@
           <Border Grid.Column="0" Padding="8" Background="#4A2A7D" CornerRadius="8"><TextBlock Text="Actions" HorizontalAlignment="Center" FontWeight="SemiBold" /></Border>
           <Border Grid.Column="1" Padding="8" CornerRadius="8"><TextBlock Text="Événements" HorizontalAlignment="Center" Classes="muted" /></Border>
         </Grid>
-        <ScrollViewer Grid.Row="3" HorizontalScrollBarVisibility="Disabled" HorizontalContentAlignment="Stretch">
+        <ScrollViewer Grid.Row="3" HorizontalScrollBarVisibility="Disabled" HorizontalContentAlignment="Stretch" PointerPressed="OnLibraryActionPressed">
           <StackPanel Spacing="10" HorizontalAlignment="Stretch">
             <Border x:Name="TwitchActionSection" Classes="productSection" IsVisible="False">
               <StackPanel Spacing="6">
