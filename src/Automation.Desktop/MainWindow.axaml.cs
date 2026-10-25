@@ -507,6 +507,7 @@ public sealed partial class MainWindow : Window
             layout.RowDefinitions = new RowDefinitions("32,*,Auto");
             var visibility = new ComboBox
             {
+                Tag = "visibilityOptions",
                 ItemsSource = _english ? new[] { "Show", "Hide" } : new[] { "Afficher", "Masquer" },
                 SelectedIndex = PrototypeServices.SourceVisibility.GetValueOrDefault(label, true) ? 0 : 1,
                 HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch,
@@ -518,6 +519,7 @@ public sealed partial class MainWindow : Window
             Grid.SetRow(visibilityField, 2);
             visibility.SelectionChanged += (_, _) =>
             {
+                if (visibility.SelectedIndex < 0) return;
                 PrototypeServices.SourceVisibility[label] = visibility.SelectedIndex == 0;
                 TestStatus.Text = _english ? "Draft modified" : "Brouillon modifié";
             };
@@ -555,7 +557,34 @@ public sealed partial class MainWindow : Window
         if (!PrototypeServices.ActionOptions.TryGetValue(label, out var options))
             PrototypeServices.ActionOptions[label] = options = new System.Text.Json.Nodes.JsonObject();
         var form = new StackPanel { Spacing = 6, Margin = new Thickness(12, 0, 12, 10) };
-        ComboBox? sourcePicker = null;
+        ListBox? sourcePicker = null;
+        var loadingSources = false;
+        async Task LoadSources()
+        {
+            if (sourcePicker is null) return;
+            try
+            {
+                var scene = options["scene"]?.ToString();
+                if (ObsSessionState.Client?.IsConnected != true || string.IsNullOrWhiteSpace(scene)) return;
+                var values = await ObsSessionState.Client.GetSourceNamesAsync(scene);
+                if (options["scene"]?.ToString() != scene) return;
+                var selected = options["sources"] is System.Text.Json.Nodes.JsonArray array
+                    ? array.Select(item => item!.GetValue<string>()).ToArray()
+                    : options["source"] is { } legacy ? new[] { legacy.ToString() } : Array.Empty<string>();
+                loadingSources = true;
+                try
+                {
+                    sourcePicker.ItemsSource = values;
+                    sourcePicker.SelectedItems?.Clear();
+                    foreach (var value in selected.Where(values.Contains)) sourcePicker.SelectedItems?.Add(value);
+                }
+                finally { loadingSources = false; }
+            }
+            catch (Exception exception)
+            {
+                ToolTip.SetTip(sourcePicker, (_english ? "OBS list unavailable: " : "Liste OBS indisponible : ") + exception.Message);
+            }
+        }
         async Task LoadChoices(ComboBox picker, string key)
         {
             try
@@ -581,11 +610,31 @@ public sealed partial class MainWindow : Window
         }
         foreach (var (key, fr, en) in fields)
         {
-            form.Children.Add(CreateFieldLabel(fr, en));
-            if (key is "scene" or "source")
+            form.Children.Add(CreateFieldLabel(key == "source" ? "Sources à modifier" : fr, key == "source" ? "Sources to change" : en));
+            if (key == "source")
             {
-                var picker = new ComboBox { PlaceholderText = _english ? en : fr, HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch, FontSize = 12 };
-                if (key == "source") sourcePicker = picker;
+                sourcePicker = new ListBox
+                {
+                    SelectionMode = SelectionMode.Multiple | SelectionMode.Toggle,
+                    Height = 110,
+                    FontSize = 12
+                };
+                sourcePicker.SelectionChanged += (_, _) =>
+                {
+                    if (loadingSources) return;
+                    var selected = sourcePicker.SelectedItems?.Cast<string>().ToArray() ?? [];
+                    options["sources"] = new System.Text.Json.Nodes.JsonArray(selected.Select(value => (System.Text.Json.Nodes.JsonNode?)System.Text.Json.Nodes.JsonValue.Create(value)).ToArray());
+                    options.Remove("source");
+                    TestStatus.Text = _english ? "Draft modified" : "Brouillon modifié";
+                };
+                form.Children.Add(sourcePicker);
+                node.Height += 80;
+                _ = LoadSources();
+                continue;
+            }
+            if (key == "scene")
+            {
+                var picker = new ComboBox { Tag = (fr, en), PlaceholderText = _english ? en : fr, HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch, FontSize = 12 };
                 picker.SelectionChanged += (_, _) =>
                 {
                     if (picker.SelectedItem is not string selected) return;
@@ -594,8 +643,8 @@ public sealed partial class MainWindow : Window
                     if (key == "scene" && changed && sourcePicker is not null)
                     {
                         options.Remove("source");
-                        sourcePicker.ItemsSource = Array.Empty<string>();
-                        _ = LoadChoices(sourcePicker, "source");
+                        options.Remove("sources");
+                        _ = LoadSources();
                     }
                 };
                 picker.DropDownOpened += (_, _) => { _ = LoadChoices(picker, key); };
@@ -660,7 +709,7 @@ public sealed partial class MainWindow : Window
 
     private void OnActionNodePressed(object? sender, PointerPressedEventArgs eventArgs)
     {
-        if ((eventArgs.Source as Visual)?.GetSelfAndVisualAncestors().Any(control => control is ComboBox || control is Button || control is TextBox) == true) return;
+        if ((eventArgs.Source as Visual)?.GetSelfAndVisualAncestors().Any(control => control is ComboBox || control is Button || control is TextBox || control is ListBox) == true) return;
         if (sender is not Border node) return;
         var point = eventArgs.GetCurrentPoint(node);
         if (point.Properties.PointerUpdateKind == PointerUpdateKind.RightButtonPressed)
@@ -1013,6 +1062,18 @@ public sealed partial class MainWindow : Window
             if (control.Text is { } text)
             {
                 control.Text = TranslateText(text, translations);
+            }
+        }
+
+        foreach (var picker in this.GetVisualDescendants().OfType<ComboBox>())
+        {
+            if (picker.Tag is ValueTuple<string, string> captions)
+                picker.PlaceholderText = english ? captions.Item2 : captions.Item1;
+            if (Equals(picker.Tag, "visibilityOptions"))
+            {
+                var selected = picker.SelectedIndex;
+                picker.ItemsSource = english ? new[] { "Show", "Hide" } : new[] { "Afficher", "Masquer" };
+                picker.SelectedIndex = selected;
             }
         }
 
