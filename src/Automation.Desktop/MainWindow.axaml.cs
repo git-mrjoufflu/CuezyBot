@@ -490,7 +490,9 @@ public sealed partial class MainWindow : Window
                         },
                         new TextBlock
                         {
-                            Text = label.Split('\u001f')[0].TrimStart('▣', '✎', '◎', '♟', '◉', '▻', '●', '▧', '◇', '◷', '＋', '♫', ' '),
+                            Text = label.Contains("source", StringComparison.OrdinalIgnoreCase)
+                                ? (_english ? "Source visibility" : "Visibilité d’une source")
+                                : label.Split('\u001f')[0].TrimStart('▣', '✎', '◎', '♟', '◉', '▻', '●', '▧', '◇', '◷', '＋', '♫', ' '),
                             FontWeight = Avalonia.Media.FontWeight.SemiBold,
                             VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center
                         }
@@ -934,8 +936,8 @@ public sealed partial class MainWindow : Window
         translations["Gérer les points de chaîne"] = _english ? "Manage channel points" : "Gérer les points de chaîne";
         translations["Récupérer un utilisateur"] = _english ? "Get a user" : "Récupérer un utilisateur";
         translations["Changer de scène"] = _english ? "Change scene" : "Changer de scène";
-        translations["Afficher une source"] = _english ? "Show a source" : "Afficher une source";
-        translations["Masquer une source"] = _english ? "Hide a source" : "Masquer une source";
+        foreach (var alias in new[] { "Afficher une source", "Masquer une source", "Show a source", "Hide a source", "Show source", "Hide source" })
+            translations[alias] = _english ? "Source visibility" : "Visibilité d’une source";
         translations["Démarrer un replay"] = _english ? "Start replay" : "Démarrer un replay";
         translations["Prendre une capture"] = _english ? "Take a screenshot" : "Prendre une capture";
 
