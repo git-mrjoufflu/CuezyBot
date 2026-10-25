@@ -53,10 +53,10 @@ internal static class PrototypeServices
         return await service.ProcessAsync(eventEnvelope, cancellationToken);
     }
 
-    internal static async Task SavePrototypeDraftAsync(CancellationToken cancellationToken = default)
+    internal static async Task SavePrototypeDraftAsync(IReadOnlyCollection<string>? selectedActions = null, CancellationToken cancellationToken = default)
     {
         await EnsureInitializedAsync(cancellationToken);
-        await new SqliteWorkflowRepository(Database).SaveDraftAsync(CreatePrototypeWorkflow(), cancellationToken);
+        await new SqliteWorkflowRepository(Database).SaveDraftAsync(CreatePrototypeWorkflow(selectedActions), cancellationToken);
     }
 
     internal static async Task<bool> HasPrototypeDraftAsync(CancellationToken cancellationToken = default)
@@ -80,31 +80,58 @@ internal static class PrototypeServices
         await new SqliteWorkflowRepository(Database).SetEnabledAsync(PrototypeWorkflowIds.WorkflowId, false, cancellationToken);
     }
 
-    internal static async Task PublishPrototypeAsync(CancellationToken cancellationToken = default)
+    internal static async Task PublishPrototypeAsync(IReadOnlyCollection<string>? selectedActions = null, CancellationToken cancellationToken = default)
     {
         await EnsureInitializedAsync(cancellationToken);
         var repository = new SqliteWorkflowRepository(Database);
         var previous = await repository.GetPublishedAsync(PrototypeWorkflowIds.WorkflowId, cancellationToken);
         var revision = (previous?.Revision ?? 0) + 1;
-        await repository.PublishAsync(CreatePrototypeWorkflow() with { Enabled = true, Revision = revision }, cancellationToken);
+        await repository.PublishAsync(CreatePrototypeWorkflow(selectedActions) with { Enabled = true, Revision = revision }, cancellationToken);
     }
 
-    private static WorkflowDefinition CreatePrototypeWorkflow() => new(
+    private static WorkflowDefinition CreatePrototypeWorkflow(IReadOnlyCollection<string>? selectedActions) 
+    {
+        var blocks = new List<WorkflowBlock>
+        {
+            new(PrototypeWorkflowIds.TriggerBlockId, "twitch.follow", 2, new JsonObject()),
+            new(PrototypeWorkflowIds.CounterBlockId, "core.increment", 1, new JsonObject()),
+            new(PrototypeWorkflowIds.ObsBlockId, "obs.set-scene", 1, new JsonObject { ["scene"] = "Merci" })
+        };
+        var connections = new List<WorkflowConnection>
+        {
+            new(PrototypeWorkflowIds.TriggerBlockId, "next", PrototypeWorkflowIds.CounterBlockId),
+            new(PrototypeWorkflowIds.CounterBlockId, "next", PrototypeWorkflowIds.ObsBlockId)
+        };
+        var previous = PrototypeWorkflowIds.ObsBlockId;
+        foreach (var label in selectedActions ?? Array.Empty<string>())
+        {
+            var id = Guid.NewGuid();
+            blocks.Add(new WorkflowBlock(id, ActionTypeFor(label), 1, new JsonObject { ["label"] = label }));
+            connections.Add(new WorkflowConnection(previous, "next", id));
+            previous = id;
+        }
+
+        return new WorkflowDefinition(
             PrototypeWorkflowIds.WorkflowId,
             1,
             "Mon Live Automatisation",
             false,
-            new[]
-            {
-                new WorkflowBlock(PrototypeWorkflowIds.TriggerBlockId, "twitch.follow", 2, new JsonObject()),
-                new WorkflowBlock(PrototypeWorkflowIds.CounterBlockId, "core.increment", 1, new JsonObject()),
-                new WorkflowBlock(PrototypeWorkflowIds.ObsBlockId, "obs.set-scene", 1, new JsonObject { ["scene"] = "Merci" })
-            },
-            new[]
-            {
-                new WorkflowConnection(PrototypeWorkflowIds.TriggerBlockId, "next", PrototypeWorkflowIds.CounterBlockId),
-                new WorkflowConnection(PrototypeWorkflowIds.CounterBlockId, "next", PrototypeWorkflowIds.ObsBlockId)
-            });
+            blocks,
+            connections);
+    }
+
+    private static string ActionTypeFor(string label) => label.ToLowerInvariant() switch
+    {
+        var value when value.Contains("clip") => "twitch.create-clip",
+        var value when value.Contains("titre") || value.Contains("title") => "twitch.update-title",
+        var value when value.Contains("message") => "twitch.send-message",
+        var value when value.Contains("capture") || value.Contains("screenshot") => "obs.screenshot",
+        var value when value.Contains("source") => "obs.set-source-visible",
+        var value when value.Contains("scène") || value.Contains("scene") => "obs.set-scene",
+        var value when value.Contains("attendre") || value.Contains("wait") => "core.delay",
+        var value when value.Contains("condition") => "core.condition",
+        _ => "core.action"
+    };
 
     private static async Task EnsureInitializedAsync(CancellationToken cancellationToken)
     {

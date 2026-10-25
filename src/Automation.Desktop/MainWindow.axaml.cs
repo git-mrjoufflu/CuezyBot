@@ -14,6 +14,7 @@ public sealed partial class MainWindow : Window
 {
     private bool _english;
     private int _addedActionCount;
+    private readonly List<string> _selectedActions = new();
 
     public MainWindow()
     {
@@ -63,7 +64,7 @@ public sealed partial class MainWindow : Window
     {
         try
         {
-            await PrototypeServices.SavePrototypeDraftAsync();
+            await PrototypeServices.SavePrototypeDraftAsync(_selectedActions);
             TestStatus.Text = _english ? "Draft saved" : "Brouillon enregistré";
         }
         catch (Exception exception)
@@ -85,7 +86,7 @@ public sealed partial class MainWindow : Window
                     TestStatus.Text = _english ? "Save the draft before starting." : "Enregistre le brouillon avant de démarrer.";
                     return;
                 }
-                await PrototypeServices.PublishPrototypeAsync();
+                await PrototypeServices.PublishPrototypeAsync(_selectedActions);
             }
             catch (Exception exception)
             {
@@ -113,7 +114,11 @@ public sealed partial class MainWindow : Window
             if (!string.IsNullOrWhiteSpace(label))
             {
                 TestStatus.Text = _english ? $"Action selected: {label}" : $"Action sélectionnée : {label}";
-                AddActionNode(label);
+                if (!_selectedActions.Contains(label, StringComparer.OrdinalIgnoreCase))
+                {
+                    _selectedActions.Add(label);
+                    AddActionNode(label);
+                }
                 eventArgs.Handled = true;
             }
         }
