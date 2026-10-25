@@ -17,17 +17,19 @@ public sealed partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        Opened += OnMainWindowOpened;
+    }
+
+    private async void OnMainWindowOpened(object? sender, EventArgs eventArgs)
+    {
         try
         {
-            var language = ConnectionPersistence.GetLanguageAsync().GetAwaiter().GetResult();
-            if (language is not null)
-            {
-                ApplyLanguage(language == "English");
-            }
+            var language = await ConnectionPersistence.GetLanguageAsync();
+            ApplyLanguage(language == "English");
         }
         catch
         {
-            // Keep the default French interface if the local settings store is unavailable.
+            ApplyLanguage(false);
         }
     }
 
