@@ -1,16 +1,21 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Media;
+using Avalonia.VisualTree;
 
 namespace Automation.Desktop;
 
 public sealed partial class MainWindow : Window
 {
+    private bool _english;
+
     public MainWindow() => InitializeComponent();
 
     private void OnTestClick(object? sender, RoutedEventArgs eventArgs)
     {
-        TestStatus.Text = "Simulation réussie : les 3 étapes seraient exécutées.";
+        TestStatus.Text = _english
+            ? "Simulation successful: 3 steps would run."
+            : "Simulation réussie : les 3 étapes seraient exécutées.";
     }
 
     internal void SetConnectionStatus(string message) => TestStatus.Text = message;
@@ -69,5 +74,39 @@ public sealed partial class MainWindow : Window
     {
         content.IsVisible = !content.IsVisible;
         chevron.Text = content.IsVisible ? "⌃" : "⌄";
+    }
+
+    private void OnLanguageClick(object? sender, RoutedEventArgs eventArgs)
+    {
+        _english = !_english;
+        LanguageButton.Content = _english ? "EN" : "FR";
+        var translations = _english
+            ? new Dictionary<string, string>
+            {
+                ["Mon Live Automatisation"] = "My Live Automation", ["Accueil"] = "Home", ["Workflows"] = "Workflows",
+                ["Événements"] = "Events", ["Actions"] = "Actions", ["Intégrations"] = "Integrations",
+                ["Variables"] = "Variables", ["Pages"] = "Pages", ["Paramètres"] = "Settings",
+                ["Tester"] = "Test", ["Enregistrer"] = "Save", ["Démarrer"] = "Start",
+                ["Bibliothèque de modèles"] = "Template library", ["Voir tout  ›"] = "View all  ›",
+                ["Twitch"] = "Twitch", ["OBS Studio"] = "OBS Studio", ["CORE"] = "CORE",
+                ["Rechercher une action…"] = "Search for an action…", ["Données enregistrées localement"] = "Data saved locally",
+                ["Moteur actif"] = "Engine active", ["Intégrations"] = "Integrations"
+            }
+            : new Dictionary<string, string>
+            {
+                ["My Live Automation"] = "Mon Live Automatisation", ["Home"] = "Accueil", ["Events"] = "Événements",
+                ["Integrations"] = "Intégrations", ["Settings"] = "Paramètres", ["Test"] = "Tester",
+                ["Save"] = "Enregistrer", ["Start"] = "Démarrer", ["Template library"] = "Bibliothèque de modèles",
+                ["View all  ›"] = "Voir tout  ›", ["Search for an action…"] = "Rechercher une action…",
+                ["Data saved locally"] = "Données enregistrées localement", ["Engine active"] = "Moteur actif"
+            };
+
+        foreach (var control in this.GetVisualDescendants().OfType<TextBlock>())
+        {
+            if (control.Text is { } text && translations.TryGetValue(text, out var translated))
+            {
+                control.Text = translated;
+            }
+        }
     }
 }
