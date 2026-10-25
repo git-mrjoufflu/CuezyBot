@@ -4,6 +4,7 @@ using Automation.Persistence.Sqlite.Storage;
 using Automation.Persistence.Sqlite.Stores;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using Avalonia.VisualTree;
 
 namespace Automation.Desktop;
 
@@ -36,6 +37,7 @@ public sealed partial class HistoryWindow : Window
             var entries = await new SqliteExecutionHistoryReader(database).GetRecentAsync(50);
             var rows = entries.Select(ToRow).ToArray();
             HistoryItems.ItemsSource = rows;
+            ApplyStaticLanguage();
             HistoryStatus.Text = rows.Length == 0
                 ? (UiLanguageState.IsEnglish ? "No events recorded yet." : "Aucun événement enregistré pour le moment.")
                 : (UiLanguageState.IsEnglish
@@ -45,6 +47,31 @@ public sealed partial class HistoryWindow : Window
         catch (Exception exception)
         {
             HistoryStatus.Text = $"Impossible de lire l’historique : {exception.Message}";
+        }
+    }
+
+    private void ApplyStaticLanguage()
+    {
+        var labels = UiLanguageState.IsEnglish
+            ? new Dictionary<string, string>
+            {
+                ["ÉVÉNEMENT TWITCH"] = "TWITCH EVENT",
+                ["EXÉCUTION"] = "EXECUTION",
+                ["ÉTAPES DU PARCOURS"] = "WORKFLOW STEPS"
+            }
+            : new Dictionary<string, string>
+            {
+                ["TWITCH EVENT"] = "ÉVÉNEMENT TWITCH",
+                ["EXECUTION"] = "EXÉCUTION",
+                ["WORKFLOW STEPS"] = "ÉTAPES DU PARCOURS"
+            };
+
+        foreach (var textBlock in this.GetVisualDescendants().OfType<TextBlock>())
+        {
+            if (textBlock.Text is { } text && labels.TryGetValue(text, out var translated))
+            {
+                textBlock.Text = translated;
+            }
         }
     }
 

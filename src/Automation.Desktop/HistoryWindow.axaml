@@ -32,7 +32,7 @@
       <ItemsControl x:Name="HistoryItems">
         <ItemsControl.ItemTemplate>
           <DataTemplate>
-            <Border Margin="0,0,0,12" CornerRadius="11" Background="#151A31" BorderBrush="#2C3353" BorderThickness="1">
+            <Border Margin="0,0,0,12" HorizontalAlignment="Stretch" CornerRadius="11" Background="#151A31" BorderBrush="#2C3353" BorderThickness="1">
               <Expander Padding="16">
                 <Expander.Header>
                   <Grid ColumnDefinitions="46,*,Auto" Margin="0,0,8,0">
