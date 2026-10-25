@@ -277,17 +277,12 @@ public sealed partial class MainWindow : Window
         UpdateHistoryButtons();
     }
 
-    private async void OnTestClick(object? sender, RoutedEventArgs eventArgs)
+    private void OnTestClick(object? sender, RoutedEventArgs eventArgs)
     {
-        if (!await PrototypeServices.HasPrototypeDraftAsync())
-        {
-            TestStatus.Text = _english ? "Save the draft before testing." : "Enregistre le brouillon avant de tester.";
-            return;
-        }
-
-        TestStatus.Text = _english
-            ? "Simulation successful: 3 steps would run."
-            : "Simulation réussie : les 3 étapes seraient exécutées.";
+        var errors = PrototypeServices.ValidateEditor(_selectedActions, GetManualLinkLabels());
+        TestStatus.Text = errors.Count > 0 ? string.Join(" · ", errors)
+            : _english ? $"Structure checked · {_selectedActions.Count} cards · no real actions executed"
+            : $"Structure vérifiée · {_selectedActions.Count} cartes · aucune action réelle exécutée";
     }
 
     private async void OnSaveWorkflowClick(object? sender, RoutedEventArgs eventArgs)

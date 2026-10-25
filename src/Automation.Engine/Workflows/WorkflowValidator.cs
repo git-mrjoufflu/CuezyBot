@@ -56,8 +56,28 @@ public sealed class WorkflowValidator(IBlockCatalog catalog) : IWorkflowValidato
 
         ValidateConnections(workflow, knownBlocks, diagnostics);
         ValidateReachability(workflow, triggers, diagnostics);
+        ValidateCycles(workflow, diagnostics);
 
         return new WorkflowValidationResult(diagnostics);
+    }
+
+    private static void ValidateCycles(WorkflowDefinition workflow, ICollection<WorkflowDiagnostic> diagnostics)
+    {
+        var edges = workflow.Connections.GroupBy(link => link.FromBlockId)
+            .ToDictionary(group => group.Key, group => group.Select(link => link.ToBlockId).Distinct().ToArray());
+        var states = new Dictionary<Guid, int>();
+        bool Visit(Guid id)
+        {
+            if (states.TryGetValue(id, out var state)) return state == 1;
+            states[id] = 1;
+            if (edges.TryGetValue(id, out var targets))
+                foreach (var target in targets)
+                    if (Visit(target)) return true;
+            states[id] = 2;
+            return false;
+        }
+        if (workflow.Blocks.Any(block => Visit(block.Id)))
+            diagnostics.Add(new("workflow.cycle", "Le parcours contient une boucle. Retire une connexion pour éviter une exécution sans fin."));
     }
 
     private static void ValidateConnections(

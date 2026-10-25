@@ -27,6 +27,12 @@ internal static class PrototypeServices
         await EnsureInitializedAsync(default);
         await new SqliteWorkflowRepository(Database).DeleteAsync(id);
     }
+
+    internal static IReadOnlyList<string> ValidateEditor(IReadOnlyCollection<string> actions, IReadOnlyCollection<(string From, string To)> links) =>
+        new WorkflowValidator(new InitialBlockCatalog()).Validate(CreatePrototypeWorkflow(actions, links)).Diagnostics
+            .Select(diagnostic => diagnostic.Code == "workflow.cycle" && UiLanguageState.IsEnglish
+                ? "The workflow contains a loop. Remove a connection to avoid endless execution."
+                : diagnostic.Message).ToArray();
     private static readonly AppDataPaths Paths = new();
     private static readonly SqliteDatabase Database = new(Paths);
     private static bool initialized;
