@@ -97,7 +97,7 @@ public sealed partial class MainWindow : Window
         WorkflowSelector.ItemsSource = _workflowNames.ToArray();
         WorkflowSelector.SelectedIndex = _workflowNames.Count - 1;
         _activeWorkflowName = name;
-        ClearWorkflowCanvas();
+        Dispatcher.UIThread.Post(ClearWorkflowCanvas);
         TestStatus.Text = _english ? "New automation created" : "Nouvelle automatisation créée";
     }
 
