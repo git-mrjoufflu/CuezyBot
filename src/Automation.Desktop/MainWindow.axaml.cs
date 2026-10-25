@@ -27,6 +27,7 @@ public sealed partial class MainWindow : Window
     private readonly Dictionary<Line, (Border From, Border To)> _linkMap = new();
     private readonly List<string> _workflowNames = new() { "Mon Live Automatisation" };
     private readonly Dictionary<string, List<string>> _workflowActions = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, Dictionary<string, Point>> _workflowPositions = new(StringComparer.OrdinalIgnoreCase);
     private string _activeWorkflowName = "Mon Live Automatisation";
     private bool _switchingWorkflow;
     private Point _dragPointerStart;
@@ -103,8 +104,10 @@ public sealed partial class MainWindow : Window
         _switchingWorkflow = true;
         var name = _english ? $"New automation {_workflowNames.Count + 1}" : $"Nouvelle automatisation {_workflowNames.Count + 1}";
         _workflowActions[_activeWorkflowName] = _selectedActions.ToList();
+        _workflowPositions[_activeWorkflowName] = _dynamicNodes.Where(node => node.Tag is string).ToDictionary(node => (string)node.Tag!, node => new Point(Canvas.GetLeft(node), Canvas.GetTop(node)));
         _workflowNames.Add(name);
         _workflowActions[name] = new List<string>();
+        _workflowPositions[name] = new Dictionary<string, Point>();
         WorkflowSelector.ItemsSource = _workflowNames.ToArray();
         WorkflowSelector.SelectedIndex = _workflowNames.Count - 1;
         _activeWorkflowName = name;
@@ -127,6 +130,10 @@ public sealed partial class MainWindow : Window
                     _selectedActions.Add(action);
                     AddActionNode(action);
                 }
+                if (_workflowPositions.TryGetValue(name, out var positions))
+                    foreach (var node in _dynamicNodes)
+                        if (node.Tag is string label && positions.TryGetValue(label, out var position)) { Canvas.SetLeft(node, position.X); Canvas.SetTop(node, position.Y); }
+                UpdateDynamicLinks();
                 _activeWorkflowName = name;
             }
             TestStatus.Text = _english ? $"Editing: {name}" : $"Édition : {name}";
