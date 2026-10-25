@@ -253,6 +253,27 @@ public sealed partial class MainWindow : Window
         TestStatus.Text = _english ? "Trigger changed — save and publish to apply" : "Déclencheur modifié — enregistre et publie pour appliquer";
     }
 
+    private async void OnAddCanvasEventClick(object? sender, RoutedEventArgs eventArgs)
+    {
+        var dialog = new Window { Title = _english ? "Add event" : "Ajouter un événement", Width = 360, Height = 190, CanResize = false, WindowStartupLocation = WindowStartupLocation.CenterOwner };
+        var manual = new Button { Content = _english ? "▶  Manual run" : "▶  Exécution manuelle", HorizontalContentAlignment = Avalonia.Layout.HorizontalAlignment.Left };
+        var follower = new Button { Content = _english ? "♥  New Twitch follower" : "♥  Nouveau follower Twitch", HorizontalContentAlignment = Avalonia.Layout.HorizontalAlignment.Left };
+        manual.Click += (_, _) => dialog.Close("manual.run"); follower.Click += (_, _) => dialog.Close("twitch.follow.received");
+        dialog.Content = new StackPanel { Margin = new Thickness(18), Spacing = 10, Children = { new TextBlock { Text = _english ? "Choose an event to add to this canvas" : "Choisis un événement à ajouter à ce canevas", TextWrapping = TextWrapping.Wrap }, manual, follower } };
+        var trigger = await dialog.ShowDialog<string?>(this);
+        if (trigger is not ("manual.run" or "twitch.follow.received")) return;
+        if (PrototypeServices.CurrentTriggerTypes.Contains(trigger))
+        {
+            TestStatus.Text = _english ? "This event is already on the canvas" : "Cet événement est déjà dans le canevas";
+            return;
+        }
+        PrototypeServices.CurrentTriggerTypes.Add(trigger);
+        PrototypeServices.CurrentTriggerType = trigger;
+        _workflowTriggerKinds[PrototypeServices.CurrentWorkflowId] = trigger;
+        AddAdditionalTriggerNode(trigger);
+        TestStatus.Text = _english ? "Event added — connect it to an action" : "Événement ajouté — relie-le à une action";
+    }
+
     private void OnActionsTabPressed(object? sender, PointerPressedEventArgs eventArgs)
     {
         if (!eventArgs.GetCurrentPoint((Visual)sender!).Properties.IsLeftButtonPressed) return;
@@ -1504,6 +1525,8 @@ public sealed partial class MainWindow : Window
             translations[alias] = _english ? "Source visibility" : "Visibilité d’une source";
         translations["Démarrer un replay"] = _english ? "Start replay" : "Démarrer un replay";
         translations["Prendre une capture"] = _english ? "Take a screenshot" : "Prendre une capture";
+        translations["＋  Événement"] = _english ? "＋  Event" : "＋  Événement";
+        translations["＋  Event"] = _english ? "＋  Event" : "＋  Événement";
 
         foreach (var control in this.GetVisualDescendants().OfType<TextBlock>())
         {
