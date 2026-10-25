@@ -36,8 +36,5 @@
         <StackPanel Spacing="9"><TextBlock Text="Twitch" FontWeight="SemiBold" /><TextBlock x:Name="TwitchStatus" Text="Non connecté" Classes="muted" FontSize="11" TextWrapping="Wrap" /><Button x:Name="TwitchButton" Classes="primary" Content="Connecter Twitch" Click="OnTwitchClick" /></StackPanel>
       </Border>
     </Grid>
-    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
-      <Button x:Name="CloseButton" Content="Fermer" Click="OnCancelClick" />
-    </StackPanel>
   </StackPanel>
 </Window>

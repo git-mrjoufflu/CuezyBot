@@ -90,7 +90,6 @@ public sealed partial class SettingsWindow : Window
         LanguageTitle.Text = english ? "Language" : "Langue";
         LanguageDescription.Text = english ? "Choose the interface language." : "Choisis la langue de l’interface.";
         IntegrationsTitle.Text = english ? "Integrations" : "Intégrations";
-        CloseButton.Content = english ? "Close" : "Fermer";
         UpdateIntegrationStatus();
     }
 }
