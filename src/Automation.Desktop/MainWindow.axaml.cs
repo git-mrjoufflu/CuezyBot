@@ -24,7 +24,7 @@ public sealed partial class MainWindow : Window
     {
         ObsActionSection.IsVisible = obsConnected;
         TwitchActionSection.IsVisible = twitchConnected;
-        ChangeTwitchAccountButton.IsVisible = twitchConnected;
+        CreatorAvatar.Text = twitchConnected ? "T" : "C";
         CreatorTitle.Text = twitchConnected && TwitchSessionState.Identity is not null
             ? TwitchSessionState.Identity.Login
             : "Créateur";

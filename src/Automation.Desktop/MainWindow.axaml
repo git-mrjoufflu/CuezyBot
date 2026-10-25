@@ -116,7 +116,6 @@
           <Button Classes="nav active" Content="⌘   Workflows" />
           <Button Classes="nav" Content="⚡   Événements" Click="OnHistoryClick" />
           <Button Classes="nav" Content="◇   Actions" />
-          <Button Classes="nav" Content="⌁   Intégrations" Click="OnIntegrationsClick" />
           <Button Classes="nav" Content="𝑥   Variables" />
           <Button Classes="nav" Content="▣   Pages" />
         </StackPanel>
@@ -137,7 +136,7 @@
                     <GradientStop Color="#4E2B9C" Offset="1" />
                   </LinearGradientBrush>
                 </Border.Background>
-                <TextBlock Text="C" FontSize="15" HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="Bold" />
+                <TextBlock x:Name="CreatorAvatar" Text="C" FontSize="15" HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="Bold" />
               </Border>
               <StackPanel Grid.Column="1" Margin="8,0,0,0">
                 <TextBlock x:Name="CreatorTitle" Text="Créateur" FontWeight="SemiBold" FontSize="13" />
@@ -145,7 +144,6 @@
               </StackPanel>
               <Button Grid.Column="2" Classes="surface" Content="⚙" Click="OnSettingsClick" ToolTip.Tip="Paramètres" Padding="5" Width="34" Height="34" FontSize="16" />
             </Grid>
-            <Button x:Name="ChangeTwitchAccountButton" Classes="surface" Content="Changer de compte Twitch" Click="OnIntegrationsClick" IsVisible="False" Padding="8,6" FontSize="10" />
           </StackPanel>
         </Border>
       </Grid>

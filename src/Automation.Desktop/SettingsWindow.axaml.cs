@@ -22,4 +22,9 @@ public sealed partial class SettingsWindow : Window
     }
 
     private void OnCancelClick(object? sender, RoutedEventArgs e) => Close();
+
+    private async void OnIntegrationsClick(object? sender, RoutedEventArgs e)
+    {
+        await new IntegrationsWindow().ShowDialog(this);
+    }
 }

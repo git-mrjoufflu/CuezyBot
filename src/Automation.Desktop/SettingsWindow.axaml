@@ -18,6 +18,7 @@
         </ComboBox>
       </Grid>
     </Border>
+    <Button Content="Gérer les intégrations OBS / Twitch" Click="OnIntegrationsClick" />
     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
       <Button Content="Annuler" Click="OnCancelClick" />
       <Button Classes="primary" Content="Enregistrer" Click="OnSaveClick" />
