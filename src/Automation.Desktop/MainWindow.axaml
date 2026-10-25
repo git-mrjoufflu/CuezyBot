@@ -112,7 +112,7 @@
           <TextBlock Text="✎" Classes="muted" VerticalAlignment="Center" />
         </StackPanel>
 
-        <TextBlock Grid.Column="2" x:Name="TestStatus" Text="Brouillon enregistré" Classes="muted" FontSize="12" VerticalAlignment="Center" HorizontalAlignment="Right" />
+        <Border Grid.Column="2" />
       </Grid>
     </Border>
 
@@ -329,6 +329,7 @@
         <TextBox Height="38" CornerRadius="9" PlaceholderText="Rechercher une action…" />
         <Border Grid.Row="1" Background="#11162B" BorderBrush="#2C3353" BorderThickness="1" CornerRadius="10" Padding="5" Margin="0,10,0,0">
           <StackPanel Orientation="Horizontal" Spacing="5">
+            <TextBlock x:Name="TestStatus" Text="Brouillon enregistré" Classes="muted" FontSize="11" VerticalAlignment="Center" Margin="3,0,4,0" />
             <Button Classes="surface" Content="▷  Tester" Click="OnTestClick" Padding="9,7" />
             <Button x:Name="SaveWorkflowButton" Classes="surface" Content="Enregistrer" Click="OnSaveWorkflowClick" Padding="9,7" />
             <Button x:Name="StartWorkflowButton" Classes="primary" Content="▶  Démarrer" Click="OnStartWorkflowClick" Padding="9,7" />
