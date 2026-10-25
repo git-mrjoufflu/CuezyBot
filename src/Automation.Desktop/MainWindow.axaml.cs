@@ -278,9 +278,6 @@ public sealed partial class MainWindow : Window
     {
         var dialog = new Window { Title = _english ? "Add to canvas" : "Ajouter au canevas", Width = 420, Height = 520, CanResize = false, WindowStartupLocation = WindowStartupLocation.CenterOwner };
         var stack = new StackPanel { Margin = new Thickness(18), Spacing = 7 };
-        stack.Children.Add(new TextBlock { Text = _english ? "Events" : "Événements", FontWeight = FontWeight.Bold });
-        foreach (var item in new[] { ("manual.run", "▶  Exécution manuelle", "▶  Manual run"), ("twitch.follow.received", "♥  Nouveau follower Twitch", "♥  New Twitch follower") })
-        { var button = new Button { Content = _english ? item.Item3 : item.Item2, HorizontalContentAlignment = Avalonia.Layout.HorizontalAlignment.Left }; button.Click += (_, _) => dialog.Close(item.Item1); stack.Children.Add(button); }
         foreach (var group in new[] {
             ("Twitch", new[] { ("Envoyer un message", "Send a message"), ("Créer un clip", "Create a clip"), ("Modifier un titre", "Edit title"), ("Gérer les points de chaîne", "Manage channel points"), ("Récupérer un utilisateur", "Get a user") }),
             ("OBS Studio", new[] { ("Changer de scène", "Change scene"), ("Visibilité d’une source", "Source visibility"), ("Démarrer un replay", "Start replay"), ("Prendre une capture", "Take a screenshot") }),
