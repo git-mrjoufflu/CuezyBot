@@ -75,6 +75,10 @@ public sealed partial class MainWindow : Window
                 }
                 UpdateDynamicLinks();
                 TestStatus.Text = _english ? "Draft restored" : "Brouillon restauré";
+                var savedPositions = await ConnectionPersistence.GetWorkflowPositionsAsync(_activeWorkflowName);
+                foreach (var node in _dynamicNodes)
+                    if (node.Tag is string label && savedPositions.TryGetValue(label, out var position)) { Canvas.SetLeft(node, position.X); Canvas.SetTop(node, position.Y); }
+                UpdateDynamicLinks();
             }
             var publishedRevision = await PrototypeServices.GetPublishedRevisionAsync();
             if (publishedRevision is not null)
@@ -220,6 +224,7 @@ public sealed partial class MainWindow : Window
         try
         {
             await PrototypeServices.SavePrototypeDraftAsync(_selectedActions, GetManualLinkLabels());
+            await ConnectionPersistence.SaveWorkflowPositionsAsync(_activeWorkflowName, _dynamicNodes.Where(node => node.Tag is string).ToDictionary(node => (string)node.Tag!, node => new Point(Canvas.GetLeft(node), Canvas.GetTop(node))));
             TestStatus.Text = _english ? "Draft saved" : "Brouillon enregistré";
         }
         catch (Exception exception)

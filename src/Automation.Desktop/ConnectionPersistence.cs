@@ -33,6 +33,26 @@ internal static class ConnectionPersistence
         return await Settings.GetAsync(LanguageKey, cancellationToken);
     }
 
+    internal static async Task SaveWorkflowPositionsAsync(string workflowName, IReadOnlyDictionary<string, Avalonia.Point> positions, CancellationToken cancellationToken = default)
+    {
+        await EnsureInitializedAsync(cancellationToken);
+        var payload = positions.ToDictionary(pair => pair.Key, pair => new[] { pair.Value.X, pair.Value.Y });
+        await Settings.SetAsync($"workflow.layout.{workflowName}", JsonSerializer.Serialize(payload), cancellationToken);
+    }
+
+    internal static async Task<IReadOnlyDictionary<string, Avalonia.Point>> GetWorkflowPositionsAsync(string workflowName, CancellationToken cancellationToken = default)
+    {
+        await EnsureInitializedAsync(cancellationToken);
+        var json = await Settings.GetAsync($"workflow.layout.{workflowName}", cancellationToken);
+        if (string.IsNullOrWhiteSpace(json)) return new Dictionary<string, Avalonia.Point>();
+        try
+        {
+            var payload = JsonSerializer.Deserialize<Dictionary<string, double[]>>(json) ?? [];
+            return payload.Where(pair => pair.Value.Length >= 2).ToDictionary(pair => pair.Key, pair => new Avalonia.Point(pair.Value[0], pair.Value[1]));
+        }
+        catch (JsonException) { return new Dictionary<string, Avalonia.Point>(); }
+    }
+
     internal static async Task SaveObsAsync(
         string host,
         int port,
