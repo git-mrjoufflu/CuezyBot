@@ -195,7 +195,7 @@ public sealed partial class MainWindow : Window
             BorderBrush = new SolidColorBrush(Color.Parse("#A640F4")),
             BorderThickness = new Avalonia.Thickness(2),
             CornerRadius = new Avalonia.CornerRadius(11),
-            Padding = new Avalonia.Thickness(12)
+            Padding = new Avalonia.Thickness(0)
         };
         node.Tag = label;
         node.Focusable = true;
