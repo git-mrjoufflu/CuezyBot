@@ -101,7 +101,6 @@
         </StackPanel>
 
         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="9" VerticalAlignment="Center">
-          <Button x:Name="LanguageButton" Classes="surface" Content="FR" Click="OnLanguageClick" Padding="9,7" />
           <TextBlock x:Name="TestStatus" Text="Brouillon enregistré" Classes="muted" FontSize="12" VerticalAlignment="Center" Margin="0,0,5,0" />
           <Button Classes="surface" Content="▷  Tester" Click="OnTestClick" />
           <Button Classes="surface" Content="Enregistrer" />
@@ -120,7 +119,7 @@
           <Button Classes="nav" Content="⌁   Intégrations" Click="OnIntegrationsClick" />
           <Button Classes="nav" Content="𝑥   Variables" />
           <Button Classes="nav" Content="▣   Pages" />
-          <Button Classes="nav" Content="⚙   Paramètres" />
+          <Button Classes="nav" Content="⚙   Paramètres" Click="OnSettingsClick" />
         </StackPanel>
 
         <Border Grid.Row="1" Padding="12" CornerRadius="9" Background="#12172D" BorderBrush="#282E4C" BorderThickness="1">

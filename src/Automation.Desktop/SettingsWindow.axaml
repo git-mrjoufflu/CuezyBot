@@ -1,0 +1,26 @@
+<Window x:Class="Automation.Desktop.SettingsWindow"
+        xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Paramètres" Width="520" Height="360" CanResize="False"
+        Background="#0D1125">
+  <StackPanel Margin="28" Spacing="18">
+    <TextBlock Text="Paramètres" FontSize="24" FontWeight="SemiBold" />
+    <TextBlock Text="Personnalise le comportement de CuezyBot." Classes="muted" />
+    <Border Background="#151A30" BorderBrush="#303858" BorderThickness="1" CornerRadius="10" Padding="16">
+      <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="*,220" RowSpacing="10">
+        <StackPanel>
+          <TextBlock Text="Langue / Language" FontWeight="SemiBold" />
+          <TextBlock Text="Choisis la langue de l’interface." Classes="muted" FontSize="11" />
+        </StackPanel>
+        <ComboBox x:Name="LanguageCombo" Grid.Column="1" SelectedIndex="0">
+          <ComboBoxItem Content="Français" Tag="Français" />
+          <ComboBoxItem Content="English" Tag="English" />
+        </ComboBox>
+      </Grid>
+    </Border>
+    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
+      <Button Content="Annuler" Click="OnCancelClick" />
+      <Button Classes="primary" Content="Enregistrer" Click="OnSaveClick" />
+    </StackPanel>
+  </StackPanel>
+</Window>

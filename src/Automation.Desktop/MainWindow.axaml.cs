@@ -61,6 +61,16 @@ public sealed partial class MainWindow : Window
         await new HistoryWindow().ShowDialog(this);
     }
 
+    private async void OnSettingsClick(object? sender, RoutedEventArgs eventArgs)
+    {
+        var window = new SettingsWindow(_english ? "English" : "Français");
+        await window.ShowDialog(this);
+        if (window.SavedLanguage is { } language)
+        {
+            ApplyLanguage(language == "English");
+        }
+    }
+
     private void OnTwitchSectionClick(object? sender, RoutedEventArgs eventArgs) =>
         ToggleSection(TwitchActions, TwitchSectionChevron);
 
@@ -78,8 +88,12 @@ public sealed partial class MainWindow : Window
 
     private void OnLanguageClick(object? sender, RoutedEventArgs eventArgs)
     {
-        _english = !_english;
-        LanguageButton.Content = _english ? "EN" : "FR";
+        ApplyLanguage(!_english);
+    }
+
+    internal void ApplyLanguage(bool english)
+    {
+        _english = english;
         var translations = _english
             ? new Dictionary<string, string>
             {
