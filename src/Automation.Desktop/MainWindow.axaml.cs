@@ -1143,6 +1143,14 @@ public sealed partial class MainWindow : Window
         node.BorderBrush = new SolidColorBrush(Color.Parse(isTrigger ? "#26C281" : GetActionPalette(node.Tag as string ?? "").Border));
     }
 
+    private void ClearSelectionVisuals()
+    {
+        foreach (var node in _dynamicNodes) RestoreNodeBorder(node);
+        if (_triggerNode is not null) RestoreNodeBorder(_triggerNode);
+        foreach (var node in _additionalTriggerNodes) RestoreNodeBorder(node);
+        _selectedNode = null;
+    }
+
     private void DeleteActionNode(Border node)
     {
         if (node.Tag is not string label) return;
@@ -1166,7 +1174,7 @@ public sealed partial class MainWindow : Window
         var point = eventArgs.GetCurrentPoint(node);
         if (point.Properties.PointerUpdateKind == PointerUpdateKind.RightButtonPressed)
         {
-            if (_selectedNode is not null) RestoreNodeBorder(_selectedNode);
+            ClearSelectionVisuals();
             _selectedNode = node;
             node.BorderBrush = new SolidColorBrush(Color.Parse("#FFD166"));
             node.Focus();
@@ -1307,7 +1315,7 @@ public sealed partial class MainWindow : Window
             {
                 if (_selectedNode is null || _selectedNode == node)
                 {
-                    if (_selectedNode is not null) RestoreNodeBorder(_selectedNode);
+                    ClearSelectionVisuals();
                     _selectedNode = node;
                     node.BorderBrush = new SolidColorBrush(Color.Parse("#FFD166"));
                     TestStatus.Text = _english ? "Source selected — click a destination" : "Source sélectionnée — clique une destination";
