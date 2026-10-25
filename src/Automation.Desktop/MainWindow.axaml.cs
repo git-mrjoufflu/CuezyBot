@@ -14,7 +14,22 @@ public sealed partial class MainWindow : Window
 {
     private bool _english;
 
-    public MainWindow() => InitializeComponent();
+    public MainWindow()
+    {
+        InitializeComponent();
+        try
+        {
+            var language = ConnectionPersistence.GetLanguageAsync().GetAwaiter().GetResult();
+            if (language is not null)
+            {
+                ApplyLanguage(language == "English");
+            }
+        }
+        catch
+        {
+            // Keep the default French interface if the local settings store is unavailable.
+        }
+    }
 
     private void OnTestClick(object? sender, RoutedEventArgs eventArgs)
     {
