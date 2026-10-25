@@ -502,8 +502,15 @@ public sealed partial class MainWindow : Window
             var fromTop = Canvas.GetTop(from);
             var toLeft = Canvas.GetLeft(to);
             var toTop = Canvas.GetTop(to);
-            var start = new Point(fromLeft + from.Width, fromTop + from.Height / 2);
-            var end = new Point(toLeft - 2, toTop + to.Height / 2);
+            var fromCenter = new Point(fromLeft + from.Width / 2, fromTop + from.Height / 2);
+            var toCenter = new Point(toLeft + to.Width / 2, toTop + to.Height / 2);
+            var horizontal = Math.Abs(toCenter.X - fromCenter.X) >= Math.Abs(toCenter.Y - fromCenter.Y);
+            var start = horizontal
+                ? new Point(toCenter.X >= fromCenter.X ? fromLeft + from.Width : fromLeft, fromCenter.Y)
+                : new Point(fromCenter.X, toCenter.Y >= fromCenter.Y ? fromTop + from.Height : fromTop);
+            var end = horizontal
+                ? new Point(toCenter.X >= fromCenter.X ? toLeft - 2 : toLeft + to.Width + 2, toCenter.Y)
+                : new Point(toCenter.X, toCenter.Y >= fromCenter.Y ? toTop - 2 : toTop + to.Height + 2);
             var dx = end.X - start.X;
             var dy = end.Y - start.Y;
             var length = Math.Max(1, Math.Sqrt(dx * dx + dy * dy));
