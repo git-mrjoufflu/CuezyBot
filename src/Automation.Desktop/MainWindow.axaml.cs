@@ -557,8 +557,7 @@ public sealed partial class MainWindow : Window
         if (!PrototypeServices.ActionOptions.TryGetValue(label, out var options))
             PrototypeServices.ActionOptions[label] = options = new System.Text.Json.Nodes.JsonObject();
         var form = new StackPanel { Spacing = 6, Margin = new Thickness(12, 0, 12, 10) };
-        ListBox? sourcePicker = null;
-        var loadingSources = false;
+        StackPanel? sourcePicker = null;
         async Task LoadSources()
         {
             if (sourcePicker is null) return;
@@ -571,14 +570,26 @@ public sealed partial class MainWindow : Window
                 var selected = options["sources"] is System.Text.Json.Nodes.JsonArray array
                     ? array.Select(item => item!.GetValue<string>()).ToArray()
                     : options["source"] is { } legacy ? new[] { legacy.ToString() } : Array.Empty<string>();
-                loadingSources = true;
-                try
+                sourcePicker.Children.Clear();
+                foreach (var value in values)
                 {
-                    sourcePicker.ItemsSource = values;
-                    sourcePicker.SelectedItems?.Clear();
-                    foreach (var value in selected.Where(values.Contains)) sourcePicker.SelectedItems?.Add(value);
+                    var checkbox = new CheckBox
+                    {
+                        Content = value,
+                        IsChecked = selected.Contains(value),
+                        FontSize = 12,
+                        MinHeight = 28
+                    };
+                    checkbox.IsCheckedChanged += (_, _) =>
+                    {
+                        options["sources"] = new System.Text.Json.Nodes.JsonArray(sourcePicker.Children
+                            .OfType<CheckBox>().Where(item => item.IsChecked == true)
+                            .Select(item => (System.Text.Json.Nodes.JsonNode?)System.Text.Json.Nodes.JsonValue.Create(item.Content!.ToString())).ToArray());
+                        options.Remove("source");
+                        TestStatus.Text = _english ? "Draft modified" : "Brouillon modifié";
+                    };
+                    sourcePicker.Children.Add(checkbox);
                 }
-                finally { loadingSources = false; }
             }
             catch (Exception exception)
             {
@@ -613,21 +624,8 @@ public sealed partial class MainWindow : Window
             form.Children.Add(CreateFieldLabel(key == "source" ? "Sources à modifier" : fr, key == "source" ? "Sources to change" : en));
             if (key == "source")
             {
-                sourcePicker = new ListBox
-                {
-                    SelectionMode = SelectionMode.Multiple | SelectionMode.Toggle,
-                    Height = 110,
-                    FontSize = 12
-                };
-                sourcePicker.SelectionChanged += (_, _) =>
-                {
-                    if (loadingSources) return;
-                    var selected = sourcePicker.SelectedItems?.Cast<string>().ToArray() ?? [];
-                    options["sources"] = new System.Text.Json.Nodes.JsonArray(selected.Select(value => (System.Text.Json.Nodes.JsonNode?)System.Text.Json.Nodes.JsonValue.Create(value)).ToArray());
-                    options.Remove("source");
-                    TestStatus.Text = _english ? "Draft modified" : "Brouillon modifié";
-                };
-                form.Children.Add(sourcePicker);
+                sourcePicker = new StackPanel { Spacing = 3 };
+                form.Children.Add(new ScrollViewer { Content = sourcePicker, Height = 110, HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled });
                 node.Height += 80;
                 _ = LoadSources();
                 continue;
