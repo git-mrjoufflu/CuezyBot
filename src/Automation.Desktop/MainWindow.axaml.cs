@@ -724,11 +724,11 @@ public sealed partial class MainWindow : Window
         {
             Width = 230, Height = 112, Background = new SolidColorBrush(Color.Parse("#151A32")),
             BorderBrush = new SolidColorBrush(Color.Parse("#26C281")), BorderThickness = new Thickness(2),
-            CornerRadius = new CornerRadius(11), Padding = new Thickness(12), IsHitTestVisible = false,
-            Child = new StackPanel { Spacing = 10, Children =
+            CornerRadius = new CornerRadius(11), Padding = new Thickness(0), IsHitTestVisible = false,
+            Child = new Grid { RowDefinitions = new RowDefinitions("32,*"), Children =
             {
-                new TextBlock { Text = "⚡  Événement", Foreground = new SolidColorBrush(Color.Parse("#62E6AE")), FontSize = 11 },
-                triggerPicker
+                new Border { Background = new SolidColorBrush(Color.Parse("#145A43")), CornerRadius = new CornerRadius(9,9,0,0), Padding = new Thickness(10,0), Child = new TextBlock { Text = "⚡  Événement", Foreground = new SolidColorBrush(Color.Parse("#62E6AE")), FontSize = 11, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center } },
+                new StackPanel { [Grid.RowProperty] = 1, Spacing = 7, Margin = new Thickness(12,8), Children = { new Border { Width = 32, Height = 32, CornerRadius = new CornerRadius(8), Background = new SolidColorBrush(Color.Parse("#20865F")), Child = new TextBlock { Text = "⚡", HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center } }, triggerPicker } }
             }}
         };
         _triggerNode.Tag = "__trigger__";
@@ -754,9 +754,9 @@ public sealed partial class MainWindow : Window
     private void UpdateTriggerNode()
     {
         if (_triggerNode is null) return;
-        if (_triggerNode.Child is StackPanel panel && panel.Children.OfType<ComboBox>().FirstOrDefault() is { } picker)
+        if (_triggerNode.GetVisualDescendants().OfType<ComboBox>().FirstOrDefault() is { } picker)
         {
-            if (panel.Children.OfType<TextBlock>().FirstOrDefault() is { } header) header.Text = _english ? "⚡  Event" : "⚡  Événement";
+            if (_triggerNode.GetVisualDescendants().OfType<TextBlock>().FirstOrDefault() is { } header) header.Text = _english ? "⚡  Event" : "⚡  Événement";
             var selected = picker.SelectedIndex;
             picker.ItemsSource = _english ? new[] { "Manual run", "New Twitch follower" } : new[] { "Exécution manuelle", "Nouveau follower Twitch" };
             picker.SelectedIndex = selected;
@@ -769,8 +769,16 @@ public sealed partial class MainWindow : Window
         var title = trigger == "twitch.follow.received"
             ? (_english ? "New Twitch follower" : "Nouveau follower Twitch")
             : (_english ? "Manual run" : "Exécution manuelle");
-        var node = new Border { Width = 230, Height = 82, Background = new SolidColorBrush(Color.Parse("#151A32")), BorderBrush = new SolidColorBrush(Color.Parse("#26C281")), BorderThickness = new Thickness(2), CornerRadius = new CornerRadius(11), Padding = new Thickness(12), Tag = $"__trigger__:{trigger}" };
-        node.Child = new StackPanel { Spacing = 10, Children = { new TextBlock { Text = _english ? "⚡  Event" : "⚡  Événement", Foreground = new SolidColorBrush(Color.Parse("#62E6AE")), FontSize = 11 }, new TextBlock { Text = title, FontWeight = FontWeight.SemiBold, FontSize = 14 } } };
+        var node = new Border { Width = 230, Height = 100, Background = new SolidColorBrush(Color.Parse("#151A32")), BorderBrush = new SolidColorBrush(Color.Parse("#26C281")), BorderThickness = new Thickness(2), CornerRadius = new CornerRadius(11), Padding = new Thickness(0), Tag = $"__trigger__:{trigger}" };
+        node.Child = new Grid
+        {
+            RowDefinitions = new RowDefinitions("32,*"),
+            Children =
+            {
+                new Border { Background = new SolidColorBrush(Color.Parse("#145A43")), CornerRadius = new CornerRadius(9,9,0,0), Padding = new Thickness(10,0), Child = new TextBlock { Text = _english ? "⚡  Event" : "⚡  Événement", Foreground = new SolidColorBrush(Color.Parse("#62E6AE")), FontSize = 11, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center } },
+                new StackPanel { [Grid.RowProperty] = 1, Orientation = Avalonia.Layout.Orientation.Horizontal, Spacing = 10, Margin = new Thickness(12,0), VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center, Children = { new Border { Width = 32, Height = 32, CornerRadius = new CornerRadius(8), Background = new SolidColorBrush(Color.Parse("#20865F")), Child = new TextBlock { Text = "⚡", HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center } }, new TextBlock { Text = title, FontWeight = FontWeight.SemiBold, FontSize = 14 } } }
+            }
+        };
         node.PointerPressed += OnActionNodePressed; node.PointerReleased += OnActionNodeReleased;
         Canvas.SetLeft(node, 60); Canvas.SetTop(node, 210 + _additionalTriggerNodes.Count * 105);
         WorkflowCanvas.Children.Add(node); _additionalTriggerNodes.Add(node);
@@ -1504,7 +1512,7 @@ public sealed partial class MainWindow : Window
         _english = english;
         UpdateTriggerNode();
         foreach (var node in _additionalTriggerNodes)
-            if (node.Child is StackPanel panel && panel.Children.OfType<TextBlock>().ToArray() is var labels && labels.Length > 1)
+            if (node.GetVisualDescendants().OfType<TextBlock>().ToArray() is var labels && labels.Length > 1)
             {
                 if (labels[0] is { } header) header.Text = english ? "⚡  Event" : "⚡  Événement";
                 if (labels[1] is { } title) title.Text = (node.Tag as string)?.EndsWith("twitch.follow.received", StringComparison.Ordinal) == true ? (english ? "New Twitch follower" : "Nouveau follower Twitch") : (english ? "Manual run" : "Exécution manuelle");
