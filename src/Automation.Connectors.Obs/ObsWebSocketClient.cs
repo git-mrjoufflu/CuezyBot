@@ -81,14 +81,14 @@ public sealed class ObsWebSocketClient : IObsController, IAsyncDisposable
     public async Task<IReadOnlyList<string>> GetSceneNamesAsync(CancellationToken cancellationToken = default)
     {
         var response = await SendRequestAsync("GetSceneList", new JsonObject(), TimeSpan.FromSeconds(10), cancellationToken);
-        return response["scenes"]?.AsArray().Select(scene => scene?["sceneName"]?.GetValue<string>())
+        return response["responseData"]?["scenes"]?.AsArray().Select(scene => scene?["sceneName"]?.GetValue<string>())
             .OfType<string>().ToArray() ?? [];
     }
 
     public async Task<IReadOnlyList<string>> GetSourceNamesAsync(string sceneName, CancellationToken cancellationToken = default)
     {
         var response = await SendRequestAsync("GetSceneItemList", new JsonObject { ["sceneName"] = sceneName }, TimeSpan.FromSeconds(10), cancellationToken);
-        return response["sceneItems"]?.AsArray().Select(item => item?["sourceName"]?.GetValue<string>())
+        return response["responseData"]?["sceneItems"]?.AsArray().Select(item => item?["sourceName"]?.GetValue<string>())
             .OfType<string>().Distinct().ToArray() ?? [];
     }
 
