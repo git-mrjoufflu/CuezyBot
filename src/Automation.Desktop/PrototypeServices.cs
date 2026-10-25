@@ -82,6 +82,22 @@ internal static class PrototypeServices
             .ToArray() ?? [];
     }
 
+    internal static async Task<IReadOnlyList<(string From, string To)>> GetDraftManualLinksAsync(CancellationToken cancellationToken = default)
+    {
+        await EnsureInitializedAsync(cancellationToken);
+        var workflow = await new SqliteWorkflowRepository(Database).GetDraftAsync(PrototypeWorkflowIds.WorkflowId, cancellationToken);
+        if (workflow is null) return [];
+        var labels = workflow.Blocks.ToDictionary(
+            block => block.Id,
+            block => block.Parameters["label"]?.GetValue<string>());
+        return workflow.Connections
+            .Where(connection => labels.TryGetValue(connection.FromBlockId, out var from) &&
+                                 labels.TryGetValue(connection.ToBlockId, out var to) &&
+                                 !string.IsNullOrWhiteSpace(from) && !string.IsNullOrWhiteSpace(to))
+            .Select(connection => (labels[connection.FromBlockId]!, labels[connection.ToBlockId]!))
+            .ToArray();
+    }
+
     internal static async Task<int?> GetPublishedRevisionAsync(CancellationToken cancellationToken = default)
     {
         await EnsureInitializedAsync(cancellationToken);

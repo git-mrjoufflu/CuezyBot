@@ -48,6 +48,14 @@ public sealed partial class MainWindow : Window
                     _selectedActions.Add(action);
                     AddActionNode(action);
                 }
+                foreach (var (from, to) in await PrototypeServices.GetDraftManualLinksAsync())
+                {
+                    var source = _dynamicNodes.FirstOrDefault(node => string.Equals(node.Tag as string, from, StringComparison.OrdinalIgnoreCase));
+                    var target = _dynamicNodes.FirstOrDefault(node => string.Equals(node.Tag as string, to, StringComparison.OrdinalIgnoreCase));
+                    if (source is not null && target is not null && !_manualLinks.Contains((source, target)))
+                        _manualLinks.Add((source, target));
+                }
+                UpdateDynamicLinks();
                 TestStatus.Text = _english ? "Draft restored" : "Brouillon restauré";
             }
             var publishedRevision = await PrototypeServices.GetPublishedRevisionAsync();
