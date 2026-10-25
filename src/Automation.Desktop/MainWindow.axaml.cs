@@ -826,7 +826,7 @@ public sealed partial class MainWindow : Window
             {
                 Children =
                 {
-                            new TextBlock { Text = _english ? title.English : title.French, Foreground = new SolidColorBrush(Color.Parse(palette.Text)), FontSize = 11, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center },
+                            new TextBlock { Text = $"◆  {(PrototypeServices.ActionTypeFor(label).StartsWith("core.", StringComparison.Ordinal) || PrototypeServices.ActionTypeFor(label).StartsWith("variables.", StringComparison.Ordinal) || PrototypeServices.ActionTypeFor(label).StartsWith("audio.", StringComparison.Ordinal) ? "CORE" : PrototypeServices.ActionTypeFor(label).StartsWith("obs.", StringComparison.Ordinal) ? "OBS" : "Twitch")} · {(_english ? title.English : title.French)}", Foreground = new SolidColorBrush(Color.Parse(palette.Text)), FontSize = 11, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center },
                     deleteButton
                 }
             }
@@ -1651,7 +1651,9 @@ public sealed partial class MainWindow : Window
             if (node.Tag is string key && node.GetVisualDescendants().OfType<TextBlock>().FirstOrDefault() is { } header)
             {
                 var actionTitle = LocalizedActionTitle(key);
-                header.Text = _english ? actionTitle.English : actionTitle.French;
+                var kind = PrototypeServices.ActionTypeFor(key);
+                var category = kind.StartsWith("core.", StringComparison.Ordinal) || kind.StartsWith("variables.", StringComparison.Ordinal) || kind.StartsWith("audio.", StringComparison.Ordinal) ? "CORE" : kind.StartsWith("obs.", StringComparison.Ordinal) ? "OBS" : "Twitch";
+                header.Text = $"◆  {category} · {(_english ? actionTitle.English : actionTitle.French)}";
             }
     }
 
