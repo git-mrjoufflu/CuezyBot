@@ -756,6 +756,7 @@ public sealed partial class MainWindow : Window
         if (_triggerNode is null) return;
         if (_triggerNode.Child is StackPanel panel && panel.Children.OfType<ComboBox>().FirstOrDefault() is { } picker)
         {
+            if (panel.Children.OfType<TextBlock>().FirstOrDefault() is { } header) header.Text = _english ? "⚡  Event" : "⚡  Événement";
             var selected = picker.SelectedIndex;
             picker.ItemsSource = _english ? new[] { "Manual run", "New Twitch follower" } : new[] { "Exécution manuelle", "Nouveau follower Twitch" };
             picker.SelectedIndex = selected;
@@ -769,7 +770,7 @@ public sealed partial class MainWindow : Window
             ? (_english ? "New Twitch follower" : "Nouveau follower Twitch")
             : (_english ? "Manual run" : "Exécution manuelle");
         var node = new Border { Width = 230, Height = 82, Background = new SolidColorBrush(Color.Parse("#151A32")), BorderBrush = new SolidColorBrush(Color.Parse("#26C281")), BorderThickness = new Thickness(2), CornerRadius = new CornerRadius(11), Padding = new Thickness(12), Tag = $"__trigger__:{trigger}" };
-        node.Child = new StackPanel { Spacing = 10, Children = { new TextBlock { Text = "⚡  Événement", Foreground = new SolidColorBrush(Color.Parse("#62E6AE")), FontSize = 11 }, new TextBlock { Text = title, FontWeight = FontWeight.SemiBold, FontSize = 14 } } };
+        node.Child = new StackPanel { Spacing = 10, Children = { new TextBlock { Text = _english ? "⚡  Event" : "⚡  Événement", Foreground = new SolidColorBrush(Color.Parse("#62E6AE")), FontSize = 11 }, new TextBlock { Text = title, FontWeight = FontWeight.SemiBold, FontSize = 14 } } };
         node.PointerPressed += OnActionNodePressed; node.PointerReleased += OnActionNodeReleased;
         Canvas.SetLeft(node, 60); Canvas.SetTop(node, 210 + _additionalTriggerNodes.Count * 105);
         WorkflowCanvas.Children.Add(node); _additionalTriggerNodes.Add(node);
@@ -1165,12 +1166,6 @@ public sealed partial class MainWindow : Window
     {
         if ((eventArgs.Source as Visual)?.GetSelfAndVisualAncestors().Any(control => control is ComboBox || control is Button || control is TextBox || control is ListBox) == true) return;
         if (sender is not Border node) return;
-        if (node == _triggerNode && eventArgs.GetCurrentPoint(node).Properties.PointerUpdateKind == PointerUpdateKind.RightButtonPressed)
-        {
-            TestStatus.Text = _english ? "The trigger is fixed at the beginning" : "Le déclencheur reste fixé au début";
-            eventArgs.Handled = true;
-            return;
-        }
         var point = eventArgs.GetCurrentPoint(node);
         if (point.Properties.PointerUpdateKind == PointerUpdateKind.RightButtonPressed)
         {
@@ -1507,6 +1502,13 @@ public sealed partial class MainWindow : Window
     internal void ApplyLanguage(bool english)
     {
         _english = english;
+        UpdateTriggerNode();
+        foreach (var node in _additionalTriggerNodes)
+            if (node.Child is StackPanel panel && panel.Children.OfType<TextBlock>().ToArray() is var labels && labels.Length > 1)
+            {
+                if (labels[0] is { } header) header.Text = english ? "⚡  Event" : "⚡  Événement";
+                if (labels[1] is { } title) title.Text = (node.Tag as string)?.EndsWith("twitch.follow.received", StringComparison.Ordinal) == true ? (english ? "New Twitch follower" : "Nouveau follower Twitch") : (english ? "Manual run" : "Exécution manuelle");
+            }
         var triggerIndex = WorkflowTriggerSelector.SelectedIndex;
         var switching = _switchingWorkflow;
         _switchingWorkflow = true;
