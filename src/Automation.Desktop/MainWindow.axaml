@@ -329,7 +329,7 @@
       </Canvas>
     </Grid>
 
-    <Border Grid.Row="1" Grid.Column="2" Background="#0C1022" BorderBrush="#292D49" BorderThickness="1,0,0,0" Padding="14">
+    <Border Grid.Row="1" Grid.Column="2" IsVisible="False" Background="#0C1022" BorderBrush="#292D49" BorderThickness="1,0,0,0" Padding="14">
       <Grid RowDefinitions="Auto,Auto,Auto,*">
         <TextBox x:Name="ActionSearch" Height="38" CornerRadius="9" PlaceholderText="Rechercher une action…" TextChanged="OnActionSearchChanged" />
         <Border Grid.Row="1" Height="1" Background="Transparent" Margin="0,10,0,0" />
