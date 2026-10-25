@@ -25,6 +25,23 @@ public sealed class WorkflowRepositoryTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task DeleteWorkflow_RemovesPublishedRevisionsAndPreservesOtherDrafts()
+    {
+        var database = new SqliteDatabase(new AppDataPaths(applicationDirectory));
+        await database.InitializeAsync(TestContext.Current.CancellationToken);
+        var repository = new SqliteWorkflowRepository(database);
+        var first = CreateWorkflow(Guid.NewGuid(), Guid.NewGuid(), 1, "À supprimer");
+        var second = CreateWorkflow(Guid.NewGuid(), Guid.NewGuid(), 1, "À conserver");
+        await repository.PublishAsync(first, TestContext.Current.CancellationToken);
+        await repository.SaveDraftAsync(second, TestContext.Current.CancellationToken);
+        await repository.DeleteAsync(first.Id, TestContext.Current.CancellationToken);
+        Assert.Null(await repository.GetDraftAsync(first.Id, TestContext.Current.CancellationToken));
+        Assert.Null(await repository.GetPublishedAsync(first.Id, TestContext.Current.CancellationToken));
+        Assert.Single(await repository.GetAllDraftsAsync(TestContext.Current.CancellationToken));
+        Assert.NotNull(await repository.GetDraftAsync(second.Id, TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
     public async Task SavingSecondWorkflow_PreservesFirstAfterReopeningRepository()
     {
         var database = new SqliteDatabase(new AppDataPaths(applicationDirectory));

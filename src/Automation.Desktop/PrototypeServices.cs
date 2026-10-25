@@ -21,6 +21,12 @@ internal static class PrototypeServices
         await EnsureInitializedAsync(default);
         return await new SqliteWorkflowRepository(Database).GetAllDraftsAsync();
     }
+
+    internal static async Task DeleteWorkflowAsync(Guid id)
+    {
+        await EnsureInitializedAsync(default);
+        await new SqliteWorkflowRepository(Database).DeleteAsync(id);
+    }
     private static readonly AppDataPaths Paths = new();
     private static readonly SqliteDatabase Database = new(Paths);
     private static bool initialized;

@@ -10,6 +10,18 @@ public sealed class SqliteWorkflowRepository(SqliteDatabase database) : IWorkflo
 {
     private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web);
 
+    public async Task DeleteAsync(Guid workflowId, CancellationToken cancellationToken = default)
+    {
+        await using var connection = database.OpenConnection();
+        await using var transaction = connection.BeginTransaction();
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = "DELETE FROM workflow_revisions WHERE workflow_id = $id; DELETE FROM workflows WHERE id = $id;";
+        command.Parameters.AddWithValue("$id", workflowId.ToString("D"));
+        await command.ExecuteNonQueryAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyList<WorkflowDefinition>> GetAllDraftsAsync(CancellationToken cancellationToken = default)
     {
         await using var connection = database.OpenConnection();

@@ -208,6 +208,11 @@ public sealed partial class MainWindow : Window
         var result = await dialog.ShowDialog<string?>(this);
         if (!string.IsNullOrWhiteSpace(result))
         {
+            if (!string.Equals(current, result, StringComparison.OrdinalIgnoreCase) && _workflowNames.Contains(result, StringComparer.OrdinalIgnoreCase))
+            {
+                TestStatus.Text = _english ? "This name is already used" : "Ce nom est déjà utilisé";
+                return;
+            }
             _switchingWorkflow = true;
             _workflowActions[current] = _selectedActions.ToList();
             _workflowLinks[current] = GetManualLinkLabels().ToList();
@@ -227,11 +232,13 @@ public sealed partial class MainWindow : Window
             if (_workflowIds.Remove(current, out var id)) _workflowIds[result] = id;
             PrototypeServices.CurrentWorkflowName = result;
             _switchingWorkflow = false;
+            await PrototypeServices.SavePrototypeDraftAsync(_selectedActions, GetManualLinkLabels());
+            await ConnectionPersistence.SaveWorkflowPositionsAsync(result, _workflowPositions[result]);
             TestStatus.Text = _english ? "Automation renamed" : "Automatisation renommée";
         }
     }
 
-    private void OnDeleteWorkflowClick(object? sender, RoutedEventArgs eventArgs)
+    private async void OnDeleteWorkflowClick(object? sender, RoutedEventArgs eventArgs)
     {
         if (_workflowNames.Count <= 1 || WorkflowSelector.SelectedIndex < 0)
         {
@@ -239,11 +246,17 @@ public sealed partial class MainWindow : Window
             return;
         }
         var currentWorkflowName = _workflowNames[WorkflowSelector.SelectedIndex];
+        if (_workflowIds.TryGetValue(currentWorkflowName, out var deletedId))
+            await PrototypeServices.DeleteWorkflowAsync(deletedId);
         _workflowNames.RemoveAt(WorkflowSelector.SelectedIndex);
         _workflowActions.Remove(currentWorkflowName);
+        _workflowLinks.Remove(currentWorkflowName);
+        _workflowPositions.Remove(currentWorkflowName);
+        _workflowIds.Remove(currentWorkflowName);
+        ClearWorkflowCanvas();
+        _activeWorkflowName = _workflowNames[0];
         WorkflowSelector.ItemsSource = _workflowNames.ToArray();
         WorkflowSelector.SelectedIndex = 0;
-        ClearWorkflowCanvas();
         TestStatus.Text = _english ? "Automation deleted" : "Automatisation supprimée";
     }
 
@@ -369,6 +382,8 @@ public sealed partial class MainWindow : Window
 
     private void RebuildActionNodes()
     {
+        var savedLinks = GetManualLinkLabels().ToArray();
+        var positions = _dynamicNodes.ToDictionary(node => (string)node.Tag!, node => new Point(Canvas.GetLeft(node), Canvas.GetTop(node)));
         foreach (var link in _dynamicLinks) WorkflowCanvas.Children.Remove(link);
         _dynamicLinks.Clear();
         _linkMap.Clear();
@@ -379,6 +394,19 @@ public sealed partial class MainWindow : Window
             WorkflowCanvas.Children.Remove(child);
         _addedActionCount = 0;
         foreach (var action in _selectedActions) AddActionNode(action);
+        foreach (var node in _dynamicNodes)
+            if (positions.TryGetValue((string)node.Tag!, out var position))
+            {
+                Canvas.SetLeft(node, position.X);
+                Canvas.SetTop(node, position.Y);
+            }
+        foreach (var (from, to) in savedLinks)
+        {
+            var source = _dynamicNodes.FirstOrDefault(node => Equals(node.Tag, from));
+            var target = _dynamicNodes.FirstOrDefault(node => Equals(node.Tag, to));
+            if (source is not null && target is not null) _manualLinks.Add((source, target));
+        }
+        UpdateDynamicLinks();
     }
 
     private void UpdateHistoryButtons()
