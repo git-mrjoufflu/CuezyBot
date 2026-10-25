@@ -337,12 +337,13 @@ public sealed partial class MainWindow : Window
 
     private void AddActionNode(string label)
     {
+        var palette = GetActionPalette(label);
         var node = new Border
         {
             Width = 210,
             Height = 100,
             Background = new SolidColorBrush(Color.Parse("#151A32")),
-            BorderBrush = new SolidColorBrush(Color.Parse("#A640F4")),
+            BorderBrush = new SolidColorBrush(Color.Parse(palette.Border)),
             BorderThickness = new Avalonia.Thickness(2),
             CornerRadius = new Avalonia.CornerRadius(11),
             Padding = new Avalonia.Thickness(0)
@@ -368,7 +369,7 @@ public sealed partial class MainWindow : Window
         deleteButton.Click += (_, _) => DeleteActionNode(node);
         var header = new Border
         {
-            Background = new SolidColorBrush(Color.Parse("#4A206F")),
+            Background = new SolidColorBrush(Color.Parse(palette.Header)),
             CornerRadius = new Avalonia.CornerRadius(9, 9, 0, 0),
             Padding = new Avalonia.Thickness(10, 0),
             Child = new Grid
@@ -395,12 +396,12 @@ public sealed partial class MainWindow : Window
                     Margin = new Avalonia.Thickness(12, 0),
                     Children =
                     {
-                        new Border
+                            new Border
                         {
                             Width = 34,
                             Height = 34,
                             CornerRadius = new Avalonia.CornerRadius(8),
-                            Background = new SolidColorBrush(Color.Parse("#6F35BE")),
+                            Background = new SolidColorBrush(Color.Parse(palette.Icon)),
                             Child = new TextBlock { Text = "◆", HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center }
                         },
                         new TextBlock
@@ -418,6 +419,16 @@ public sealed partial class MainWindow : Window
         WorkflowCanvas.Children.Add(node);
         _dynamicNodes.Add(node);
         _addedActionCount++;
+    }
+
+    private static (string Header, string Border, string Icon) GetActionPalette(string label)
+    {
+        var value = label.ToLowerInvariant();
+        if (value.Contains("obs") || value.Contains("scène") || value.Contains("scene") || value.Contains("source") || value.Contains("replay") || value.Contains("capture"))
+            return ("#20242C", "#737B8A", "#343A4D");
+        if (value.Contains("condition") || value.Contains("attendre") || value.Contains("wait") || value.Contains("variable") || value.Contains("compteur"))
+            return ("#173C73", "#3788F5", "#275AA0");
+        return ("#4A206F", "#A640F4", "#6F35BE");
     }
 
     private void DeleteActionNode(Border node)
