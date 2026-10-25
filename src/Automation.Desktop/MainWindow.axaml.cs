@@ -24,6 +24,7 @@ public sealed partial class MainWindow : Window
     private readonly List<Border> _dynamicNodes = new();
     private readonly List<Line> _dynamicLinks = new();
     private readonly List<(Border From, Border To)> _manualLinks = new();
+    private readonly Dictionary<Line, (Border From, Border To)> _linkMap = new();
     private Point _dragPointerStart;
     private double _dragNodeLeft;
     private double _dragNodeTop;
@@ -170,6 +171,7 @@ public sealed partial class MainWindow : Window
     {
         foreach (var link in _dynamicLinks) WorkflowCanvas.Children.Remove(link);
         _dynamicLinks.Clear();
+        _linkMap.Clear();
         _dynamicNodes.Clear();
         _manualLinks.Clear();
         _selectedNode = null;
@@ -347,9 +349,21 @@ public sealed partial class MainWindow : Window
                 StrokeThickness = 3,
                 ZIndex = -1
             };
+            link.PointerPressed += OnWorkflowLinkPressed;
             WorkflowCanvas.Children.Insert(0, link);
             _dynamicLinks.Add(link);
+            _linkMap[link] = (from, to);
         }
+    }
+
+    private void OnWorkflowLinkPressed(object? sender, PointerPressedEventArgs eventArgs)
+    {
+        if (sender is not Line line || !_linkMap.TryGetValue(line, out var link)) return;
+        if (eventArgs.GetCurrentPoint(line).Properties.PointerUpdateKind != PointerUpdateKind.RightButtonPressed) return;
+        _manualLinks.Remove(link);
+        UpdateDynamicLinks();
+        TestStatus.Text = _english ? "Link deleted" : "Lien supprimé";
+        eventArgs.Handled = true;
     }
 
     private void OnActionNodeReleased(object? sender, PointerReleasedEventArgs eventArgs)
