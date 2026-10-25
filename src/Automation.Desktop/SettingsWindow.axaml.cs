@@ -5,22 +5,19 @@ namespace Automation.Desktop;
 
 public sealed partial class SettingsWindow : Window
 {
-    public SettingsWindow() : this("Français") { }
+    public SettingsWindow() : this("Français", null) { }
 
-    public SettingsWindow(string language)
+    private readonly Action<bool>? languageChanged;
+
+    public SettingsWindow(string language, Action<bool>? languageChanged)
     {
+        this.languageChanged = languageChanged;
         InitializeComponent();
         LanguageCombo.SelectedIndex = language == "English" ? 1 : 0;
         UpdateIntegrationStatus();
     }
 
     public string? SavedLanguage { get; private set; }
-
-    private void OnSaveClick(object? sender, RoutedEventArgs e)
-    {
-        SavedLanguage = (LanguageCombo.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "Français";
-        Close();
-    }
 
     private void OnCancelClick(object? sender, RoutedEventArgs e) => Close();
 
@@ -34,6 +31,7 @@ public sealed partial class SettingsWindow : Window
         if (LanguageCombo.SelectedItem is ComboBoxItem item && item.Tag is string language)
         {
             SavedLanguage = language;
+            languageChanged?.Invoke(language == "English");
             await ConnectionPersistence.SaveLanguageAsync(language);
         }
     }

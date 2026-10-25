@@ -85,7 +85,7 @@ public sealed partial class MainWindow : Window
 
     private async void OnSettingsClick(object? sender, RoutedEventArgs eventArgs)
     {
-        var window = new SettingsWindow(_english ? "English" : "Français");
+        var window = new SettingsWindow(_english ? "English" : "Français", english => ApplyLanguage(english));
         await window.ShowDialog(this);
         UpdateIntegrationCount(
             ObsSessionState.Client?.IsConnected == true,

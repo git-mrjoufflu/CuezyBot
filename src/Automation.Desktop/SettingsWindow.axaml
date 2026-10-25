@@ -37,8 +37,7 @@
       </Border>
     </Grid>
     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
-      <Button Content="Annuler" Click="OnCancelClick" />
-      <Button Classes="primary" Content="Enregistrer" Click="OnSaveClick" />
+      <Button Content="Fermer" Click="OnCancelClick" />
     </StackPanel>
   </StackPanel>
 </Window>
