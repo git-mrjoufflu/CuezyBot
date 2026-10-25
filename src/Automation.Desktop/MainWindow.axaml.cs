@@ -30,6 +30,14 @@ public sealed partial class MainWindow : Window
             {
                 TestStatus.Text = _english ? "Draft restored" : "Brouillon restauré";
             }
+            var publishedRevision = await PrototypeServices.GetPublishedRevisionAsync();
+            if (publishedRevision is not null)
+            {
+                TestStatus.Text = _english
+                    ? $"Automation active · revision {publishedRevision}"
+                    : $"Automatisation active · révision {publishedRevision}";
+                StartWorkflowButton.Content = _english ? "■  Stop" : "■  Arrêter";
+            }
         }
         catch
         {

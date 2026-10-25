@@ -66,6 +66,14 @@ internal static class PrototypeServices
             .GetDraftAsync(PrototypeWorkflowIds.WorkflowId, cancellationToken) is not null;
     }
 
+    internal static async Task<int?> GetPublishedRevisionAsync(CancellationToken cancellationToken = default)
+    {
+        await EnsureInitializedAsync(cancellationToken);
+        var workflow = await new SqliteWorkflowRepository(Database)
+            .GetPublishedAsync(PrototypeWorkflowIds.WorkflowId, cancellationToken);
+        return workflow?.Enabled == true ? workflow.Revision : null;
+    }
+
     internal static async Task PublishPrototypeAsync(CancellationToken cancellationToken = default)
     {
         await EnsureInitializedAsync(cancellationToken);
