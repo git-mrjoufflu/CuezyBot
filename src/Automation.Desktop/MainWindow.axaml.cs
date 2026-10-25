@@ -776,7 +776,7 @@ public sealed partial class MainWindow : Window
             Children =
             {
                 new Border { Background = new SolidColorBrush(Color.Parse("#145A43")), CornerRadius = new CornerRadius(9,9,0,0), Padding = new Thickness(10,0), Child = new TextBlock { Text = _english ? $"⚡  {title}" : $"⚡  {title}", Foreground = new SolidColorBrush(Color.Parse("#62E6AE")), FontSize = 11, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center } },
-                new StackPanel { [Grid.RowProperty] = 1, Orientation = Avalonia.Layout.Orientation.Horizontal, Spacing = 10, Margin = new Thickness(12,0), VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center, Children = { new Border { Width = 32, Height = 32, CornerRadius = new CornerRadius(8), Background = new SolidColorBrush(Color.Parse("#20865F")), Child = new TextBlock { Text = "⚡", HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center } }, new TextBlock { Text = title, FontWeight = FontWeight.SemiBold, FontSize = 14 } } }
+                new StackPanel { [Grid.RowProperty] = 1, Orientation = Avalonia.Layout.Orientation.Horizontal, Spacing = 10, Margin = new Thickness(12,0), VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center, Children = { new Border { Width = 32, Height = 32, CornerRadius = new CornerRadius(8), Background = new SolidColorBrush(Color.Parse("#20865F")), Child = new TextBlock { Text = "⚡", HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center } } } }
             }
         };
         node.PointerPressed += OnActionNodePressed; node.PointerReleased += OnActionNodeReleased;
@@ -854,15 +854,6 @@ public sealed partial class MainWindow : Window
                             Background = new SolidColorBrush(Color.Parse(palette.Icon)),
                             Child = new TextBlock { Text = "◆", HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center }
                         },
-                        new TextBlock
-                        {
-                            Text = _english ? title.English : title.French,
-                            Tag = (title.French, title.English),
-                            FontWeight = Avalonia.Media.FontWeight.SemiBold,
-                            MaxWidth = 136,
-                            TextWrapping = TextWrapping.Wrap,
-                            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center
-                        }
                     }
                 }
             }
