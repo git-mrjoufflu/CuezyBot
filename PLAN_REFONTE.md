@@ -284,3 +284,7 @@ Les essais réseau réels constituent une campagne explicite sur comptes et inst
 Une fonction est terminée lorsque son comportement est implémenté, expliqué dans l’interface, vérifié avec des cas utiles, persistant si nécessaire et validé sur les deux plateformes lorsqu’elle leur est commune. Les limitations sont visibles et consignées.
 
 Prochaine action : réaliser l’étape 0 puis la maquette de l’étape 1, centrée sur le parcours « connecter → créer → tester → publier → activer → comprendre le résultat ».
+
+## Note permanente — Localisation complète
+
+CuezyBot doit être disponible au minimum en français et en anglais. La langue choisie est enregistrée localement et doit être appliquée à toute l’application : fenêtre principale, Paramètres, connexion OBS, connexion Twitch, historique, boutons, statuts, erreurs, infobulles et messages système. Aucun écran ne doit rester partiellement dans une autre langue.
