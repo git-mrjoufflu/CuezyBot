@@ -186,12 +186,12 @@ public sealed partial class MainWindow : Window
     {
         var node = new Border
         {
-            Width = 205,
+            Width = 210,
             Height = 100,
-            Background = new SolidColorBrush(Color.Parse("#171B34")),
+            Background = new SolidColorBrush(Color.Parse("#151A32")),
             BorderBrush = new SolidColorBrush(Color.Parse("#A640F4")),
             BorderThickness = new Avalonia.Thickness(2),
-            CornerRadius = new Avalonia.CornerRadius(10),
+            CornerRadius = new Avalonia.CornerRadius(11),
             Padding = new Avalonia.Thickness(12)
         };
         node.Tag = label;
@@ -216,7 +216,7 @@ public sealed partial class MainWindow : Window
         var header = new Border
         {
             Background = new SolidColorBrush(Color.Parse("#4A206F")),
-            CornerRadius = new Avalonia.CornerRadius(8, 8, 0, 0),
+            CornerRadius = new Avalonia.CornerRadius(9, 9, 0, 0),
             Padding = new Avalonia.Thickness(10, 0),
             Child = new Grid
             {
