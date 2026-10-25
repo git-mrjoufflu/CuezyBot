@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Avalonia;
 using Avalonia.Interactivity;
 using Avalonia.Input;
 using Avalonia.Media;
@@ -17,6 +18,10 @@ public sealed partial class MainWindow : Window
     private readonly List<string> _selectedActions = new();
     private readonly Stack<string> _undoActions = new();
     private readonly Stack<string> _redoActions = new();
+    private Border? _draggedNode;
+    private Point _dragPointerStart;
+    private double _dragNodeLeft;
+    private double _dragNodeTop;
 
     public MainWindow()
     {
@@ -182,7 +187,11 @@ public sealed partial class MainWindow : Window
             CornerRadius = new Avalonia.CornerRadius(10),
             Padding = new Avalonia.Thickness(12)
         };
+        node.Tag = label;
         node.Classes.Add("dynamicAction");
+        node.PointerPressed += OnActionNodePressed;
+        node.PointerMoved += OnActionNodeMoved;
+        node.PointerReleased += OnActionNodeReleased;
         node.Child = new StackPanel
         {
             Spacing = 5,
@@ -196,6 +205,56 @@ public sealed partial class MainWindow : Window
         Canvas.SetTop(node, 520 + (_addedActionCount / 3) * 90);
         WorkflowCanvas.Children.Add(node);
         _addedActionCount++;
+    }
+
+    private void OnActionNodePressed(object? sender, PointerPressedEventArgs eventArgs)
+    {
+        if (sender is not Border node) return;
+        var point = eventArgs.GetCurrentPoint(node);
+        if (point.Properties.PointerUpdateKind == PointerUpdateKind.RightButtonPressed)
+        {
+            if (node.Tag is string label)
+            {
+                _selectedActions.Remove(label);
+                _undoActions.Push(label);
+                _redoActions.Clear();
+                RebuildActionNodes();
+                TestStatus.Text = _english ? "Action deleted" : "Action supprimée";
+                UpdateHistoryButtons();
+            }
+            eventArgs.Handled = true;
+            return;
+        }
+
+        if (point.Properties.PointerUpdateKind == PointerUpdateKind.LeftButtonPressed)
+        {
+            _draggedNode = node;
+            _dragPointerStart = point.Position;
+            _dragNodeLeft = Canvas.GetLeft(node);
+            _dragNodeTop = Canvas.GetTop(node);
+            eventArgs.Pointer.Capture(node);
+            eventArgs.Handled = true;
+        }
+    }
+
+    private void OnActionNodeMoved(object? sender, PointerEventArgs eventArgs)
+    {
+        if (_draggedNode != sender || eventArgs.Pointer.Captured != _draggedNode) return;
+        var point = eventArgs.GetCurrentPoint(WorkflowCanvas).Position;
+        var left = Math.Max(8, _dragNodeLeft + point.X - _dragPointerStart.X);
+        var top = Math.Max(8, _dragNodeTop + point.Y - _dragPointerStart.Y);
+        Canvas.SetLeft(_draggedNode!, left);
+        Canvas.SetTop(_draggedNode!, top);
+    }
+
+    private void OnActionNodeReleased(object? sender, PointerReleasedEventArgs eventArgs)
+    {
+        if (_draggedNode == sender)
+        {
+            eventArgs.Pointer.Capture(null);
+            _draggedNode = null;
+            TestStatus.Text = _english ? "Action moved" : "Action déplacée";
+        }
     }
 
     internal void SetConnectionStatus(string message) => TestStatus.Text = message;
