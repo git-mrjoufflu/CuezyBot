@@ -41,6 +41,11 @@ public sealed partial class MainWindow : Window
         CreatorSubtitle.Text = twitchConnected && TwitchSessionState.Identity is not null
             ? "Twitch"
             : "Espace local  ·  Privé";
+        StatusCreatorName.Text = twitchConnected && TwitchSessionState.Identity is not null
+            ? TwitchSessionState.Identity.Login
+            : "Créateur";
+        StatusCreatorImage.IsVisible = false;
+        StatusCreatorAvatarFallback.IsVisible = true;
 
         var connected = (obsConnected ? 1 : 0) + (twitchConnected ? 1 : 0);
         IntegrationObsTooltipDot.Fill = new SolidColorBrush(Color.Parse(obsConnected ? "#53D994" : "#F1B85B"));
@@ -119,6 +124,9 @@ public sealed partial class MainWindow : Window
                 CreatorImage.Source = bitmap;
                 CreatorImage.IsVisible = true;
                 CreatorAvatar.IsVisible = false;
+                StatusCreatorImage.Source = bitmap;
+                StatusCreatorImage.IsVisible = true;
+                StatusCreatorAvatarFallback.IsVisible = false;
             });
         }
         catch

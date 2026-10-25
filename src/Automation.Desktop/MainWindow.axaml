@@ -132,7 +132,7 @@
           <Button Classes="nav" Content="▣   Pages" />
         </StackPanel>
 
-        <Border Grid.Row="1" Padding="13" CornerRadius="12" BorderBrush="#39466F" BorderThickness="1">
+        <Border x:Name="CreatorCard" Grid.Row="1" Padding="13" CornerRadius="12" BorderBrush="#39466F" BorderThickness="1" IsVisible="False">
           <Border.Background>
             <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
               <GradientStop Color="#1A2040" Offset="0" />
@@ -141,7 +141,7 @@
           </Border.Background>
           <StackPanel Spacing="8">
             <Grid ColumnDefinitions="Auto,*,Auto">
-              <Border Width="36" Height="36" CornerRadius="18">
+              <Border Width="36" Height="36" CornerRadius="18" ClipToBounds="True">
                 <Border.Background>
                   <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
                     <GradientStop Color="#9A4DFF" Offset="0" />
@@ -395,8 +395,10 @@
     <Border Grid.Row="2" Grid.ColumnSpan="3" Background="#0A0E20" BorderBrush="#292D49" BorderThickness="0,1,0,0">
       <Grid Margin="16,0" ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center">
         <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
-          <Border Width="8" Height="8" CornerRadius="4" Background="#5EE6A8" />
-          <TextBlock Text="Moteur actif" Foreground="#B8C0D9" FontSize="11" />
+          <Border Width="22" Height="22" CornerRadius="11" ClipToBounds="True" Background="#52308B">
+            <Grid><TextBlock x:Name="StatusCreatorAvatarFallback" Text="C" FontSize="10" HorizontalAlignment="Center" VerticalAlignment="Center" /><Image x:Name="StatusCreatorImage" IsVisible="False" Stretch="UniformToFill" /></Grid>
+          </Border>
+          <StackPanel><TextBlock x:Name="StatusCreatorName" Text="Créateur" Foreground="#E8E7F5" FontSize="11" /><TextBlock Text="Moteur actif" Foreground="#5EE6A8" FontSize="9" /></StackPanel>
         </StackPanel>
 
         <TextBlock Grid.Column="1" Text="Données enregistrées localement" Classes="muted" FontSize="11"
