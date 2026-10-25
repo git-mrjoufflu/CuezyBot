@@ -22,10 +22,9 @@ public sealed partial class MainWindow : Window
     private Border? _draggedNode;
     private Border? _selectedNode;
     private readonly List<Border> _dynamicNodes = new();
-    private readonly List<Line> _dynamicLinks = new();
-    private readonly List<Polygon> _dynamicArrows = new();
+    private readonly List<Avalonia.Controls.Shapes.Path> _dynamicLinks = new();
     private readonly List<(Border From, Border To)> _manualLinks = new();
-    private readonly Dictionary<Line, (Border From, Border To)> _linkMap = new();
+    private readonly Dictionary<Avalonia.Controls.Shapes.Path, (Border From, Border To)> _linkMap = new();
     private readonly List<string> _workflowNames = new() { "Mon Live Automatisation" };
     private readonly Dictionary<string, List<string>> _workflowActions = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, Dictionary<string, Point>> _workflowPositions = new(StringComparer.OrdinalIgnoreCase);
@@ -201,8 +200,6 @@ public sealed partial class MainWindow : Window
         _dynamicNodes.Clear();
         foreach (var link in _dynamicLinks) WorkflowCanvas.Children.Remove(link);
         _dynamicLinks.Clear();
-        foreach (var arrow in _dynamicArrows) WorkflowCanvas.Children.Remove(arrow);
-        _dynamicArrows.Clear();
         foreach (var node in WorkflowCanvas.Children.OfType<Border>().Where(border => border.Classes.Contains("dynamicAction")).ToArray())
             WorkflowCanvas.Children.Remove(node);
         _addedActionCount = 0;
@@ -505,11 +502,31 @@ public sealed partial class MainWindow : Window
             var fromTop = Canvas.GetTop(from);
             var toLeft = Canvas.GetLeft(to);
             var toTop = Canvas.GetTop(to);
-            var link = new Line
+            var start = new Point(fromLeft + from.Width, fromTop + from.Height / 2);
+            var end = new Point(toLeft, toTop + to.Height / 2);
+            var dx = end.X - start.X;
+            var dy = end.Y - start.Y;
+            var length = Math.Max(1, Math.Sqrt(dx * dx + dy * dy));
+            var ux = dx / length;
+            var uy = dy / length;
+            var px = -uy;
+            var py = ux;
+            var headBase = new Point(end.X - ux * 13, end.Y - uy * 13);
+            var wingA = new Point(headBase.X + px * 6, headBase.Y + py * 6);
+            var wingB = new Point(headBase.X - px * 6, headBase.Y - py * 6);
+            var geometry = new StreamGeometry();
+            using (var context = geometry.Open())
             {
-                StartPoint = new Point(fromLeft + from.Width, fromTop + from.Height / 2),
-                EndPoint = new Point(toLeft, toTop + to.Height / 2),
-                Stroke = new SolidColorBrush(Color.Parse("#A640F4")),
+                context.BeginFigure(start, false);
+                context.LineTo(end);
+                context.BeginFigure(wingA, false);
+                context.LineTo(end);
+                context.LineTo(wingB);
+            }
+            var link = new Avalonia.Controls.Shapes.Path
+            {
+                Data = geometry,
+                Stroke = from.BorderBrush,
                 StrokeThickness = 3,
                 ZIndex = -1
             };
@@ -517,21 +534,12 @@ public sealed partial class MainWindow : Window
             WorkflowCanvas.Children.Insert(0, link);
             _dynamicLinks.Add(link);
             _linkMap[link] = (from, to);
-            var arrow = new Polygon
-            {
-                Points = new Points { new Point(0, 0), new Point(14, 7), new Point(0, 14) },
-                Fill = from.BorderBrush
-            };
-            Canvas.SetLeft(arrow, toLeft - 14);
-            Canvas.SetTop(arrow, toTop + to.Height / 2 - 7);
-            WorkflowCanvas.Children.Add(arrow);
-            _dynamicArrows.Add(arrow);
         }
     }
 
     private void OnWorkflowLinkPressed(object? sender, PointerPressedEventArgs eventArgs)
     {
-        if (sender is not Line line || !_linkMap.TryGetValue(line, out var link)) return;
+        if (sender is not Avalonia.Controls.Shapes.Path line || !_linkMap.TryGetValue(line, out var link)) return;
         if (eventArgs.GetCurrentPoint(line).Properties.PointerUpdateKind != PointerUpdateKind.RightButtonPressed) return;
         _manualLinks.Remove(link);
         UpdateDynamicLinks();
