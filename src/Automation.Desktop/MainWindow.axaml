@@ -162,7 +162,7 @@
     </Border>
 
     <Grid Grid.Row="1" Grid.Column="1" Background="#080C1B" ClipToBounds="True">
-      <Canvas>
+      <Canvas x:Name="WorkflowCanvas">
         <Canvas.Background>
           <DrawingBrush TileMode="Tile" DestinationRect="0,0,32,32" SourceRect="0,0,32,32">
             <DrawingBrush.Drawing>

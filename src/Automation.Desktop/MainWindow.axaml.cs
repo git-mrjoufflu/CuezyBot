@@ -13,6 +13,7 @@ namespace Automation.Desktop;
 public sealed partial class MainWindow : Window
 {
     private bool _english;
+    private int _addedActionCount;
 
     public MainWindow()
     {
@@ -112,9 +113,37 @@ public sealed partial class MainWindow : Window
             if (!string.IsNullOrWhiteSpace(label))
             {
                 TestStatus.Text = _english ? $"Action selected: {label}" : $"Action sélectionnée : {label}";
+                AddActionNode(label);
                 eventArgs.Handled = true;
             }
         }
+    }
+
+    private void AddActionNode(string label)
+    {
+        var node = new Border
+        {
+            Width = 205,
+            Height = 72,
+            Background = new SolidColorBrush(Color.Parse("#48206F")),
+            BorderBrush = new SolidColorBrush(Color.Parse("#A640F4")),
+            BorderThickness = new Avalonia.Thickness(2),
+            CornerRadius = new Avalonia.CornerRadius(10),
+            Padding = new Avalonia.Thickness(12)
+        };
+        node.Child = new StackPanel
+        {
+            Spacing = 5,
+            Children =
+            {
+                new TextBlock { Text = _english ? "Action" : "Action", Foreground = new SolidColorBrush(Color.Parse("#D39AFF")), FontSize = 11 },
+                new TextBlock { Text = label.TrimStart('▣', '✎', '◎', '♟', '◉', '▻', '●', '▧', '◇', '◷', '＋', '♫', ' '), FontWeight = Avalonia.Media.FontWeight.SemiBold }
+            }
+        };
+        Canvas.SetLeft(node, 70 + (_addedActionCount % 3) * 230);
+        Canvas.SetTop(node, 520 + (_addedActionCount / 3) * 90);
+        WorkflowCanvas.Children.Add(node);
+        _addedActionCount++;
     }
 
     internal void SetConnectionStatus(string message) => TestStatus.Text = message;
