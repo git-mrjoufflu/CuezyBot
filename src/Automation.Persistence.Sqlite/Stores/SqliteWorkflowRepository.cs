@@ -111,6 +111,17 @@ public sealed class SqliteWorkflowRepository(SqliteDatabase database) : IWorkflo
             workflowId,
             cancellationToken);
 
+    public async Task SetEnabledAsync(Guid workflowId, bool enabled, CancellationToken cancellationToken = default)
+    {
+        await using var connection = database.OpenConnection();
+        await using var command = connection.CreateCommand();
+        command.CommandText = "UPDATE workflows SET is_active = $enabled, updated_at = $updatedAt WHERE id = $id;";
+        command.Parameters.AddWithValue("$id", workflowId.ToString("D"));
+        command.Parameters.AddWithValue("$enabled", enabled ? 1 : 0);
+        command.Parameters.AddWithValue("$updatedAt", DateTimeOffset.UtcNow.ToString("O"));
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
     private async Task<WorkflowDefinition?> ReadDefinitionAsync(
         string sql,
         Guid workflowId,

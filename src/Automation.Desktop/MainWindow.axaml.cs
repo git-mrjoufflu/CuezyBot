@@ -81,6 +81,10 @@ public sealed partial class MainWindow : Window
                 return;
             }
         }
+        else
+        {
+            await PrototypeServices.DisablePrototypeAsync();
+        }
         TestStatus.Text = stopping
             ? (_english ? "Automation stopped" : "Automatisation arrêtée")
             : (_english ? "Automation published and enabled" : "Automatisation publiée et activée");
