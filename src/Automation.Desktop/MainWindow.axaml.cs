@@ -79,6 +79,11 @@ public sealed partial class MainWindow : Window
         {
             try
             {
+                if (!await PrototypeServices.HasPrototypeDraftAsync())
+                {
+                    TestStatus.Text = _english ? "Save the draft before starting." : "Enregistre le brouillon avant de démarrer.";
+                    return;
+                }
                 await PrototypeServices.PublishPrototypeAsync();
             }
             catch (Exception exception)
