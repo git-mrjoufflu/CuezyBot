@@ -71,10 +71,23 @@
       <Setter Property="Background" Value="Transparent" />
       <Setter Property="BorderBrush" Value="Transparent" />
       <Setter Property="Foreground" Value="#C9B4FF" />
-      <Setter Property="FontSize" Value="17" />
+      <Setter Property="FontSize" Value="18" />
       <Setter Property="Padding" Value="2" />
       <Setter Property="Width" Value="30" />
       <Setter Property="Height" Value="30" />
+      <Setter Property="MinWidth" Value="30" />
+      <Setter Property="MinHeight" Value="30" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.profileSettings:pointerover">
+      <Setter Property="Background" Value="#29234A" />
+      <Setter Property="BorderBrush" Value="#604B91" />
+      <Setter Property="Width" Value="30" />
+      <Setter Property="Height" Value="30" />
+      <Setter Property="MinWidth" Value="30" />
+      <Setter Property="MinHeight" Value="30" />
+      <Setter Property="FontSize" Value="18" />
     </Style>
     <Style Selector="Border.productSection">
       <Setter Property="Background" Value="#10162B" />
