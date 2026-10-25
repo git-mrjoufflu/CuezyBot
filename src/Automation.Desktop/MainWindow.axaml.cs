@@ -19,6 +19,7 @@ public sealed partial class MainWindow : Window
     private readonly Stack<string> _undoActions = new();
     private readonly Stack<string> _redoActions = new();
     private Border? _draggedNode;
+    private Border? _selectedNode;
     private Point _dragPointerStart;
     private double _dragNodeLeft;
     private double _dragNodeTop;
@@ -188,6 +189,8 @@ public sealed partial class MainWindow : Window
             Padding = new Avalonia.Thickness(12)
         };
         node.Tag = label;
+        node.Focusable = true;
+        node.KeyDown += OnActionNodeKeyDown;
         node.Classes.Add("dynamicAction");
         node.PointerPressed += OnActionNodePressed;
         node.PointerMoved += OnActionNodeMoved;
@@ -213,15 +216,9 @@ public sealed partial class MainWindow : Window
         var point = eventArgs.GetCurrentPoint(node);
         if (point.Properties.PointerUpdateKind == PointerUpdateKind.RightButtonPressed)
         {
-            if (node.Tag is string label)
-            {
-                _selectedActions.Remove(label);
-                _undoActions.Push(label);
-                _redoActions.Clear();
-                RebuildActionNodes();
-                TestStatus.Text = _english ? "Action deleted" : "Action supprimée";
-                UpdateHistoryButtons();
-            }
+            _selectedNode = node;
+            node.Focus();
+            TestStatus.Text = _english ? "Action selected — press Delete to remove" : "Action sélectionnée — appuie sur Suppr pour supprimer";
             eventArgs.Handled = true;
             return;
         }
@@ -229,12 +226,26 @@ public sealed partial class MainWindow : Window
         if (point.Properties.PointerUpdateKind == PointerUpdateKind.LeftButtonPressed)
         {
             _draggedNode = node;
+            _selectedNode = node;
+            node.Focus();
             _dragPointerStart = eventArgs.GetCurrentPoint(WorkflowCanvas).Position;
             _dragNodeLeft = Canvas.GetLeft(node);
             _dragNodeTop = Canvas.GetTop(node);
             eventArgs.Pointer.Capture(node);
             eventArgs.Handled = true;
         }
+    }
+
+    private void OnActionNodeKeyDown(object? sender, KeyEventArgs eventArgs)
+    {
+        if (eventArgs.Key != Key.Delete || sender is not Border node || node.Tag is not string label) return;
+        _selectedActions.Remove(label);
+        _undoActions.Push(label);
+        _redoActions.Clear();
+        RebuildActionNodes();
+        TestStatus.Text = _english ? "Action deleted" : "Action supprimée";
+        UpdateHistoryButtons();
+        eventArgs.Handled = true;
     }
 
     private void OnActionNodeMoved(object? sender, PointerEventArgs eventArgs)
