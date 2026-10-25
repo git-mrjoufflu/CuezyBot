@@ -22,6 +22,7 @@ public sealed partial class MainWindow : Window
     private Border? _draggedNode;
     private Border? _selectedNode;
     private readonly List<Border> _dynamicNodes = new();
+    private readonly Dictionary<Border, Func<Task>> _obsCardRefresh = new();
     private readonly List<Avalonia.Controls.Shapes.Path> _dynamicLinks = new();
     private readonly List<(Border From, Border To)> _manualLinks = new();
     private readonly Dictionary<Avalonia.Controls.Shapes.Path, (Border From, Border To)> _linkMap = new();
@@ -558,18 +559,21 @@ public sealed partial class MainWindow : Window
             PrototypeServices.ActionOptions[label] = options = new System.Text.Json.Nodes.JsonObject();
         var form = new StackPanel { Spacing = 6, Margin = new Thickness(12, 0, 12, 10) };
         StackPanel? sourcePicker = null;
+        ComboBox? scenePicker = null;
+        var restoringScene = false;
         async Task LoadSources()
         {
             if (sourcePicker is null) return;
             try
             {
                 var scene = options["scene"]?.ToString();
-                if (ObsSessionState.Client?.IsConnected != true || string.IsNullOrWhiteSpace(scene)) return;
-                var values = await ObsSessionState.Client.GetSourceNamesAsync(scene);
-                if (options["scene"]?.ToString() != scene) return;
                 var selected = options["sources"] is System.Text.Json.Nodes.JsonArray array
                     ? array.Select(item => item!.GetValue<string>()).ToArray()
                     : options["source"] is { } legacy ? new[] { legacy.ToString() } : Array.Empty<string>();
+                IReadOnlyList<string> values = selected;
+                if (ObsSessionState.Client?.IsConnected == true && !string.IsNullOrWhiteSpace(scene))
+                    values = (await ObsSessionState.Client.GetSourceNamesAsync(scene)).Concat(selected).Distinct().ToArray();
+                if (options["scene"]?.ToString() != scene) return;
                 sourcePicker.Children.Clear();
                 foreach (var value in values)
                 {
@@ -611,8 +615,14 @@ public sealed partial class MainWindow : Window
                 var values = key == "scene" ? await client.GetSceneNamesAsync() : await client.GetSourceNamesAsync(scene!);
                 if (key == "source" && options["scene"]?.ToString() != scene) return;
                 var saved = options[key]?.ToString();
-                picker.ItemsSource = values;
-                picker.SelectedItem = values.Contains(saved) ? saved : null;
+                restoringScene = true;
+                try
+                {
+                    picker.ItemsSource = saved is null ? values : values.Append(saved).Distinct().ToArray();
+                    picker.SelectedItem = saved;
+                }
+                finally { restoringScene = false; }
+                await LoadSources();
             }
             catch (Exception exception)
             {
@@ -633,8 +643,15 @@ public sealed partial class MainWindow : Window
             if (key == "scene")
             {
                 var picker = new ComboBox { Tag = (fr, en), PlaceholderText = _english ? en : fr, HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch, FontSize = 12 };
+                scenePicker = picker;
+                if (options[key]?.ToString() is { } savedScene)
+                {
+                    picker.ItemsSource = new[] { savedScene };
+                    picker.SelectedItem = savedScene;
+                }
                 picker.SelectionChanged += (_, _) =>
                 {
+                    if (restoringScene) return;
                     if (picker.SelectedItem is not string selected) return;
                     var changed = options[key]?.ToString() != selected;
                     options[key] = selected;
@@ -669,6 +686,8 @@ public sealed partial class MainWindow : Window
         Grid.SetRow(form, grid.RowDefinitions.Count - 1);
         grid.Children.Add(form);
         node.Height += fields.Count * 64 + 10;
+        if (scenePicker is not null)
+            _obsCardRefresh[node] = async () => { await LoadChoices(scenePicker, "scene"); await LoadSources(); };
     }
 
     private TextBlock CreateFieldLabel(string french, string english)
@@ -862,6 +881,10 @@ public sealed partial class MainWindow : Window
 
     internal void UpdateIntegrationCount(bool obsConnected, bool twitchConnected)
     {
+        foreach (var removed in _obsCardRefresh.Keys.Where(card => !_dynamicNodes.Contains(card)).ToArray())
+            _obsCardRefresh.Remove(removed);
+        if (obsConnected)
+            foreach (var refresh in _obsCardRefresh.Values.ToArray()) _ = refresh();
         ObsActionSection.IsVisible = obsConnected;
         TwitchActionSection.IsVisible = twitchConnected;
         CreatorAvatar.Text = twitchConnected ? "T" : "C";
