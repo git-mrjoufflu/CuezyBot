@@ -26,6 +26,7 @@ public sealed partial class MainWindow : Window
     private Border? _selectedNode;
     private readonly List<Border> _dynamicNodes = new();
     private Border? _triggerNode;
+    private readonly List<Border> _additionalTriggerNodes = new();
     private readonly Dictionary<Border, Func<Task>> _obsCardRefresh = new();
     private readonly List<Avalonia.Controls.Shapes.Path> _dynamicLinks = new();
     private readonly List<(Border From, Border To)> _manualLinks = new();
@@ -128,6 +129,7 @@ public sealed partial class MainWindow : Window
             if (await PrototypeServices.HasPrototypeDraftAsync())
             {
                 AddTriggerNode();
+                foreach (var trigger in PrototypeServices.CurrentTriggerTypes.Skip(1)) AddAdditionalTriggerNode(trigger);
                 foreach (var action in await PrototypeServices.GetDraftActionLabelsAsync())
                 {
                     _selectedActions.Add(action);
@@ -353,6 +355,8 @@ public sealed partial class MainWindow : Window
         _addedActionCount = 0;
         _linkMap.Clear();
         _selectedNode = null;
+        foreach (var trigger in _additionalTriggerNodes) WorkflowCanvas.Children.Remove(trigger);
+        _additionalTriggerNodes.Clear();
         AddTriggerNode();
         _undoActions.Clear();
         _redoActions.Clear();
@@ -529,7 +533,11 @@ public sealed partial class MainWindow : Window
                 if (trigger is not ("manual.run" or "twitch.follow.received")) return;
                 PrototypeServices.CurrentTriggerType = trigger;
                 _workflowTriggerKinds[PrototypeServices.CurrentWorkflowId] = trigger;
-                if (!PrototypeServices.CurrentTriggerTypes.Contains(trigger)) PrototypeServices.CurrentTriggerTypes.Add(trigger);
+                if (!PrototypeServices.CurrentTriggerTypes.Contains(trigger))
+                {
+                    PrototypeServices.CurrentTriggerTypes.Add(trigger);
+                    AddAdditionalTriggerNode(trigger);
+                }
                 UpdateTriggerNode();
                 _switchingWorkflow = true;
                 WorkflowTriggerSelector.SelectedIndex = trigger == "manual.run" ? 0 : 1;
@@ -587,7 +595,10 @@ public sealed partial class MainWindow : Window
         foreach (var child in WorkflowCanvas.Children.OfType<Border>().Where(border => border.Classes.Contains("dynamicAction")).ToArray())
             WorkflowCanvas.Children.Remove(child);
         _addedActionCount = 0;
+        foreach (var trigger in _additionalTriggerNodes) WorkflowCanvas.Children.Remove(trigger);
+        _additionalTriggerNodes.Clear();
         AddTriggerNode();
+        foreach (var trigger in PrototypeServices.CurrentTriggerTypes.Skip(1)) AddAdditionalTriggerNode(trigger);
         foreach (var action in _selectedActions) AddActionNode(action);
         foreach (var node in _dynamicNodes)
             if (positions.TryGetValue((string)node.Tag!, out var position))
@@ -699,6 +710,19 @@ public sealed partial class MainWindow : Window
             picker.ItemsSource = _english ? new[] { "Manual run", "New Twitch follower" } : new[] { "Exécution manuelle", "Nouveau follower Twitch" };
             picker.SelectedIndex = selected;
         }
+    }
+
+    private void AddAdditionalTriggerNode(string trigger)
+    {
+        if (_additionalTriggerNodes.Any(node => Equals(node.Tag, $"__trigger__:{trigger}"))) return;
+        var title = trigger == "twitch.follow.received"
+            ? (_english ? "New Twitch follower" : "Nouveau follower Twitch")
+            : (_english ? "Manual run" : "Exécution manuelle");
+        var node = new Border { Width = 230, Height = 82, Background = new SolidColorBrush(Color.Parse("#151A32")), BorderBrush = new SolidColorBrush(Color.Parse("#26C281")), BorderThickness = new Thickness(2), CornerRadius = new CornerRadius(11), Padding = new Thickness(12), Tag = $"__trigger__:{trigger}" };
+        node.Child = new StackPanel { Spacing = 10, Children = { new TextBlock { Text = "⚡  Événement", Foreground = new SolidColorBrush(Color.Parse("#62E6AE")), FontSize = 11 }, new TextBlock { Text = title, FontWeight = FontWeight.SemiBold, FontSize = 14 } } };
+        node.PointerPressed += OnActionNodePressed; node.PointerReleased += OnActionNodeReleased;
+        Canvas.SetLeft(node, 60); Canvas.SetTop(node, 210 + _additionalTriggerNodes.Count * 105);
+        WorkflowCanvas.Children.Add(node); _additionalTriggerNodes.Add(node);
     }
 
     private void AddActionNode(string label)
