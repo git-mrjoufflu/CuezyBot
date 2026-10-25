@@ -4,6 +4,7 @@ using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 
 namespace Automation.Desktop;
 
@@ -13,7 +14,29 @@ public sealed partial class TwitchConnectionWindow : Window
     private TwitchDeviceAuthorization? authorization;
     private CancellationTokenSource? authorizationCancellation;
 
-    public TwitchConnectionWindow() => InitializeComponent();
+    public TwitchConnectionWindow()
+    {
+        InitializeComponent();
+        ApplyLanguage(UiLanguageState.IsEnglish);
+    }
+
+    private void ApplyLanguage(bool english)
+    {
+        foreach (var text in this.GetVisualDescendants().OfType<TextBlock>())
+        {
+            text.Text = text.Text switch
+            {
+                "Connecter Twitch" => english ? "Connect Twitch" : "Connecter Twitch",
+                "Fermer" => english ? "Close" : "Fermer",
+                "Ouvrir Twitch" => english ? "Open Twitch" : "Ouvrir Twitch",
+                "Commencer la connexion" => english ? "Start connection" : "Commencer la connexion",
+                "Permission demandée" => english ? "Permission requested" : "Permission demandée",
+                _ => text.Text
+            };
+        }
+        OpenBrowserButton.Content = english ? "Open Twitch" : "Ouvrir Twitch";
+        ConnectButton.Content = english ? "Start connection" : "Commencer la connexion";
+    }
 
     private async void OnConnectClick(object? sender, RoutedEventArgs eventArgs)
     {

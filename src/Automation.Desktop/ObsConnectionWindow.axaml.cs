@@ -3,6 +3,7 @@ using Automation.Connectors.Obs;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Media;
+using Avalonia.VisualTree;
 
 namespace Automation.Desktop;
 
@@ -13,6 +14,7 @@ public sealed partial class ObsConnectionWindow : Window
     public ObsConnectionWindow()
     {
         InitializeComponent();
+        ApplyLanguage(UiLanguageState.IsEnglish);
         connectedClient = ObsSessionState.Client;
         if (connectedClient?.IsConnected == true)
         {
@@ -21,6 +23,26 @@ public sealed partial class ObsConnectionWindow : Window
             StatusDot.Background = new SolidColorBrush(Color.Parse("#53D994"));
             TestSceneButton.IsEnabled = true;
         }
+    }
+
+    private void ApplyLanguage(bool english)
+    {
+        foreach (var text in this.GetVisualDescendants().OfType<TextBlock>())
+        {
+            text.Text = text.Text switch
+            {
+                "Connecter OBS" => english ? "Connect OBS" : "Connecter OBS",
+                "Adresse du serveur" => english ? "Server address" : "Adresse du serveur",
+                "Port" => "Port",
+                "Mot de passe OBS" => english ? "OBS password" : "Mot de passe OBS",
+                "Tester la connexion" => english ? "Test connection" : "Tester la connexion",
+                "Tester une scène" => english ? "Test a scene" : "Tester une scène",
+                "Fermer" => english ? "Close" : "Fermer",
+                _ => text.Text
+            };
+        }
+        TestConnectionButton.Content = english ? "Test connection" : "Tester la connexion";
+        TestSceneButton.Content = english ? "Test a scene" : "Tester une scène";
     }
 
     private async void OnTestConnectionClick(object? sender, RoutedEventArgs eventArgs)
