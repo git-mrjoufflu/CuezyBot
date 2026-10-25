@@ -227,13 +227,30 @@ public sealed partial class MainWindow : Window
             Children =
             {
                 header,
-                new TextBlock
+                new StackPanel
                 {
                     [Grid.RowProperty] = 1,
-                    Text = label.TrimStart('▣', '✎', '◎', '♟', '◉', '▻', '●', '▧', '◇', '◷', '＋', '♫', ' '),
-                    FontWeight = Avalonia.Media.FontWeight.SemiBold,
+                    Orientation = Avalonia.Layout.Orientation.Horizontal,
+                    Spacing = 10,
                     VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
-                    Margin = new Avalonia.Thickness(12, 0)
+                    Margin = new Avalonia.Thickness(12, 0),
+                    Children =
+                    {
+                        new Border
+                        {
+                            Width = 34,
+                            Height = 34,
+                            CornerRadius = new Avalonia.CornerRadius(8),
+                            Background = new SolidColorBrush(Color.Parse("#6F35BE")),
+                            Child = new TextBlock { Text = "◆", HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center }
+                        },
+                        new TextBlock
+                        {
+                            Text = label.TrimStart('▣', '✎', '◎', '♟', '◉', '▻', '●', '▧', '◇', '◷', '＋', '♫', ' '),
+                            FontWeight = Avalonia.Media.FontWeight.SemiBold,
+                            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center
+                        }
+                    }
                 }
             }
         };
