@@ -229,7 +229,7 @@ public sealed partial class MainWindow : Window
         if (point.Properties.PointerUpdateKind == PointerUpdateKind.LeftButtonPressed)
         {
             _draggedNode = node;
-            _dragPointerStart = point.Position;
+            _dragPointerStart = eventArgs.GetCurrentPoint(WorkflowCanvas).Position;
             _dragNodeLeft = Canvas.GetLeft(node);
             _dragNodeTop = Canvas.GetTop(node);
             eventArgs.Pointer.Capture(node);
