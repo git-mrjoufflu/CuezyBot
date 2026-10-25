@@ -188,7 +188,7 @@ public sealed partial class MainWindow : Window
         {
             Width = 205,
             Height = 100,
-            Background = new SolidColorBrush(Color.Parse("#48206F")),
+            Background = new SolidColorBrush(Color.Parse("#171B34")),
             BorderBrush = new SolidColorBrush(Color.Parse("#A640F4")),
             BorderThickness = new Avalonia.Thickness(2),
             CornerRadius = new Avalonia.CornerRadius(10),
