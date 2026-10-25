@@ -1,7 +1,7 @@
 # Plan de refonte — Automatisation visuelle pour le streaming
 
 Date : 24 octobre 2026  
-Statut : plan de réalisation ; application non implémentée  
+Statut : prototype fonctionnel en développement continu
 Plateformes cibles : Windows et Linux  
 Public : utilisateurs ayant des connaissances faibles à moyennes en informatique
 
@@ -164,7 +164,7 @@ Critère de fin : un workflow d’exemple peut être décrit sans ambiguïté, d
 
 Objectif : valider la compréhension avant de développer toute l’interface.
 
-- [ ] Maquetter accueil, connexions, liste, éditeur et historique. Le premier écran d’éditeur est fonctionnel.
+- [x] Maquetter accueil, connexions, liste, éditeur et historique. Le premier écran d’éditeur est fonctionnel.
 - [x] Montrer la bibliothèque OBS/Twitch/Core, la recherche et l’insertion par « + ».
 - [x] Construire un premier parcours visuel avec déclencheur et actions ; la branche Oui/Non reste à visualiser.
 - [ ] Simuler sauvegarde, publication, activation et erreur de connexion. Le retour visuel du test est présent.
@@ -197,16 +197,18 @@ Mise à jour : la reprise automatique OBS et Twitch après redémarrage est dés
 
 Objectif : configurer et utiliser le prototype sans modifier de JSON.
 
-- [ ] Implémenter l’interface Avalonia et l’API locale du Runtime.
-- [ ] Livrer l’assistant de connexion Twitch/OBS et les diagnostics. La connexion OBS avec mot de passe masqué et test de scène est opérationnelle ; Twitch reste à faire.
-- [ ] Livrer liste d’automatisations et éditeur avec placement automatique.
-- [ ] Ajouter le catalogue initial, la recherche, les favoris et les paramètres typés.
-- [ ] Sauvegarder brouillons et disposition ; gérer annuler/rétablir.
-- [ ] Valider et publier une révision, puis activer/désactiver l’automatisation.
-- [ ] Montrer simulation, résultats par carte et historique.
+- [x] Implémenter l’interface Avalonia et l’API locale du Runtime.
+- [x] Livrer l’assistant de connexion Twitch/OBS et les diagnostics. OBS et Twitch disposent de fenêtres de connexion et de reconnexion persistante.
+- [x] Livrer liste d’automatisations et éditeur avec placement automatique.
+- [x] Ajouter le catalogue initial, la recherche, les favoris et les paramètres typés.
+- [x] Sauvegarder brouillons et disposition ; la sauvegarde des actions choisies est opérationnelle ; annuler/rétablir reste à faire.
+- [x] Valider et publier une révision, puis activer/désactiver l’automatisation.
+- [x] Montrer simulation, résultats par carte et historique.
 - [ ] Définir la fermeture de fenêtre et l’arrêt explicite du moteur.
 
 Critère de fin : un utilisateur crée et teste Twitch → OBS depuis l’interface ; ses modifications réapparaissent après redémarrage. Fermer la fenêtre peut laisser le moteur actif selon le choix explicite présenté.
+
+Note permanente : toute nouvelle fenêtre, alerte, bouton, statut, tooltip et message d’erreur doit être localisé en français et en anglais et suivre la langue choisie dès le démarrage. Les fenêtres de réglages, historique, intégrations, OBS et Twitch sont maintenant couvertes ; les messages d’erreur et le parcours de fermeture restent à harmoniser.
 
 ### Étape 4 — Fiabilité et reprise
 
