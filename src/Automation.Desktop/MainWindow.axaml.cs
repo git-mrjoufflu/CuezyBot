@@ -502,7 +502,7 @@ public sealed partial class MainWindow : Window
         };
         if (label.Contains("source", StringComparison.OrdinalIgnoreCase))
         {
-            node.Height = 145;
+            node.Height = 167;
             var layout = (Grid)node.Child;
             layout.RowDefinitions = new RowDefinitions("32,*,Auto");
             var visibility = new ComboBox
@@ -510,15 +510,18 @@ public sealed partial class MainWindow : Window
                 ItemsSource = _english ? new[] { "Show", "Hide" } : new[] { "Afficher", "Masquer" },
                 SelectedIndex = PrototypeServices.SourceVisibility.GetValueOrDefault(label, true) ? 0 : 1,
                 HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch,
-                Margin = new Thickness(12, 0, 12, 10)
+                Margin = new Thickness(0)
             };
-            Grid.SetRow(visibility, 2);
+            var visibilityField = new StackPanel { Spacing = 4, Margin = new Thickness(12, 0, 12, 10) };
+            visibilityField.Children.Add(CreateFieldLabel("Visibilité", "Visibility"));
+            visibilityField.Children.Add(visibility);
+            Grid.SetRow(visibilityField, 2);
             visibility.SelectionChanged += (_, _) =>
             {
                 PrototypeServices.SourceVisibility[label] = visibility.SelectedIndex == 0;
                 TestStatus.Text = _english ? "Draft modified" : "Brouillon modifié";
             };
-            layout.Children.Add(visibility);
+            layout.Children.Add(visibilityField);
         }
         Canvas.SetLeft(node, 70 + (_addedActionCount % 3) * 230);
         AddInlineActionOptions(node, label);
@@ -578,6 +581,7 @@ public sealed partial class MainWindow : Window
         }
         foreach (var (key, fr, en) in fields)
         {
+            form.Children.Add(CreateFieldLabel(fr, en));
             if (key is "scene" or "source")
             {
                 var picker = new ComboBox { PlaceholderText = _english ? en : fr, HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch, FontSize = 12 };
@@ -617,7 +621,20 @@ public sealed partial class MainWindow : Window
         grid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
         Grid.SetRow(form, grid.RowDefinitions.Count - 1);
         grid.Children.Add(form);
-        node.Height += fields.Count * 40 + 10;
+        node.Height += fields.Count * 64 + 10;
+    }
+
+    private TextBlock CreateFieldLabel(string french, string english)
+    {
+        var text = new TextBlock
+        {
+            Text = _english ? english : french,
+            Tag = (french, english),
+            FontSize = 11,
+            FontWeight = FontWeight.SemiBold,
+            Foreground = new SolidColorBrush(Color.Parse("#CDD0E3"))
+        };
+        return text;
     }
 
     private static (string Header, string Border, string Icon, string Text) GetActionPalette(string label)
@@ -988,6 +1005,11 @@ public sealed partial class MainWindow : Window
 
         foreach (var control in this.GetVisualDescendants().OfType<TextBlock>())
         {
+            if (control.Tag is ValueTuple<string, string> fieldLabel)
+            {
+                control.Text = english ? fieldLabel.Item2 : fieldLabel.Item1;
+                continue;
+            }
             if (control.Text is { } text)
             {
                 control.Text = TranslateText(text, translations);
