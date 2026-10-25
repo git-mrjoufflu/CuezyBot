@@ -13,13 +13,13 @@
     <Style Selector="ComboBox"><Setter Property="FontFamily" Value="Inter" /><Setter Property="Background" Value="#171B34" /><Setter Property="Foreground" Value="#F4F3FF" /><Setter Property="BorderBrush" Value="#3A4264" /><Setter Property="BorderThickness" Value="1" /></Style>
   </Window.Styles>
   <StackPanel Margin="28" Spacing="18">
-    <TextBlock Text="Paramètres" FontSize="24" FontWeight="SemiBold" />
-    <TextBlock Text="Personnalise le comportement de CuezyBot." Classes="muted" />
+    <TextBlock x:Name="SettingsTitle" Text="Paramètres" FontSize="24" FontWeight="SemiBold" />
+    <TextBlock x:Name="SettingsDescription" Text="Personnalise le comportement de CuezyBot." Classes="muted" />
     <Border Background="#151A30" BorderBrush="#303858" BorderThickness="1" CornerRadius="10" Padding="16">
       <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="*,220" RowSpacing="10">
         <StackPanel>
-          <TextBlock Text="Langue / Language" FontWeight="SemiBold" />
-          <TextBlock Text="Choisis la langue de l’interface." Classes="muted" FontSize="11" />
+          <TextBlock x:Name="LanguageTitle" Text="Langue / Language" FontWeight="SemiBold" />
+          <TextBlock x:Name="LanguageDescription" Text="Choisis la langue de l’interface." Classes="muted" FontSize="11" />
         </StackPanel>
         <ComboBox x:Name="LanguageCombo" Grid.Column="1" SelectedIndex="0" SelectionChanged="OnLanguageChanged">
           <ComboBoxItem Content="Français" Tag="Français" />
@@ -27,7 +27,7 @@
         </ComboBox>
       </Grid>
     </Border>
-    <TextBlock Text="Intégrations" FontSize="17" FontWeight="SemiBold" Margin="0,8,0,0" />
+    <TextBlock x:Name="IntegrationsTitle" Text="Intégrations" FontSize="17" FontWeight="SemiBold" Margin="0,8,0,0" />
     <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
       <Border Grid.Column="0" Background="#151A30" BorderBrush="#303858" BorderThickness="1" CornerRadius="10" Padding="13">
         <StackPanel Spacing="9"><TextBlock Text="OBS Studio" FontWeight="SemiBold" /><TextBlock x:Name="ObsStatus" Text="Non connecté" Classes="muted" FontSize="11" TextWrapping="Wrap" /><Button x:Name="ObsButton" Classes="primary" Content="Configurer OBS" Click="OnObsClick" /></StackPanel>
@@ -37,7 +37,7 @@
       </Border>
     </Grid>
     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
-      <Button Content="Fermer" Click="OnCancelClick" />
+      <Button x:Name="CloseButton" Content="Fermer" Click="OnCancelClick" />
     </StackPanel>
   </StackPanel>
 </Window>

@@ -49,10 +49,14 @@ public sealed partial class MainWindow : Window
 
         var connected = (obsConnected ? 1 : 0) + (twitchConnected ? 1 : 0);
         IntegrationObsTooltipDot.Fill = new SolidColorBrush(Color.Parse(obsConnected ? "#53D994" : "#F1B85B"));
-        IntegrationObsTooltipStatus.Text = obsConnected ? "Connecté" : "Non connecté";
+        IntegrationObsTooltipStatus.Text = _english
+            ? (obsConnected ? "Connected" : "Disconnected")
+            : (obsConnected ? "Connecté" : "Non connecté");
         IntegrationObsTooltipStatus.Foreground = new SolidColorBrush(Color.Parse(obsConnected ? "#72F0AA" : "#FFD081"));
         IntegrationTwitchTooltipDot.Fill = new SolidColorBrush(Color.Parse(twitchConnected ? "#53D994" : "#F1B85B"));
-        IntegrationTwitchTooltipStatus.Text = twitchConnected ? "Connecté" : "Non connecté";
+        IntegrationTwitchTooltipStatus.Text = _english
+            ? (twitchConnected ? "Connected" : "Disconnected")
+            : (twitchConnected ? "Connecté" : "Non connecté");
         IntegrationTwitchTooltipStatus.Foreground = new SolidColorBrush(Color.Parse(twitchConnected ? "#72F0AA" : "#FFD081"));
         IntegrationCountStatus.Text = $"{connected}/2 intégrations connectées";
         IntegrationStatusDot.Background = new SolidColorBrush(Color.Parse(connected switch
