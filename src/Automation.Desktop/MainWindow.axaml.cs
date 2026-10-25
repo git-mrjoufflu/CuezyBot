@@ -40,9 +40,17 @@ public sealed partial class MainWindow : Window
             : "Simulation réussie : les 3 étapes seraient exécutées.";
     }
 
-    private void OnSaveWorkflowClick(object? sender, RoutedEventArgs eventArgs)
+    private async void OnSaveWorkflowClick(object? sender, RoutedEventArgs eventArgs)
     {
-        TestStatus.Text = _english ? "Draft saved" : "Brouillon enregistré";
+        try
+        {
+            await PrototypeServices.SavePrototypeDraftAsync();
+            TestStatus.Text = _english ? "Draft saved" : "Brouillon enregistré";
+        }
+        catch (Exception exception)
+        {
+            TestStatus.Text = _english ? $"Save failed: {exception.Message}" : $"Échec de sauvegarde : {exception.Message}";
+        }
     }
 
     private void OnStartWorkflowClick(object? sender, RoutedEventArgs eventArgs)
