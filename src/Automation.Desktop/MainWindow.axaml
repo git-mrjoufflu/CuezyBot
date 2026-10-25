@@ -238,10 +238,10 @@
           </Grid>
         </Border>
 
-        <Border Canvas.Left="605" Canvas.Top="183" Padding="17,6" CornerRadius="14" Background="#197246" BorderBrush="#45DD8D" BorderThickness="1">
+        <Border IsVisible="False" Canvas.Left="605" Canvas.Top="183" Padding="17,6" CornerRadius="14" Background="#197246" BorderBrush="#45DD8D" BorderThickness="1">
           <TextBlock Text="Oui" FontWeight="SemiBold" />
         </Border>
-        <Border Canvas.Left="600" Canvas.Top="345" Padding="17,6" CornerRadius="14" Background="#8C202E" BorderBrush="#FF5368" BorderThickness="1">
+        <Border IsVisible="False" Canvas.Left="600" Canvas.Top="345" Padding="17,6" CornerRadius="14" Background="#8C202E" BorderBrush="#FF5368" BorderThickness="1">
           <TextBlock Text="Non" FontWeight="SemiBold" />
         </Border>
 

@@ -39,6 +39,10 @@ public sealed partial class MainWindow : Window
             node.PointerReleased += OnActionNodeReleased;
             node.Tag = node == EventNode ? "New follow" : node == ConditionNode ? "Is a subscriber?" : "Show an OBS alert";
         }
+        foreach (var demoNode in this.GetVisualDescendants().OfType<Border>().Where(border => border.Classes.Contains("node")))
+            demoNode.IsVisible = false;
+        foreach (var demoPath in this.GetVisualDescendants().OfType<Avalonia.Controls.Shapes.Path>())
+            demoPath.IsVisible = false;
         Opened += OnMainWindowOpened;
     }
 
