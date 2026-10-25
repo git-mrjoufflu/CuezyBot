@@ -24,6 +24,13 @@ public sealed partial class MainWindow : Window
     {
         ObsActionSection.IsVisible = obsConnected;
         TwitchActionSection.IsVisible = twitchConnected;
+        ChangeTwitchAccountButton.IsVisible = twitchConnected;
+        CreatorTitle.Text = twitchConnected && TwitchSessionState.Identity is not null
+            ? TwitchSessionState.Identity.Login
+            : "Créateur";
+        CreatorSubtitle.Text = twitchConnected && TwitchSessionState.Identity is not null
+            ? $"@{TwitchSessionState.Identity.Login}  ·  Twitch"
+            : "Espace local  ·  Privé";
 
         var connected = (obsConnected ? 1 : 0) + (twitchConnected ? 1 : 0);
         IntegrationObsTooltipDot.Fill = new SolidColorBrush(Color.Parse(obsConnected ? "#53D994" : "#F1B85B"));
