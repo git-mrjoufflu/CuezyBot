@@ -23,7 +23,7 @@ public sealed partial class MainWindow : Window
     private Border? _selectedNode;
     private readonly List<Border> _dynamicNodes = new();
     private readonly List<Line> _dynamicLinks = new();
-    private readonly List<TextBlock> _dynamicArrows = new();
+    private readonly List<Polygon> _dynamicArrows = new();
     private readonly List<(Border From, Border To)> _manualLinks = new();
     private readonly Dictionary<Line, (Border From, Border To)> _linkMap = new();
     private readonly List<string> _workflowNames = new() { "Mon Live Automatisation" };
@@ -517,9 +517,13 @@ public sealed partial class MainWindow : Window
             WorkflowCanvas.Children.Insert(0, link);
             _dynamicLinks.Add(link);
             _linkMap[link] = (from, to);
-            var arrow = new TextBlock { Text = "▶", FontSize = 14, FontWeight = Avalonia.Media.FontWeight.Bold, Foreground = from.BorderBrush };
+            var arrow = new Polygon
+            {
+                Points = new Points { new Point(0, 0), new Point(14, 7), new Point(0, 14) },
+                Fill = from.BorderBrush
+            };
             Canvas.SetLeft(arrow, (fromLeft + from.Width + toLeft) / 2 - 7);
-            Canvas.SetTop(arrow, (fromTop + toTop + from.Height / 2) / 2 - 9);
+            Canvas.SetTop(arrow, (fromTop + toTop + from.Height / 2) / 2 - 7);
             WorkflowCanvas.Children.Add(arrow);
             _dynamicArrows.Add(arrow);
         }
