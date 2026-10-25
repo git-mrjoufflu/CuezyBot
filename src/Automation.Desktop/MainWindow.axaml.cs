@@ -23,6 +23,7 @@ public sealed partial class MainWindow : Window
     private Border? _selectedNode;
     private readonly List<Border> _dynamicNodes = new();
     private readonly List<Line> _dynamicLinks = new();
+    private readonly List<TextBlock> _dynamicArrows = new();
     private readonly List<(Border From, Border To)> _manualLinks = new();
     private readonly Dictionary<Line, (Border From, Border To)> _linkMap = new();
     private readonly List<string> _workflowNames = new() { "Mon Live Automatisation" };
@@ -200,6 +201,8 @@ public sealed partial class MainWindow : Window
         _dynamicNodes.Clear();
         foreach (var link in _dynamicLinks) WorkflowCanvas.Children.Remove(link);
         _dynamicLinks.Clear();
+        foreach (var arrow in _dynamicArrows) WorkflowCanvas.Children.Remove(arrow);
+        _dynamicArrows.Clear();
         foreach (var node in WorkflowCanvas.Children.OfType<Border>().Where(border => border.Classes.Contains("dynamicAction")).ToArray())
             WorkflowCanvas.Children.Remove(node);
         _addedActionCount = 0;
@@ -376,7 +379,7 @@ public sealed partial class MainWindow : Window
             {
                 Children =
                 {
-                    new TextBlock { Text = "◆  Action", Foreground = new SolidColorBrush(Color.Parse("#D39AFF")), FontSize = 11, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center },
+                            new TextBlock { Text = "◆  Action", Foreground = new SolidColorBrush(Color.Parse(palette.Text)), FontSize = 11, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center },
                     deleteButton
                 }
             }
@@ -421,14 +424,14 @@ public sealed partial class MainWindow : Window
         _addedActionCount++;
     }
 
-    private static (string Header, string Border, string Icon) GetActionPalette(string label)
+    private static (string Header, string Border, string Icon, string Text) GetActionPalette(string label)
     {
         var value = label.ToLowerInvariant();
         if (value.Contains("obs") || value.Contains("scène") || value.Contains("scene") || value.Contains("source") || value.Contains("replay") || value.Contains("capture"))
-            return ("#20242C", "#737B8A", "#343A4D");
+            return ("#20242C", "#737B8A", "#343A4D", "#DCE2EE");
         if (value.Contains("condition") || value.Contains("attendre") || value.Contains("wait") || value.Contains("variable") || value.Contains("compteur"))
-            return ("#173C73", "#3788F5", "#275AA0");
-        return ("#4A206F", "#A640F4", "#6F35BE");
+            return ("#173C73", "#3788F5", "#275AA0", "#7EB8FF");
+        return ("#4A206F", "#A640F4", "#6F35BE", "#D39AFF");
     }
 
     private void DeleteActionNode(Border node)
@@ -514,6 +517,11 @@ public sealed partial class MainWindow : Window
             WorkflowCanvas.Children.Insert(0, link);
             _dynamicLinks.Add(link);
             _linkMap[link] = (from, to);
+            var arrow = new TextBlock { Text = "▶", FontSize = 14, FontWeight = Avalonia.Media.FontWeight.Bold, Foreground = from.BorderBrush };
+            Canvas.SetLeft(arrow, (fromLeft + from.Width + toLeft) / 2 - 7);
+            Canvas.SetTop(arrow, (fromTop + toTop + from.Height / 2) / 2 - 9);
+            WorkflowCanvas.Children.Add(arrow);
+            _dynamicArrows.Add(arrow);
         }
     }
 
