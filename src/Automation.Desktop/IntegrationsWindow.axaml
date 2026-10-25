@@ -17,8 +17,8 @@
 
   <Grid Margin="28" RowDefinitions="Auto,*,Auto">
     <StackPanel Spacing="5">
-      <TextBlock Text="Intégrations" FontSize="25" FontWeight="SemiBold" />
-      <TextBlock Text="Connecte les services utilisés dans tes automatisations." Classes="muted" />
+      <TextBlock x:Name="IntegrationsTitle" Text="Intégrations" FontSize="25" FontWeight="SemiBold" />
+      <TextBlock x:Name="IntegrationsDescription" Text="Connecte les services utilisés dans tes automatisations." Classes="muted" />
     </StackPanel>
 
     <Grid Grid.Row="1" Margin="0,25" ColumnDefinitions="*,*" ColumnSpacing="16">
@@ -31,7 +31,7 @@
             <StackPanel VerticalAlignment="Center"><TextBlock Text="OBS Studio" FontSize="18" FontWeight="SemiBold" /><TextBlock Text="WebSocket 5.x" Classes="muted" /></StackPanel>
           </StackPanel>
           <TextBlock Grid.Row="1" Margin="0,18" Text="Change de scène et contrôle OBS depuis les workflows CuezyBot." TextWrapping="Wrap" Classes="muted" />
-          <Button Grid.Row="2" Classes="primary" Content="Configurer OBS" Click="OnObsClick" HorizontalAlignment="Stretch" />
+          <Button x:Name="ObsButton" Grid.Row="2" Classes="primary" Content="Configurer OBS" Click="OnObsClick" HorizontalAlignment="Stretch" />
         </Grid>
       </Border>
 
@@ -44,11 +44,11 @@
             <StackPanel VerticalAlignment="Center"><TextBlock Text="Twitch" FontSize="18" FontWeight="SemiBold" /><TextBlock Text="OAuth et EventSub" Classes="muted" /></StackPanel>
           </StackPanel>
           <TextBlock Grid.Row="1" Margin="0,18" Text="Reçois les follows et autres événements autorisés de ta chaîne." TextWrapping="Wrap" Classes="muted" />
-          <Button Grid.Row="2" Classes="primary" Content="Connecter Twitch" Click="OnTwitchClick" HorizontalAlignment="Stretch" />
+          <Button x:Name="TwitchButton" Grid.Row="2" Classes="primary" Content="Connecter Twitch" Click="OnTwitchClick" HorizontalAlignment="Stretch" />
         </Grid>
       </Border>
     </Grid>
 
-    <Button Grid.Row="2" Content="Fermer" HorizontalAlignment="Right" Click="OnCloseClick" />
+    <Button x:Name="CloseButton" Grid.Row="2" Content="Fermer" HorizontalAlignment="Right" Click="OnCloseClick" />
   </Grid>
 </Window>
