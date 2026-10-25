@@ -645,16 +645,36 @@ public sealed partial class MainWindow : Window
     private void AddTriggerNode()
     {
         if (_triggerNode is not null) { UpdateTriggerNode(); return; }
+        var triggerPicker = new ComboBox
+        {
+            ItemsSource = _english ? new[] { "Manual run", "New Twitch follower" } : new[] { "Exécution manuelle", "Nouveau follower Twitch" },
+            SelectedIndex = PrototypeServices.CurrentTriggerType == "twitch.follow.received" ? 1 : 0,
+            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch,
+            FontSize = 12,
+            Tag = "triggerPicker"
+        };
         _triggerNode = new Border
         {
-            Width = 210, Height = 100, Background = new SolidColorBrush(Color.Parse("#151A32")),
-            BorderBrush = new SolidColorBrush(Color.Parse("#A640F4")), BorderThickness = new Thickness(2),
+            Width = 230, Height = 112, Background = new SolidColorBrush(Color.Parse("#151A32")),
+            BorderBrush = new SolidColorBrush(Color.Parse("#26C281")), BorderThickness = new Thickness(2),
             CornerRadius = new CornerRadius(11), Padding = new Thickness(12), IsHitTestVisible = false,
             Child = new StackPanel { Spacing = 10, Children =
             {
-                new TextBlock { Text = "⚡  Événement", Foreground = new SolidColorBrush(Color.Parse("#D39AFF")), FontSize = 11 },
-                new TextBlock { Name = "TriggerTitle", FontWeight = FontWeight.SemiBold, FontSize = 15 }
+                new TextBlock { Text = "⚡  Événement", Foreground = new SolidColorBrush(Color.Parse("#62E6AE")), FontSize = 11 },
+                triggerPicker
             }}
+        };
+        _triggerNode.IsHitTestVisible = true;
+        triggerPicker.SelectionChanged += (_, _) =>
+        {
+            if (triggerPicker.SelectedIndex < 0) return;
+            var trigger = triggerPicker.SelectedIndex == 1 ? "twitch.follow.received" : "manual.run";
+            PrototypeServices.CurrentTriggerType = trigger;
+            _workflowTriggerKinds[PrototypeServices.CurrentWorkflowId] = trigger;
+            var switching = _switchingWorkflow; _switchingWorkflow = true;
+            WorkflowTriggerSelector.SelectedIndex = triggerPicker.SelectedIndex;
+            _switchingWorkflow = switching;
+            TestStatus.Text = _english ? "Trigger changed — save and publish to apply" : "Déclencheur modifié — enregistre et publie pour appliquer";
         };
         Canvas.SetLeft(_triggerNode, 60); Canvas.SetTop(_triggerNode, 80);
         WorkflowCanvas.Children.Add(_triggerNode);
@@ -664,11 +684,12 @@ public sealed partial class MainWindow : Window
     private void UpdateTriggerNode()
     {
         if (_triggerNode is null) return;
-        var title = _workflowTriggerKinds.GetValueOrDefault(PrototypeServices.CurrentWorkflowId, PrototypeServices.CurrentTriggerType) == "twitch.follow.received"
-            ? (_english ? "New Twitch follower" : "Nouveau follower Twitch")
-            : (_english ? "Manual run" : "Exécution manuelle");
-        if (_triggerNode.Child is StackPanel panel && panel.Children.OfType<TextBlock>().LastOrDefault() is { } text)
-            text.Text = title;
+        if (_triggerNode.Child is StackPanel panel && panel.Children.OfType<ComboBox>().FirstOrDefault() is { } picker)
+        {
+            var selected = picker.SelectedIndex;
+            picker.ItemsSource = _english ? new[] { "Manual run", "New Twitch follower" } : new[] { "Exécution manuelle", "Nouveau follower Twitch" };
+            picker.SelectedIndex = selected;
+        }
     }
 
     private void AddActionNode(string label)
