@@ -5,6 +5,8 @@ namespace Automation.Desktop;
 
 public sealed partial class SettingsWindow : Window
 {
+    public SettingsWindow() : this("Français") { }
+
     public SettingsWindow(string language)
     {
         InitializeComponent();
