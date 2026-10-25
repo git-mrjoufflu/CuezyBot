@@ -519,10 +519,58 @@ public sealed partial class MainWindow : Window
             layout.Children.Add(visibility);
         }
         Canvas.SetLeft(node, 70 + (_addedActionCount % 3) * 230);
+        AddInlineActionOptions(node, label);
         Canvas.SetTop(node, 520 + (_addedActionCount / 3) * 165);
         WorkflowCanvas.Children.Add(node);
         _dynamicNodes.Add(node);
         _addedActionCount++;
+    }
+
+    private void AddInlineActionOptions(Border node, string label)
+    {
+        var name = label.Split('\u001f')[0].ToLowerInvariant();
+        var fields = new List<(string Key, string Fr, string En)>();
+        if (name.Contains("source"))
+        {
+            fields.Add(("scene", "Scène OBS", "OBS scene"));
+            fields.Add(("source", "Nom de la source", "Source name"));
+        }
+        else if (name.Contains("scene") || name.Contains("scène")) fields.Add(("scene", "Scène OBS", "OBS scene"));
+        else if (name.Contains("wait") || name.Contains("attendre")) fields.Add(("seconds", "Durée en secondes", "Duration in seconds"));
+        else if (name.Contains("title") || name.Contains("titre")) fields.Add(("title", "Nouveau titre", "New title"));
+        else if (name.Contains("message")) fields.Add(("message", "Message à envoyer", "Message to send"));
+        else if (name.Contains("variable"))
+        {
+            fields.Add(("name", "Nom de la variable", "Variable name"));
+            fields.Add(("value", "Valeur", "Value"));
+        }
+        else if (name.Contains("sound") || name.Contains("son")) fields.Add(("file", "Fichier audio", "Audio file"));
+        else if (name.Contains("utilisateur") || name.Contains("user")) fields.Add(("login", "Identifiant Twitch", "Twitch login"));
+        if (fields.Count == 0) return;
+        if (!PrototypeServices.ActionOptions.TryGetValue(label, out var options))
+            PrototypeServices.ActionOptions[label] = options = new System.Text.Json.Nodes.JsonObject();
+        var form = new StackPanel { Spacing = 6, Margin = new Thickness(12, 0, 12, 10) };
+        foreach (var (key, fr, en) in fields)
+        {
+            var input = new TextBox
+            {
+                PlaceholderText = _english ? en : fr,
+                Text = options[key]?.ToString() ?? (key == "seconds" ? "1" : ""),
+                FontSize = 12
+            };
+            ToolTip.SetTip(input, _english ? en : fr);
+            input.TextChanged += (_, _) =>
+            {
+                options[key] = input.Text ?? "";
+                TestStatus.Text = _english ? "Draft modified" : "Brouillon modifié";
+            };
+            form.Children.Add(input);
+        }
+        var grid = (Grid)node.Child!;
+        grid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+        Grid.SetRow(form, grid.RowDefinitions.Count - 1);
+        grid.Children.Add(form);
+        node.Height += fields.Count * 40 + 10;
     }
 
     private static (string Header, string Border, string Icon, string Text) GetActionPalette(string label)
@@ -548,7 +596,7 @@ public sealed partial class MainWindow : Window
 
     private void OnActionNodePressed(object? sender, PointerPressedEventArgs eventArgs)
     {
-        if ((eventArgs.Source as Visual)?.GetSelfAndVisualAncestors().Any(control => control is ComboBox || control is Button) == true) return;
+        if ((eventArgs.Source as Visual)?.GetSelfAndVisualAncestors().Any(control => control is ComboBox || control is Button || control is TextBox) == true) return;
         if (sender is not Border node) return;
         var point = eventArgs.GetCurrentPoint(node);
         if (point.Properties.PointerUpdateKind == PointerUpdateKind.RightButtonPressed)

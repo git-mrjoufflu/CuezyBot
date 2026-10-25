@@ -16,11 +16,15 @@ internal static class PrototypeServices
     internal static Guid CurrentWorkflowId { get; set; } = PrototypeWorkflowIds.WorkflowId;
     internal static string CurrentWorkflowName { get; set; } = "Mon Live Automatisation";
     internal static readonly Dictionary<string, bool> SourceVisibility = new(StringComparer.Ordinal);
+    internal static readonly Dictionary<string, JsonObject> ActionOptions = new(StringComparer.Ordinal);
 
     internal static async Task<IReadOnlyList<WorkflowDefinition>> GetDraftsAsync()
     {
         await EnsureInitializedAsync(default);
         var drafts = await new SqliteWorkflowRepository(Database).GetAllDraftsAsync();
+        foreach (var block in drafts.SelectMany(draft => draft.Blocks))
+            if (block.Parameters["label"]?.GetValue<string>() is { } key)
+                ActionOptions[key] = (JsonObject)block.Parameters.DeepClone();
         foreach (var block in drafts.SelectMany(draft => draft.Blocks).Where(block => block.Type == "obs.set-source-visible"))
             if (block.Parameters["label"]?.GetValue<string>() is { } label)
                 SourceVisibility[label] = block.Parameters["visible"]?.GetValue<bool>() ?? !(label.Contains("Hide", StringComparison.OrdinalIgnoreCase) || label.Contains("Masquer", StringComparison.OrdinalIgnoreCase));
@@ -166,7 +170,8 @@ internal static class PrototypeServices
         {
             var id = Guid.NewGuid();
             actionIds[label] = id;
-            var parameters = new JsonObject { ["label"] = label };
+            var parameters = ActionOptions.TryGetValue(label, out var options) ? (JsonObject)options.DeepClone() : new JsonObject();
+            parameters["label"] = label;
             if (ActionTypeFor(label) == "obs.set-source-visible")
                 parameters["visible"] = SourceVisibility.GetValueOrDefault(label, true);
             blocks.Add(new WorkflowBlock(id, ActionTypeFor(label), 1, parameters));
