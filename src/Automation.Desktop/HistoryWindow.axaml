@@ -44,8 +44,8 @@
                       <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="16" />
                       <TextBlock Text="{Binding Summary}" Classes="muted" FontSize="12" />
                     </StackPanel>
-                    <Border Grid.Column="2" Padding="10,5" CornerRadius="12" Background="#174B38" VerticalAlignment="Center">
-                      <TextBlock Text="{Binding StatusLabel}" Foreground="#72F0AA" FontWeight="SemiBold" FontSize="12" />
+                    <Border Grid.Column="2" Padding="10,5" CornerRadius="12" Background="{Binding StatusBackground}" VerticalAlignment="Center">
+                      <TextBlock Text="{Binding StatusLabel}" Foreground="{Binding StatusColor}" FontWeight="SemiBold" FontSize="12" />
                     </Border>
                   </Grid>
                 </Expander.Header>
@@ -53,7 +53,7 @@
                   <Grid ColumnDefinitions="*,*" ColumnSpacing="16">
                     <Border Grid.Column="0" Padding="13" CornerRadius="9" Background="#10152A">
                       <StackPanel Spacing="5">
-                        <TextBlock Text="ÉVÉNEMENT TWITCH" Classes="label" />
+                        <TextBlock Text="{Binding EventHeading}" Classes="label" />
                         <TextBlock Text="{Binding FollowerName}" FontSize="17" FontWeight="SemiBold" />
                         <TextBlock Text="{Binding FollowerDetails}" Classes="muted" />
                         <TextBlock Text="{Binding ReceivedLabel}" Classes="muted" FontSize="12" />
@@ -61,7 +61,7 @@
                     </Border>
                     <Border Grid.Column="1" Padding="13" CornerRadius="9" Background="#10152A">
                       <StackPanel Spacing="5">
-                        <TextBlock Text="EXÉCUTION" Classes="label" />
+                        <TextBlock Text="{Binding ExecutionHeading}" Classes="label" />
                         <TextBlock Text="{Binding DurationLabel}" FontWeight="SemiBold" />
                         <TextBlock Text="{Binding ExecutionIdLabel}" Classes="muted" FontSize="11" TextWrapping="Wrap" />
                         <TextBlock Text="{Binding MessageIdLabel}" Classes="muted" FontSize="11" TextWrapping="Wrap" />
@@ -69,12 +69,12 @@
                     </Border>
                   </Grid>
                   <StackPanel Spacing="7">
-                    <TextBlock Text="ÉTAPES DU PARCOURS" Classes="label" />
+                    <TextBlock Text="{Binding StepsHeading}" Classes="label" />
                     <ItemsControl ItemsSource="{Binding Steps}">
                       <ItemsControl.ItemTemplate>
                         <DataTemplate>
                           <Grid Margin="0,4" ColumnDefinitions="22,*,Auto">
-                            <TextBlock Text="✓" Foreground="#53D994" />
+                            <TextBlock Text="{Binding Icon}" Foreground="{Binding Color}" />
                             <TextBlock Grid.Column="1" Text="{Binding Message}" />
                             <TextBlock Grid.Column="2" Text="{Binding Duration}" Classes="muted" FontSize="12" />
                           </Grid>

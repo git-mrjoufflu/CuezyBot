@@ -22,6 +22,8 @@ public sealed partial class TwitchConnectionWindow : Window
 
     private void ApplyLanguage(bool english)
     {
+        PermissionsDescription.Text = english ? "Allow follower reading, title changes, chat messages and clip creation." : "Autorise la lecture des followers, la modification du titre, les messages de chat et la création de clips.";
+        PermissionsSummary.Text = english ? "Followers · broadcast information · chat · clips" : "Followers · informations de diffusion · chat · clips";
         foreach (var text in this.GetVisualDescendants().OfType<TextBlock>())
         {
             text.Text = text.Text switch

@@ -28,6 +28,24 @@ public sealed class DurableExecutionTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task ClaimSpecificRequest_DoesNotReplayOlderPendingWork()
+    {
+        var token = TestContext.Current.CancellationToken;
+        var database = new SqliteDatabase(new AppDataPaths(applicationDirectory)); await database.InitializeAsync(token);
+        var admissions = new SqliteEventAdmissionStore(database);
+        var oldEvent = CreateEvent();
+        var newEvent = CreateEvent() with { Id = Guid.NewGuid(), ProviderEventId = "new-message" };
+        var older = CreateRequest(oldEvent.Id);
+        var newer = CreateRequest(newEvent.Id);
+        await admissions.TryAdmitAsync(oldEvent, [older], token);
+        await admissions.TryAdmitAsync(newEvent, [newer], token);
+        var executions = new SqliteExecutionStore(database);
+        Assert.Equal(newer.Id, (await executions.TryClaimAsync(newer.Id, token))!.Id);
+        Assert.Null(await executions.TryClaimAsync(newer.Id, token));
+        Assert.Equal(older.Id, (await executions.TryClaimNextAsync(token))!.Id);
+    }
+
+    [Fact]
     public async Task DuplicateEvent_DoesNotRunOrIncrementTwice()
     {
         var database = new SqliteDatabase(new AppDataPaths(applicationDirectory));

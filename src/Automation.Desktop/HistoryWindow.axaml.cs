@@ -87,7 +87,9 @@ public sealed partial class HistoryWindow : Window
 
         var english = UiLanguageState.IsEnglish;
         return new HistoryRow(
-            english ? $"New follower: {userName}" : $"Nouveau follower : {userName}",
+            entry.EventType == "manual.run"
+                ? (english ? $"Manual run: {userName}" : $"Exécution manuelle : {userName}")
+                : (english ? $"New follower: {userName}" : $"Nouveau follower : {userName}"),
             english ? $"{entry.EventReceivedAt.ToLocalTime():g} · {entry.Steps.Count} step(s)" : $"{entry.EventReceivedAt.ToLocalTime():g} · {entry.Steps.Count} étape(s)",
             ToStatus(entry.Status, english),
             userName,
@@ -98,9 +100,16 @@ public sealed partial class HistoryWindow : Window
             english ? $"EventSub message: {entry.ProviderEventId}" : $"Message EventSub : {entry.ProviderEventId}",
             entry.Steps.Select(step => new StepRow(
                 TranslateStepMessage(step.Message, english),
-                FormatDuration(step.CompletedAt - step.StartedAt))).ToArray(),
+                FormatDuration(step.CompletedAt - step.StartedAt),
+                step.Status == ExecutionStatus.Succeeded ? "✓" : step.Status == ExecutionStatus.Cancelled ? "■" : "✕",
+                step.Status == ExecutionStatus.Succeeded ? "#53D994" : "#FF7587")).ToArray(),
             entry.Error ?? string.Empty,
-            !string.IsNullOrWhiteSpace(entry.Error));
+            !string.IsNullOrWhiteSpace(entry.Error),
+            english ? "EVENT" : "ÉVÉNEMENT",
+            english ? "EXECUTION" : "EXÉCUTION",
+            english ? "WORKFLOW STEPS" : "ÉTAPES DU PARCOURS",
+            entry.Status == ExecutionStatus.Succeeded ? "#174B38" : entry.Status == ExecutionStatus.Failed ? "#331A25" : "#3A3020",
+            entry.Status == ExecutionStatus.Succeeded ? "#72F0AA" : entry.Status == ExecutionStatus.Failed ? "#FF7587" : "#FFD081");
     }
 
     private static string FormatDuration(TimeSpan duration) => duration.TotalSeconds >= 1
@@ -111,7 +120,13 @@ public sealed partial class HistoryWindow : Window
     {
         if (!english)
         {
-            return message;
+            return message.Replace("Follower event received", "Événement follower reçu", StringComparison.Ordinal)
+                .Replace("Twitch title updated", "Titre Twitch modifié", StringComparison.Ordinal)
+                .Replace("OBS replay buffer started", "Tampon de replay OBS démarré", StringComparison.Ordinal)
+                .Replace("OBS scene:", "Scène OBS :", StringComparison.Ordinal)
+                .Replace("Wait:", "Attente :", StringComparison.Ordinal)
+                .Replace("source(s) shown", "source(s) affichées", StringComparison.Ordinal)
+                .Replace("source(s) hidden", "source(s) masquées", StringComparison.Ordinal);
         }
 
         if (message.StartsWith("Compteur followersTraites", StringComparison.OrdinalIgnoreCase))
@@ -151,7 +166,12 @@ public sealed partial class HistoryWindow : Window
         string MessageIdLabel,
         IReadOnlyList<StepRow> Steps,
         string Error,
-        bool HasError);
+        bool HasError,
+        string EventHeading,
+        string ExecutionHeading,
+        string StepsHeading,
+        string StatusBackground,
+        string StatusColor);
 
-    private sealed record StepRow(string Message, string Duration);
+    private sealed record StepRow(string Message, string Duration, string Icon, string Color);
 }

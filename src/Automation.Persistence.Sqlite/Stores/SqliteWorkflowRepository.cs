@@ -33,6 +33,20 @@ public sealed class SqliteWorkflowRepository(SqliteDatabase database) : IWorkflo
         return drafts;
     }
 
+    public Task<WorkflowDefinition?> GetRevisionAsync(Guid workflowId, int revision, CancellationToken cancellationToken = default) =>
+        ReadDefinitionAsync($"SELECT definition_json FROM workflow_revisions WHERE workflow_id = $id AND revision = {revision};", workflowId, cancellationToken);
+
+    public async Task<IReadOnlyList<WorkflowDefinition>> GetEnabledPublishedAsync(CancellationToken cancellationToken = default)
+    {
+        await using var connection = database.OpenConnection();
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT r.definition_json FROM workflows w JOIN workflow_revisions r ON r.workflow_id = w.id AND r.revision = w.published_revision WHERE w.is_active = 1 ORDER BY w.id;";
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        var workflows = new List<WorkflowDefinition>();
+        while (await reader.ReadAsync(cancellationToken)) workflows.Add(Deserialize(reader.GetString(0)) with { Enabled = true });
+        return workflows;
+    }
+
     public async Task SaveDraftAsync(
         WorkflowDefinition workflow,
         CancellationToken cancellationToken = default)
@@ -47,7 +61,6 @@ public sealed class SqliteWorkflowRepository(SqliteDatabase database) : IWorkflo
             ON CONFLICT(id) DO UPDATE SET
                 name = excluded.name,
                 draft_json = excluded.draft_json,
-                is_active = excluded.is_active,
                 updated_at = excluded.updated_at;
             """;
         command.Parameters.AddWithValue("$id", workflow.Id.ToString("D"));

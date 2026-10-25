@@ -92,6 +92,21 @@ public sealed class ObsWebSocketClient : IObsController, IAsyncDisposable
             .OfType<string>().Distinct().ToArray() ?? [];
     }
 
+    public async Task SetSourceVisibilityAsync(string scene, IReadOnlyCollection<string> sources, bool visible, CancellationToken cancellationToken = default)
+    {
+        var response = await SendRequestAsync("GetSceneItemList", new JsonObject { ["sceneName"] = scene }, TimeSpan.FromSeconds(10), cancellationToken);
+        var items = response["responseData"]?["sceneItems"]?.AsArray() ?? throw new InvalidDataException("OBS sceneItems missing");
+        // Resolve every name before applying anything, so a missing source cannot produce partial changes.
+        var targets = sources.Select(source => items.Where(item => item?["sourceName"]?.GetValue<string>() == source)
+            .Select(item => item!["sceneItemId"]!.GetValue<int>()).ToArray()).ToArray();
+        if (targets.Any(ids => ids.Length == 0)) throw new InvalidOperationException("OBS: source introuvable dans la scène sélectionnée.");
+        foreach (var id in targets.SelectMany(ids => ids).Distinct())
+            await SendRequestAsync("SetSceneItemEnabled", new JsonObject { ["sceneName"] = scene, ["sceneItemId"] = id, ["sceneItemEnabled"] = visible }, TimeSpan.FromSeconds(10), cancellationToken);
+    }
+
+    public async Task StartReplayBufferAsync(CancellationToken cancellationToken = default) =>
+        await SendRequestAsync("StartReplayBuffer", new JsonObject(), TimeSpan.FromSeconds(10), cancellationToken);
+
     public async ValueTask DisposeAsync()
     {
         lifetime.Cancel();

@@ -7,7 +7,11 @@ namespace Automation.Persistence.Sqlite.Stores;
 
 public sealed class SqliteExecutionStore(SqliteDatabase database) : IExecutionStore
 {
-    public async Task<ExecutionRequest?> TryClaimNextAsync(CancellationToken cancellationToken = default)
+    public Task<ExecutionRequest?> TryClaimNextAsync(CancellationToken cancellationToken = default) => ClaimAsync(null, cancellationToken);
+
+    public Task<ExecutionRequest?> TryClaimAsync(Guid requestId, CancellationToken cancellationToken = default) => ClaimAsync(requestId, cancellationToken);
+
+    private async Task<ExecutionRequest?> ClaimAsync(Guid? requestId, CancellationToken cancellationToken)
     {
         await using var connection = database.OpenConnection();
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
@@ -16,10 +20,11 @@ public sealed class SqliteExecutionStore(SqliteDatabase database) : IExecutionSt
         select.CommandText = """
             SELECT id, event_id, workflow_id, workflow_revision, created_at
             FROM execution_requests
-            WHERE status = 'Pending'
+            WHERE status = 'Pending' AND ($requestId IS NULL OR id = $requestId)
             ORDER BY rowid
             LIMIT 1;
             """;
+        select.Parameters.AddWithValue("$requestId", requestId is { } id ? id.ToString("D") : DBNull.Value);
 
         await using var reader = await select.ExecuteReaderAsync(cancellationToken);
         if (!await reader.ReadAsync(cancellationToken))

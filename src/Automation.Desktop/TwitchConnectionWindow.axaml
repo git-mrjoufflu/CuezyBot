@@ -26,15 +26,15 @@
           <TextBlock Text="Connexion sécurisée dans le navigateur" Classes="muted" />
         </StackPanel>
       </StackPanel>
-      <TextBlock Text="CuezyBot demandera uniquement la permission de lire les nouveaux followers pour ce prototype." TextWrapping="Wrap" Classes="muted" Margin="0,8,0,0" />
+      <TextBlock x:Name="PermissionsDescription" Text="Autorise la lecture des followers et la modification du titre de ta chaîne." TextWrapping="Wrap" Classes="muted" Margin="0,8,0,0" />
     </StackPanel>
 
     <StackPanel Grid.Row="1" Margin="0,24,0,0" Spacing="15">
       <Border Padding="16" CornerRadius="10" Background="#151A31" BorderBrush="#2C3353" BorderThickness="1">
         <StackPanel Spacing="8">
           <TextBlock Text="Permission demandée" FontWeight="SemiBold" />
-          <TextBlock Text="Lire la liste des followers de ta chaîne" />
-          <TextBlock Text="moderator:read:followers" Classes="muted" FontSize="12" />
+          <TextBlock x:Name="PermissionsSummary" Text="Lire les followers et modifier les informations de diffusion" TextWrapping="Wrap" />
+          <TextBlock Text="moderator:read:followers · channel:manage:broadcast · user:write:chat · clips:edit" Classes="muted" FontSize="12" TextWrapping="Wrap" />
         </StackPanel>
       </Border>
 

@@ -33,6 +33,7 @@ public sealed partial class MainWindow : Window
     private string _activeWorkflowName = "Mon Live Automatisation";
     private bool _switchingWorkflow;
     private readonly Dictionary<string, Guid> _workflowIds = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<Guid> _enabledWorkflowIds = new();
     private Point _dragPointerStart;
     private double _dragNodeLeft;
     private double _dragNodeTop;
@@ -64,6 +65,7 @@ public sealed partial class MainWindow : Window
             var language = await ConnectionPersistence.GetLanguageAsync();
             ApplyLanguage(language == "English");
             var drafts = await PrototypeServices.GetDraftsAsync();
+            _enabledWorkflowIds.UnionWith(await PrototypeServices.GetEnabledWorkflowIdsAsync());
             if (drafts.Count > 0)
             {
                 _switchingWorkflow = true;
@@ -75,7 +77,7 @@ public sealed partial class MainWindow : Window
                     if (_workflowIds.ContainsKey(name)) name += $" ({draft.Id.ToString()[..8]})";
                     _workflowNames.Add(name);
                     _workflowIds[name] = draft.Id;
-                    _workflowActions[name] = draft.Blocks.Skip(3).Select(block => block.Parameters["label"]?.GetValue<string>()).OfType<string>().ToList();
+                    _workflowActions[name] = draft.Blocks.Select(block => block.Parameters["label"]?.GetValue<string>()).OfType<string>().ToList();
                     var labels = draft.Blocks.Where(block => block.Parameters["label"] is not null).ToDictionary(block => block.Id, block => block.Parameters["label"]!.GetValue<string>());
                     _workflowLinks[name] = draft.Connections.Where(link => labels.ContainsKey(link.FromBlockId) && labels.ContainsKey(link.ToBlockId)).Select(link => (labels[link.FromBlockId], labels[link.ToBlockId])).ToList();
                     _workflowPositions[name] = new Dictionary<string, Point>(await ConnectionPersistence.GetWorkflowPositionsAsync(name));
@@ -149,6 +151,7 @@ public sealed partial class MainWindow : Window
         WorkflowSelector.SelectedIndex = _workflowNames.Count - 1;
         _activeWorkflowName = name;
         ClearWorkflowCanvas();
+        StartWorkflowButton.Content = _english ? "▶  Start" : "▶  Démarrer";
         _switchingWorkflow = false;
         TestStatus.Text = _english ? "New automation created" : "Nouvelle automatisation créée";
     }
@@ -184,7 +187,8 @@ public sealed partial class MainWindow : Window
                 if (!_workflowIds.ContainsKey(name)) _workflowIds[name] = PrototypeServices.CurrentWorkflowId;
                 PrototypeServices.CurrentWorkflowId = _workflowIds[name];
                 PrototypeServices.CurrentWorkflowName = name;
-                StartWorkflowButton.Content = _english ? "▶  Start" : "▶  Démarrer";
+                StartWorkflowButton.Content = _enabledWorkflowIds.Contains(PrototypeServices.CurrentWorkflowId)
+                    ? (_english ? "■  Stop" : "■  Arrêter") : (_english ? "▶  Start" : "▶  Démarrer");
             }
             TestStatus.Text = _english ? $"Editing: {name}" : $"Édition : {name}";
         }
@@ -288,10 +292,12 @@ public sealed partial class MainWindow : Window
 
     private async void OnSaveWorkflowClick(object? sender, RoutedEventArgs eventArgs)
     {
+        var name = _activeWorkflowName;
+        var positions = _dynamicNodes.Where(node => node.Tag is string).ToDictionary(node => (string)node.Tag!, node => new Point(Canvas.GetLeft(node), Canvas.GetTop(node)));
         try
         {
             await PrototypeServices.SavePrototypeDraftAsync(_selectedActions, GetManualLinkLabels());
-            await ConnectionPersistence.SaveWorkflowPositionsAsync(_activeWorkflowName, _dynamicNodes.Where(node => node.Tag is string).ToDictionary(node => (string)node.Tag!, node => new Point(Canvas.GetLeft(node), Canvas.GetTop(node))));
+            await ConnectionPersistence.SaveWorkflowPositionsAsync(name, positions);
             TestStatus.Text = _english ? "Draft saved" : "Brouillon enregistré";
         }
         catch (Exception exception)
@@ -300,10 +306,25 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    private async void OnRunOnceClick(object? sender, RoutedEventArgs eventArgs)
+    {
+        RunOnceButton.IsEnabled = false;
+        TestStatus.Text = _english ? "Running published workflow…" : "Exécution du workflow publié…";
+        try
+        {
+            var result = await PrototypeServices.RunPublishedOnceAsync();
+            TestStatus.Text = result == Automation.Domain.Execution.ExecutionStatus.Succeeded
+                ? (_english ? "Run completed — open History for details" : "Exécution terminée — détails dans l’historique")
+                : (_english ? "Run failed or cancelled — open History" : "Exécution échouée ou annulée — ouvre l’historique");
+        }
+        catch (Exception exception) { TestStatus.Text = exception.Message; }
+        finally { RunOnceButton.IsEnabled = true; }
+    }
+
     private async void OnStartWorkflowClick(object? sender, RoutedEventArgs eventArgs)
     {
-        var stopping = StartWorkflowButton.Content?.ToString()?.Contains("Stop", StringComparison.Ordinal) == true
-            || StartWorkflowButton.Content?.ToString()?.Contains("Arrêter", StringComparison.Ordinal) == true;
+        var workflowId = PrototypeServices.CurrentWorkflowId;
+        var stopping = _enabledWorkflowIds.Contains(workflowId);
         if (!stopping)
         {
             try
@@ -314,6 +335,7 @@ public sealed partial class MainWindow : Window
                     return;
                 }
                 await PrototypeServices.PublishPrototypeAsync(_selectedActions, GetManualLinkLabels());
+                _enabledWorkflowIds.Add(workflowId);
             }
             catch (Exception exception)
             {
@@ -324,7 +346,9 @@ public sealed partial class MainWindow : Window
         else
         {
             await PrototypeServices.DisablePrototypeAsync();
+            _enabledWorkflowIds.Remove(workflowId);
         }
+        if (PrototypeServices.CurrentWorkflowId != workflowId) return;
         TestStatus.Text = stopping
             ? (_english ? "Automation stopped" : "Automatisation arrêtée")
             : (_english ? "Automation published and enabled" : "Automatisation publiée et activée");
@@ -558,6 +582,25 @@ public sealed partial class MainWindow : Window
         if (!PrototypeServices.ActionOptions.TryGetValue(label, out var options))
             PrototypeServices.ActionOptions[label] = options = new System.Text.Json.Nodes.JsonObject();
         var form = new StackPanel { Spacing = 6, Margin = new Thickness(12, 0, 12, 10) };
+        if (name.Contains("variable"))
+        {
+            form.Children.Add(CreateFieldLabel("Opération", "Operation"));
+            var operation = new ComboBox
+            {
+                Tag = "variableOperations",
+                ItemsSource = _english ? new[] { "Set", "Add" } : new[] { "Définir", "Ajouter" },
+                SelectedIndex = options["operation"]?.ToString() == "increment" ? 1 : 0,
+                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch
+            };
+            operation.SelectionChanged += (_, _) =>
+            {
+                if (operation.SelectedIndex < 0) return;
+                options["operation"] = operation.SelectedIndex == 1 ? "increment" : "set";
+                TestStatus.Text = _english ? "Draft modified" : "Brouillon modifié";
+            };
+            form.Children.Add(operation);
+            node.Height += 64;
+        }
         StackPanel? sourcePicker = null;
         ComboBox? scenePicker = null;
         var restoringScene = false;
@@ -1011,6 +1054,8 @@ public sealed partial class MainWindow : Window
     internal void ApplyLanguage(bool english)
     {
         _english = english;
+        RunOnceButton.Content = english ? "Run once" : "Exécuter";
+        ToolTip.SetTip(RunOnceButton, english ? "Run the published version with real effects" : "Exécuter la version publiée avec des effets réels");
         UiLanguageState.IsEnglish = english;
         SaveWorkflowButton.Content = english ? "Save" : "Enregistrer";
         if (StartWorkflowButton.Content?.ToString()?.Contains("Stop", StringComparison.Ordinal) == true || StartWorkflowButton.Content?.ToString()?.Contains("Arrêter", StringComparison.Ordinal) == true)
@@ -1094,6 +1139,12 @@ public sealed partial class MainWindow : Window
             {
                 var selected = picker.SelectedIndex;
                 picker.ItemsSource = english ? new[] { "Show", "Hide" } : new[] { "Afficher", "Masquer" };
+                picker.SelectedIndex = selected;
+            }
+            if (Equals(picker.Tag, "variableOperations"))
+            {
+                var selected = picker.SelectedIndex;
+                picker.ItemsSource = english ? new[] { "Set", "Add" } : new[] { "Définir", "Ajouter" };
                 picker.SelectedIndex = selected;
             }
         }
