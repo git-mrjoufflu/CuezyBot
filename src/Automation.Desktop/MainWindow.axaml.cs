@@ -496,6 +496,7 @@ public sealed partial class MainWindow : Window
     {
         foreach (var link in _dynamicLinks) WorkflowCanvas.Children.Remove(link);
         _dynamicLinks.Clear();
+        var targetGroups = _manualLinks.GroupBy(link => link.To).ToDictionary(group => group.Key, group => group.ToList());
         foreach (var (from, to) in _manualLinks)
         {
             var fromLeft = Canvas.GetLeft(from);
@@ -505,12 +506,15 @@ public sealed partial class MainWindow : Window
             var fromCenter = new Point(fromLeft + from.Width / 2, fromTop + from.Height / 2);
             var toCenter = new Point(toLeft + to.Width / 2, toTop + to.Height / 2);
             var horizontal = Math.Abs(toCenter.X - fromCenter.X) >= Math.Abs(toCenter.Y - fromCenter.Y);
+            var targetIndex = targetGroups[to].IndexOf((from, to));
+            var targetCount = targetGroups[to].Count;
+            var spread = (targetIndex - (targetCount - 1) / 2d) * 14;
             var start = horizontal
                 ? new Point(toCenter.X >= fromCenter.X ? fromLeft + from.Width : fromLeft, fromCenter.Y)
                 : new Point(fromCenter.X, toCenter.Y >= fromCenter.Y ? fromTop + from.Height : fromTop);
             var end = horizontal
-                ? new Point(toCenter.X >= fromCenter.X ? toLeft - 2 : toLeft + to.Width + 2, toCenter.Y)
-                : new Point(toCenter.X, toCenter.Y >= fromCenter.Y ? toTop - 2 : toTop + to.Height + 2);
+                ? new Point(toCenter.X >= fromCenter.X ? toLeft - 2 : toLeft + to.Width + 2, toCenter.Y + spread)
+                : new Point(toCenter.X + spread, toCenter.Y >= fromCenter.Y ? toTop - 2 : toTop + to.Height + 2);
             var dx = end.X - start.X;
             var dy = end.Y - start.Y;
             var length = Math.Max(1, Math.Sqrt(dx * dx + dy * dy));
