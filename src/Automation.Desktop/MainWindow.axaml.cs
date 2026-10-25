@@ -31,6 +31,7 @@ public sealed partial class MainWindow : Window
     private readonly Dictionary<string, Dictionary<string, Point>> _workflowPositions = new(StringComparer.OrdinalIgnoreCase);
     private string _activeWorkflowName = "Mon Live Automatisation";
     private bool _switchingWorkflow;
+    private readonly Dictionary<string, Guid> _workflowIds = new(StringComparer.OrdinalIgnoreCase);
     private Point _dragPointerStart;
     private double _dragNodeLeft;
     private double _dragNodeTop;
@@ -38,6 +39,7 @@ public sealed partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        _workflowIds[_activeWorkflowName] = PrototypeServices.CurrentWorkflowId;
         WorkflowSelector.ItemsSource = _workflowNames.ToArray();
         foreach (var node in new[] { EventNode, ConditionNode, ObsAlertNode })
         {
@@ -60,6 +62,30 @@ public sealed partial class MainWindow : Window
             HidePrototypeNodes();
             var language = await ConnectionPersistence.GetLanguageAsync();
             ApplyLanguage(language == "English");
+            var drafts = await PrototypeServices.GetDraftsAsync();
+            if (drafts.Count > 0)
+            {
+                _switchingWorkflow = true;
+                _workflowNames.Clear();
+                _workflowIds.Clear();
+                foreach (var draft in drafts)
+                {
+                    var name = draft.Name;
+                    if (_workflowIds.ContainsKey(name)) name += $" ({draft.Id.ToString()[..8]})";
+                    _workflowNames.Add(name);
+                    _workflowIds[name] = draft.Id;
+                    _workflowActions[name] = draft.Blocks.Skip(3).Select(block => block.Parameters["label"]?.GetValue<string>()).OfType<string>().ToList();
+                    var labels = draft.Blocks.Where(block => block.Parameters["label"] is not null).ToDictionary(block => block.Id, block => block.Parameters["label"]!.GetValue<string>());
+                    _workflowLinks[name] = draft.Connections.Where(link => labels.ContainsKey(link.FromBlockId) && labels.ContainsKey(link.ToBlockId)).Select(link => (labels[link.FromBlockId], labels[link.ToBlockId])).ToList();
+                    _workflowPositions[name] = new Dictionary<string, Point>(await ConnectionPersistence.GetWorkflowPositionsAsync(name));
+                }
+                _activeWorkflowName = _workflowNames[0];
+                PrototypeServices.CurrentWorkflowId = _workflowIds[_activeWorkflowName];
+                PrototypeServices.CurrentWorkflowName = _activeWorkflowName;
+                WorkflowSelector.ItemsSource = _workflowNames.ToArray();
+                WorkflowSelector.SelectedIndex = 0;
+                _switchingWorkflow = false;
+            }
             if (await PrototypeServices.HasPrototypeDraftAsync())
             {
                 foreach (var action in await PrototypeServices.GetDraftActionLabelsAsync())
@@ -108,10 +134,14 @@ public sealed partial class MainWindow : Window
     {
         _switchingWorkflow = true;
         var name = _english ? $"New automation {_workflowNames.Count + 1}" : $"Nouvelle automatisation {_workflowNames.Count + 1}";
+        while (_workflowNames.Contains(name)) name += " +";
         _workflowActions[_activeWorkflowName] = _selectedActions.ToList();
         _workflowLinks[_activeWorkflowName] = GetManualLinkLabels().ToList();
         _workflowPositions[_activeWorkflowName] = _dynamicNodes.Where(node => node.Tag is string).ToDictionary(node => (string)node.Tag!, node => new Point(Canvas.GetLeft(node), Canvas.GetTop(node)));
         _workflowNames.Add(name);
+        _workflowIds[name] = Guid.NewGuid();
+        PrototypeServices.CurrentWorkflowId = _workflowIds[name];
+        PrototypeServices.CurrentWorkflowName = name;
         _workflowActions[name] = new List<string>();
         _workflowPositions[name] = new Dictionary<string, Point>();
         WorkflowSelector.ItemsSource = _workflowNames.ToArray();
@@ -150,6 +180,10 @@ public sealed partial class MainWindow : Window
                     }
                 UpdateDynamicLinks();
                 _activeWorkflowName = name;
+                if (!_workflowIds.ContainsKey(name)) _workflowIds[name] = PrototypeServices.CurrentWorkflowId;
+                PrototypeServices.CurrentWorkflowId = _workflowIds[name];
+                PrototypeServices.CurrentWorkflowName = name;
+                StartWorkflowButton.Content = _english ? "▶  Start" : "▶  Démarrer";
             }
             TestStatus.Text = _english ? $"Editing: {name}" : $"Édition : {name}";
         }
@@ -190,6 +224,8 @@ public sealed partial class MainWindow : Window
             if (_workflowLinks.Remove(current, out var links)) _workflowLinks[result] = links;
             if (_workflowPositions.Remove(current, out var positions)) _workflowPositions[result] = positions;
             _activeWorkflowName = result;
+            if (_workflowIds.Remove(current, out var id)) _workflowIds[result] = id;
+            PrototypeServices.CurrentWorkflowName = result;
             _switchingWorkflow = false;
             TestStatus.Text = _english ? "Automation renamed" : "Automatisation renommée";
         }

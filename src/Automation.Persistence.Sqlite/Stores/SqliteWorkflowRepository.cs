@@ -10,6 +10,17 @@ public sealed class SqliteWorkflowRepository(SqliteDatabase database) : IWorkflo
 {
     private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web);
 
+    public async Task<IReadOnlyList<WorkflowDefinition>> GetAllDraftsAsync(CancellationToken cancellationToken = default)
+    {
+        await using var connection = database.OpenConnection();
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT draft_json FROM workflows WHERE draft_json IS NOT NULL ORDER BY updated_at, id;";
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        var drafts = new List<WorkflowDefinition>();
+        while (await reader.ReadAsync(cancellationToken)) drafts.Add(Deserialize(reader.GetString(0)));
+        return drafts;
+    }
+
     public async Task SaveDraftAsync(
         WorkflowDefinition workflow,
         CancellationToken cancellationToken = default)

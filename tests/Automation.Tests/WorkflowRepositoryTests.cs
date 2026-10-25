@@ -25,6 +25,25 @@ public sealed class WorkflowRepositoryTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task SavingSecondWorkflow_PreservesFirstAfterReopeningRepository()
+    {
+        var database = new SqliteDatabase(new AppDataPaths(applicationDirectory));
+        await database.InitializeAsync(TestContext.Current.CancellationToken);
+        var repository = new SqliteWorkflowRepository(database);
+        var first = CreateWorkflow(Guid.NewGuid(), Guid.NewGuid(), 1, "Premier");
+        var second = CreateWorkflow(Guid.NewGuid(), Guid.NewGuid(), 1, "Second");
+        await repository.SaveDraftAsync(first, TestContext.Current.CancellationToken);
+        await repository.SaveDraftAsync(second, TestContext.Current.CancellationToken);
+        await repository.SaveDraftAsync(second with { Name = "Second modifié" }, TestContext.Current.CancellationToken);
+        var reopened = new SqliteWorkflowRepository(new SqliteDatabase(new AppDataPaths(applicationDirectory)));
+        var drafts = await reopened.GetAllDraftsAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(2, drafts.Count);
+        Assert.Equal("Premier", drafts.Single(draft => draft.Id == first.Id).Name);
+        Assert.Equal(first.Blocks[0].Id, drafts.Single(draft => draft.Id == first.Id).Blocks[0].Id);
+        Assert.Equal("Second modifié", drafts.Single(draft => draft.Id == second.Id).Name);
+    }
+
+    [Fact]
     public async Task PublishedRevision_DoesNotChangeWhenDraftChanges()
     {
         var database = new SqliteDatabase(new AppDataPaths(applicationDirectory));

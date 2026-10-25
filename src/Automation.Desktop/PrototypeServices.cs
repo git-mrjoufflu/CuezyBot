@@ -13,6 +13,14 @@ namespace Automation.Desktop;
 
 internal static class PrototypeServices
 {
+    internal static Guid CurrentWorkflowId { get; set; } = PrototypeWorkflowIds.WorkflowId;
+    internal static string CurrentWorkflowName { get; set; } = "Mon Live Automatisation";
+
+    internal static async Task<IReadOnlyList<WorkflowDefinition>> GetDraftsAsync()
+    {
+        await EnsureInitializedAsync(default);
+        return await new SqliteWorkflowRepository(Database).GetAllDraftsAsync();
+    }
     private static readonly AppDataPaths Paths = new();
     private static readonly SqliteDatabase Database = new(Paths);
     private static bool initialized;
@@ -59,7 +67,6 @@ internal static class PrototypeServices
     {
         await EnsureInitializedAsync(cancellationToken);
         var workflow = CreatePrototypeWorkflow(selectedActions, manualLinks);
-        EnsureValid(workflow);
         await new SqliteWorkflowRepository(Database).SaveDraftAsync(workflow, cancellationToken);
     }
 
@@ -67,13 +74,13 @@ internal static class PrototypeServices
     {
         await EnsureInitializedAsync(cancellationToken);
         return await new SqliteWorkflowRepository(Database)
-            .GetDraftAsync(PrototypeWorkflowIds.WorkflowId, cancellationToken) is not null;
+            .GetDraftAsync(CurrentWorkflowId, cancellationToken) is not null;
     }
 
     internal static async Task<IReadOnlyList<string>> GetDraftActionLabelsAsync(CancellationToken cancellationToken = default)
     {
         await EnsureInitializedAsync(cancellationToken);
-        var workflow = await new SqliteWorkflowRepository(Database).GetDraftAsync(PrototypeWorkflowIds.WorkflowId, cancellationToken);
+        var workflow = await new SqliteWorkflowRepository(Database).GetDraftAsync(CurrentWorkflowId, cancellationToken);
         return workflow?.Blocks
             .Skip(3)
             .Select(block => block.Parameters["label"]?.GetValue<string>())
@@ -85,7 +92,7 @@ internal static class PrototypeServices
     internal static async Task<IReadOnlyList<(string From, string To)>> GetDraftManualLinksAsync(CancellationToken cancellationToken = default)
     {
         await EnsureInitializedAsync(cancellationToken);
-        var workflow = await new SqliteWorkflowRepository(Database).GetDraftAsync(PrototypeWorkflowIds.WorkflowId, cancellationToken);
+        var workflow = await new SqliteWorkflowRepository(Database).GetDraftAsync(CurrentWorkflowId, cancellationToken);
         if (workflow is null) return [];
         var labels = workflow.Blocks.ToDictionary(
             block => block.Id,
@@ -102,21 +109,21 @@ internal static class PrototypeServices
     {
         await EnsureInitializedAsync(cancellationToken);
         var workflow = await new SqliteWorkflowRepository(Database)
-            .GetPublishedAsync(PrototypeWorkflowIds.WorkflowId, cancellationToken);
+            .GetPublishedAsync(CurrentWorkflowId, cancellationToken);
         return workflow?.Enabled == true ? workflow.Revision : null;
     }
 
     internal static async Task DisablePrototypeAsync(CancellationToken cancellationToken = default)
     {
         await EnsureInitializedAsync(cancellationToken);
-        await new SqliteWorkflowRepository(Database).SetEnabledAsync(PrototypeWorkflowIds.WorkflowId, false, cancellationToken);
+        await new SqliteWorkflowRepository(Database).SetEnabledAsync(CurrentWorkflowId, false, cancellationToken);
     }
 
     internal static async Task PublishPrototypeAsync(IReadOnlyCollection<string>? selectedActions = null, IReadOnlyCollection<(string From, string To)>? manualLinks = null, CancellationToken cancellationToken = default)
     {
         await EnsureInitializedAsync(cancellationToken);
         var repository = new SqliteWorkflowRepository(Database);
-        var previous = await repository.GetPublishedAsync(PrototypeWorkflowIds.WorkflowId, cancellationToken);
+        var previous = await repository.GetPublishedAsync(CurrentWorkflowId, cancellationToken);
         var revision = (previous?.Revision ?? 0) + 1;
         var workflow = CreatePrototypeWorkflow(selectedActions, manualLinks) with { Enabled = true, Revision = revision };
         EnsureValid(workflow);
@@ -155,9 +162,9 @@ internal static class PrototypeServices
         }
 
         return new WorkflowDefinition(
-            PrototypeWorkflowIds.WorkflowId,
+            CurrentWorkflowId,
             1,
-            "Mon Live Automatisation",
+            CurrentWorkflowName,
             false,
             blocks,
             connections);
