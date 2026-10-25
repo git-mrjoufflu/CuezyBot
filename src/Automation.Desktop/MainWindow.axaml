@@ -189,20 +189,7 @@
           </StackPanel>
         </Border>
 
-        <Path Data="M 280,225 C 325,225 318,275 360,275" Stroke="#4C9CFF" StrokeThickness="3" />
-        <Path Data="M 570,275 C 625,275 610,170 670,170" Stroke="#53D994" StrokeThickness="3" />
-        <Path Data="M 570,275 C 620,275 615,355 670,355" Stroke="#A640F4" StrokeThickness="3" />
-        <Path Data="M 465,327 C 465,425 525,445 575,445" Stroke="#FF465F" StrokeThickness="3" />
-        <Path Data="M 785,445 C 830,445 825,445 865,445" Stroke="#A640F4" StrokeThickness="3" />
-
-        <Border Canvas.Left="235" Canvas.Top="218" Width="12" Height="12" CornerRadius="6" Background="#4C9CFF" />
-        <Border Canvas.Left="354" Canvas.Top="269" Width="12" Height="12" CornerRadius="6" Background="#4C9CFF" />
-        <Border Canvas.Left="564" Canvas.Top="269" Width="12" Height="12" CornerRadius="6" Background="#53D994" />
-        <Border Canvas.Left="664" Canvas.Top="164" Width="12" Height="12" CornerRadius="6" Background="#53D994" />
-        <Border Canvas.Left="664" Canvas.Top="349" Width="12" Height="12" CornerRadius="6" Background="#A640F4" />
-        <Border Canvas.Left="459" Canvas.Top="321" Width="12" Height="12" CornerRadius="6" Background="#FF465F" />
-        <Border Canvas.Left="569" Canvas.Top="439" Width="12" Height="12" CornerRadius="6" Background="#A640F4" />
-        <Border Canvas.Left="779" Canvas.Top="439" Width="12" Height="12" CornerRadius="6" Background="#A640F4" />
+        <!-- Prototype demo links removed: links are created manually by the user. -->
 
         <Border x:Name="EventNode" Canvas.Left="75" Canvas.Top="175" Width="210" Height="100" Classes="node" BorderBrush="#9B42FF">
           <Grid RowDefinitions="32,*">
