@@ -55,6 +55,7 @@ public sealed partial class MainWindow : Window
     {
         try
         {
+            HidePrototypeNodes();
             var language = await ConnectionPersistence.GetLanguageAsync();
             ApplyLanguage(language == "English");
             if (await PrototypeServices.HasPrototypeDraftAsync())
@@ -87,6 +88,14 @@ public sealed partial class MainWindow : Window
         {
             ApplyLanguage(false);
         }
+    }
+
+    private void HidePrototypeNodes()
+    {
+        foreach (var demoNode in this.GetVisualDescendants().OfType<Border>().Where(border => border.Classes.Contains("node")))
+            demoNode.IsVisible = false;
+        foreach (var demoPath in this.GetVisualDescendants().OfType<Avalonia.Controls.Shapes.Path>())
+            demoPath.IsVisible = false;
     }
 
     private void OnNewWorkflowClick(object? sender, RoutedEventArgs eventArgs)
