@@ -498,8 +498,28 @@ public sealed partial class MainWindow : Window
                 }
             }
         };
+        if (label.Contains("source", StringComparison.OrdinalIgnoreCase))
+        {
+            node.Height = 145;
+            var layout = (Grid)node.Child;
+            layout.RowDefinitions = new RowDefinitions("32,*,Auto");
+            var visibility = new ComboBox
+            {
+                ItemsSource = _english ? new[] { "Show", "Hide" } : new[] { "Afficher", "Masquer" },
+                SelectedIndex = PrototypeServices.SourceVisibility.GetValueOrDefault(label, true) ? 0 : 1,
+                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch,
+                Margin = new Thickness(12, 0, 12, 10)
+            };
+            Grid.SetRow(visibility, 2);
+            visibility.SelectionChanged += (_, _) =>
+            {
+                PrototypeServices.SourceVisibility[label] = visibility.SelectedIndex == 0;
+                TestStatus.Text = _english ? "Draft modified" : "Brouillon modifié";
+            };
+            layout.Children.Add(visibility);
+        }
         Canvas.SetLeft(node, 70 + (_addedActionCount % 3) * 230);
-        Canvas.SetTop(node, 520 + (_addedActionCount / 3) * 90);
+        Canvas.SetTop(node, 520 + (_addedActionCount / 3) * 165);
         WorkflowCanvas.Children.Add(node);
         _dynamicNodes.Add(node);
         _addedActionCount++;
@@ -528,6 +548,7 @@ public sealed partial class MainWindow : Window
 
     private void OnActionNodePressed(object? sender, PointerPressedEventArgs eventArgs)
     {
+        if ((eventArgs.Source as Visual)?.GetSelfAndVisualAncestors().Any(control => control is ComboBox || control is Button) == true) return;
         if (sender is not Border node) return;
         var point = eventArgs.GetCurrentPoint(node);
         if (point.Properties.PointerUpdateKind == PointerUpdateKind.RightButtonPressed)
@@ -853,6 +874,7 @@ public sealed partial class MainWindow : Window
             };
 
         translations["Brouillon enregistré"] = _english ? "Draft saved" : "Brouillon enregistré";
+        translations[_english ? "Visibilité d’une source" : "Source visibility"] = _english ? "Source visibility" : "Visibilité d’une source";
         translations["Événement"] = _english ? "Event" : "Événement";
         translations["Condition"] = _english ? "Condition" : "Condition";
         translations["Démarrer"] = _english ? "Start" : "Démarrer";

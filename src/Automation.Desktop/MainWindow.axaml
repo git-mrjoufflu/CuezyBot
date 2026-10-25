@@ -364,8 +364,7 @@
               </Button>
               <StackPanel x:Name="ObsActions" Spacing="6">
                 <Border Classes="libraryItem"><TextBlock Text="◉  Changer de scène" /></Border>
-                <Border Classes="libraryItem"><TextBlock Text="▻  Afficher une source" /></Border>
-                <Border Classes="libraryItem"><TextBlock Text="▻  Masquer une source" /></Border>
+                <Border Classes="libraryItem"><TextBlock Text="▻  Visibilité d’une source" /></Border>
                 <Border Classes="libraryItem"><TextBlock Text="●  Démarrer un replay" /></Border>
                 <Border Classes="libraryItem"><TextBlock Text="▧  Prendre une capture" /></Border>
               </StackPanel>

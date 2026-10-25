@@ -15,11 +15,16 @@ internal static class PrototypeServices
 {
     internal static Guid CurrentWorkflowId { get; set; } = PrototypeWorkflowIds.WorkflowId;
     internal static string CurrentWorkflowName { get; set; } = "Mon Live Automatisation";
+    internal static readonly Dictionary<string, bool> SourceVisibility = new(StringComparer.Ordinal);
 
     internal static async Task<IReadOnlyList<WorkflowDefinition>> GetDraftsAsync()
     {
         await EnsureInitializedAsync(default);
-        return await new SqliteWorkflowRepository(Database).GetAllDraftsAsync();
+        var drafts = await new SqliteWorkflowRepository(Database).GetAllDraftsAsync();
+        foreach (var block in drafts.SelectMany(draft => draft.Blocks).Where(block => block.Type == "obs.set-source-visible"))
+            if (block.Parameters["label"]?.GetValue<string>() is { } label)
+                SourceVisibility[label] = block.Parameters["visible"]?.GetValue<bool>() ?? !(label.Contains("Hide", StringComparison.OrdinalIgnoreCase) || label.Contains("Masquer", StringComparison.OrdinalIgnoreCase));
+        return drafts;
     }
 
     internal static async Task DeleteWorkflowAsync(Guid id)
@@ -161,7 +166,10 @@ internal static class PrototypeServices
         {
             var id = Guid.NewGuid();
             actionIds[label] = id;
-            blocks.Add(new WorkflowBlock(id, ActionTypeFor(label), 1, new JsonObject { ["label"] = label }));
+            var parameters = new JsonObject { ["label"] = label };
+            if (ActionTypeFor(label) == "obs.set-source-visible")
+                parameters["visible"] = SourceVisibility.GetValueOrDefault(label, true);
+            blocks.Add(new WorkflowBlock(id, ActionTypeFor(label), 1, parameters));
             connections.Add(new WorkflowConnection(previous, "next", id));
             previous = id;
         }
