@@ -26,6 +26,11 @@ public sealed partial class SettingsWindow : Window
 
     private async void OnLanguageChanged(object? sender, SelectionChangedEventArgs e)
     {
+        if (LanguageCombo is null)
+        {
+            return;
+        }
+
         if (LanguageCombo.SelectedItem is ComboBoxItem item && item.Tag is string language)
         {
             SavedLanguage = language;
