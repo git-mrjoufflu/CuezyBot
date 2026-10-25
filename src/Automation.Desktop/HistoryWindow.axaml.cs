@@ -93,7 +93,7 @@ public sealed partial class HistoryWindow : Window
             english ? $"{entry.EventReceivedAt.ToLocalTime():g} · {entry.Steps.Count} step(s)" : $"{entry.EventReceivedAt.ToLocalTime():g} · {entry.Steps.Count} étape(s)",
             ToStatus(entry.Status, english),
             userName,
-            $"@{userLogin} · ID {userId}",
+            entry.EventType == "manual.run" ? (english ? "Manual activation" : "Déclenchement manuel") : $"@{userLogin} · ID {userId}",
             english ? $"Received {entry.EventReceivedAt.ToLocalTime():f}" : $"Reçu le {entry.EventReceivedAt.ToLocalTime():f}",
             duration is null ? (english ? "Unknown duration" : "Durée inconnue") : (english ? $"Total duration: {FormatDuration(duration.Value)}" : $"Durée totale : {FormatDuration(duration.Value)}"),
             english ? $"Execution: {entry.Id:D}" : $"Exécution : {entry.Id:D}",
@@ -103,7 +103,7 @@ public sealed partial class HistoryWindow : Window
                 FormatDuration(step.CompletedAt - step.StartedAt),
                 step.Status == ExecutionStatus.Succeeded ? "✓" : step.Status == ExecutionStatus.Cancelled ? "■" : "✕",
                 step.Status == ExecutionStatus.Succeeded ? "#53D994" : "#FF7587")).ToArray(),
-            entry.Error ?? string.Empty,
+            TranslateStepMessage(entry.Error ?? string.Empty, english),
             !string.IsNullOrWhiteSpace(entry.Error),
             english ? "EVENT" : "ÉVÉNEMENT",
             english ? "EXECUTION" : "EXÉCUTION",
@@ -121,7 +121,18 @@ public sealed partial class HistoryWindow : Window
         if (!english)
         {
             return message.Replace("Follower event received", "Événement follower reçu", StringComparison.Ordinal)
+                .Replace("Manual run", "Exécution manuelle", StringComparison.Ordinal)
                 .Replace("Twitch title updated", "Titre Twitch modifié", StringComparison.Ordinal)
+                .Replace("Twitch message sent", "Message Twitch envoyé", StringComparison.Ordinal)
+                .Replace("Twitch user:", "Utilisateur Twitch :", StringComparison.Ordinal)
+                .Replace("Twitch clip:", "Clip Twitch :", StringComparison.Ordinal)
+                .Replace("Audio played", "Son joué", StringComparison.Ordinal)
+                .Replace("OBS disconnected", "OBS déconnecté", StringComparison.Ordinal)
+                .Replace("Twitch disconnected", "Twitch déconnecté", StringComparison.Ordinal)
+                .Replace("Missing parameter:", "Paramètre manquant :", StringComparison.Ordinal)
+                .Replace("Variable not found:", "Variable introuvable :", StringComparison.Ordinal)
+                .Replace("Select at least one OBS source", "Coche au moins une source OBS", StringComparison.Ordinal)
+                .Replace("OBS screenshot:", "Capture OBS :", StringComparison.Ordinal)
                 .Replace("OBS replay buffer started", "Tampon de replay OBS démarré", StringComparison.Ordinal)
                 .Replace("OBS scene:", "Scène OBS :", StringComparison.Ordinal)
                 .Replace("Wait:", "Attente :", StringComparison.Ordinal)

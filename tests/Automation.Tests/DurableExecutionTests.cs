@@ -21,7 +21,7 @@ public sealed class DurableExecutionTests : IAsyncLifetime
     {
         if (Directory.Exists(applicationDirectory))
         {
-            Directory.Delete(applicationDirectory, recursive: true);
+            TestDataCleanup.Delete(applicationDirectory);
         }
 
         return ValueTask.CompletedTask;

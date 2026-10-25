@@ -302,7 +302,7 @@ public sealed partial class MainWindow : Window
         var currentWorkflowName = _workflowNames[WorkflowSelector.SelectedIndex];
         if (_workflowIds.TryGetValue(currentWorkflowName, out var deletedId))
             await PrototypeServices.DeleteWorkflowAsync(deletedId);
-        _workflowNames.RemoveAt(WorkflowSelector.SelectedIndex);
+        _workflowNames.Remove(currentWorkflowName);
         _workflowActions.Remove(currentWorkflowName);
         _workflowLinks.Remove(currentWorkflowName);
         _workflowPositions.Remove(currentWorkflowName);
@@ -316,6 +316,7 @@ public sealed partial class MainWindow : Window
 
     private void ClearWorkflowCanvas()
     {
+        _obsCardRefresh.Clear();
         _selectedActions.Clear();
         _manualLinks.Clear();
         _dynamicNodes.Clear();
@@ -481,7 +482,9 @@ public sealed partial class MainWindow : Window
         if (PrototypeServices.CurrentWorkflowId != workflowId) return;
         TestStatus.Text = stopping
             ? (_english ? "Automation stopped" : "Automatisation arrêtée")
-            : (_english ? "Automation published and enabled" : "Automatisation publiée et activée");
+            : PrototypeServices.CurrentTriggerType == "manual.run"
+                ? (_english ? "Published — click Run once to execute" : "Version publiée — clique Exécuter pour la lancer")
+                : (_english ? "Enabled — waiting for a new follower" : "Activée — en attente d’un nouveau follower");
         StartWorkflowButton.Content = stopping
             ? (_english ? "▶  Start" : "▶  Démarrer")
             : (_english ? "■  Stop" : "■  Arrêter");
@@ -530,6 +533,7 @@ public sealed partial class MainWindow : Window
 
     private void RebuildActionNodes()
     {
+        _obsCardRefresh.Clear();
         var savedLinks = GetManualLinkLabels().ToArray();
         var positions = _dynamicNodes.ToDictionary(node => (string)node.Tag!, node => new Point(Canvas.GetLeft(node), Canvas.GetTop(node)));
         foreach (var link in _dynamicLinks) WorkflowCanvas.Children.Remove(link);
@@ -1117,6 +1121,19 @@ public sealed partial class MainWindow : Window
                 }
                 else
                 {
+                    var reachable = new HashSet<Border>();
+                    var pending = new Stack<Border>(); pending.Push(node);
+                    while (pending.TryPop(out var candidate))
+                    {
+                        if (!reachable.Add(candidate)) continue;
+                        foreach (var edge in _manualLinks.Where(edge => edge.From == candidate)) pending.Push(edge.To);
+                    }
+                    if (reachable.Contains(_selectedNode))
+                    {
+                        TestStatus.Text = _english ? "This link would create a loop" : "Cette liaison créerait une boucle";
+                        _draggedNode = null; _dragStartSnapshot = null;
+                        return;
+                    }
                     RememberCanvas();
                     if (!_manualLinks.Contains((_selectedNode, node))) _manualLinks.Add((_selectedNode, node));
                     if (_selectedNode.Tag is string sourceKey && node.Tag is string targetKey && sourceKey.Contains("condition", StringComparison.OrdinalIgnoreCase)

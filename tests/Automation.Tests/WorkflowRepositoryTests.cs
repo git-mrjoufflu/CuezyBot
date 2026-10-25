@@ -18,7 +18,7 @@ public sealed class WorkflowRepositoryTests : IAsyncLifetime
     {
         if (Directory.Exists(applicationDirectory))
         {
-            Directory.Delete(applicationDirectory, recursive: true);
+            TestDataCleanup.Delete(applicationDirectory);
         }
 
         return ValueTask.CompletedTask;

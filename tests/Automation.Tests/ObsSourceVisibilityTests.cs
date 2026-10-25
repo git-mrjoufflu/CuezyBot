@@ -36,6 +36,7 @@ public sealed class ObsSourceVisibilityTests
                 var type = data["requestType"]!.GetValue<string>();
                 var payload = type switch
                 {
+                    "GetSourceScreenshot" => new JsonObject { ["imageData"] = "data:image/png;base64,AQID" },
                     "GetSceneList" => new JsonObject { ["scenes"] = new JsonArray(new JsonObject { ["sceneName"] = "Studio" }) },
                     "GetSceneItemList" => new JsonObject { ["sceneItems"] = new JsonArray(
                         new JsonObject { ["sourceName"] = "Camera", ["sceneItemId"] = 11 },
@@ -55,6 +56,7 @@ public sealed class ObsSourceVisibilityTests
             await client.ConnectAsync(new Uri($"ws://127.0.0.1:{port}/"), null, token);
             Assert.Equal(new[] { "Studio" }, await client.GetSceneNamesAsync(token));
             Assert.Equal(3, (await client.GetSourceNamesAsync("Studio", token)).Count);
+            Assert.Equal(new byte[] { 1, 2, 3 }, await client.GetScreenshotAsync("Studio", token));
             if (missingSource)
                 await Assert.ThrowsAsync<InvalidOperationException>(() => client.SetSourceVisibilityAsync("Studio", ["Camera", "Missing"], false, token));
             else await client.SetSourceVisibilityAsync("Studio", ["Camera", "Logo"], false, token);

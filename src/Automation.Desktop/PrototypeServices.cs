@@ -41,6 +41,8 @@ internal static class PrototypeServices
     internal static async Task DeleteWorkflowAsync(Guid id)
     {
         await EnsureInitializedAsync(default);
+        if (Running.TryGetValue(id, out var running))
+            try { running.Cancel(); } catch (ObjectDisposedException) { }
         await new SqliteWorkflowRepository(Database).DeleteAsync(id);
     }
 
@@ -136,7 +138,8 @@ internal static class PrototypeServices
             executionCancellation = CancellationTokenSource.CreateLinkedTokenSource(ct);
             Running[id] = executionCancellation;
             return await repository.GetRevisionAsync(id, revision, ct);
-        }, (block, ct) => ExecuteBlockAsync(block, executionCancellation?.Token ?? ct),
+        }, (block, ct) => manualWorkflow is not null && block.Type == "twitch.follow.received"
+            ? Task.FromResult("Manual run") : ExecuteBlockAsync(block, executionCancellation?.Token ?? ct),
         async (block, ct) =>
         {
             if (block.Type != "core.condition") return null;

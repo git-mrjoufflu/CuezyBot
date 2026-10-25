@@ -11,7 +11,7 @@ public sealed class PublishedWorkflowExecutionTests : IAsyncLifetime
 {
     private readonly string directory = Path.Combine(Path.GetTempPath(), $"published-execution-{Guid.NewGuid():N}");
     public ValueTask InitializeAsync() => ValueTask.CompletedTask;
-    public ValueTask DisposeAsync() { if (Directory.Exists(directory)) Directory.Delete(directory, true); return ValueTask.CompletedTask; }
+    public ValueTask DisposeAsync() { TestDataCleanup.Delete(directory); return ValueTask.CompletedTask; }
 
     [Theory]
     [InlineData(false, false)]

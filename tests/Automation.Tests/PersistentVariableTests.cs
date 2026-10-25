@@ -22,6 +22,6 @@ public sealed class PersistentVariableTests
             Assert.Equal(-2, await reopened.GetIntegerAsync("first", token));
             Assert.Equal(99, await reopened.GetIntegerAsync("second", token));
         }
-        finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
+        finally { TestDataCleanup.Delete(directory); }
     }
 }

@@ -24,5 +24,15 @@ jobs:
         with:
           global-json-file: global.json
       - run: dotnet build StreamerAutomation.slnx -c Release
-      - run: dotnet test --solution StreamerAutomation.slnx -c Release --no-build
+      - name: Run unit and integration tests
+        shell: pwsh
+        run: |
+          $testOutput = & dotnet test --solution StreamerAutomation.slnx -c Release --no-build 2>&1
+          $testExitCode = $LASTEXITCODE
+          $testOutput | Write-Output
+          if ($testExitCode -ne 0) {
+            $failureText = ($testOutput -join "`n").Replace('%', '%25').Replace("`r", '%0D').Replace("`n", '%0A')
+            Write-Output "::error::$failureText"
+            exit $testExitCode
+          }
       - run: dotnet run --project tests/Automation.Desktop.SmokeTests -c Release --no-build
