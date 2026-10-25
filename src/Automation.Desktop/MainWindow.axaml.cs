@@ -289,7 +289,9 @@ public sealed partial class MainWindow : Window
         var point = eventArgs.GetCurrentPoint(node);
         if (point.Properties.PointerUpdateKind == PointerUpdateKind.RightButtonPressed)
         {
+            if (_selectedNode is not null) _selectedNode.BorderBrush = new SolidColorBrush(Color.Parse("#A640F4"));
             _selectedNode = node;
+            node.BorderBrush = new SolidColorBrush(Color.Parse("#FFD166"));
             node.Focus();
             TestStatus.Text = _english ? "Action selected — press Delete to remove" : "Action sélectionnée — appuie sur Suppr pour supprimer";
             eventArgs.Handled = true;
@@ -375,12 +377,15 @@ public sealed partial class MainWindow : Window
             {
                 if (_selectedNode is null || _selectedNode == node)
                 {
+                    if (_selectedNode is not null) _selectedNode.BorderBrush = new SolidColorBrush(Color.Parse("#A640F4"));
                     _selectedNode = node;
+                    node.BorderBrush = new SolidColorBrush(Color.Parse("#FFD166"));
                     TestStatus.Text = _english ? "Source selected — click a destination" : "Source sélectionnée — clique une destination";
                 }
                 else
                 {
                     if (!_manualLinks.Contains((_selectedNode, node))) _manualLinks.Add((_selectedNode, node));
+                    _selectedNode.BorderBrush = new SolidColorBrush(Color.Parse("#A640F4"));
                     _selectedNode = null;
                     TestStatus.Text = _english ? "Link created" : "Lien créé";
                     UpdateDynamicLinks();
