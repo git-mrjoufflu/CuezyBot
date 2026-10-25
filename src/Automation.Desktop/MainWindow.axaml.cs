@@ -23,6 +23,7 @@ public sealed partial class MainWindow : Window
     private Border? _selectedNode;
     private readonly List<Border> _dynamicNodes = new();
     private readonly List<Line> _dynamicLinks = new();
+    private readonly List<(Border From, Border To)> _manualLinks = new();
     private Point _dragPointerStart;
     private double _dragNodeLeft;
     private double _dragNodeTop;
@@ -170,6 +171,8 @@ public sealed partial class MainWindow : Window
         foreach (var link in _dynamicLinks) WorkflowCanvas.Children.Remove(link);
         _dynamicLinks.Clear();
         _dynamicNodes.Clear();
+        _manualLinks.Clear();
+        _selectedNode = null;
         foreach (var child in WorkflowCanvas.Children.OfType<Border>().Where(border => border.Classes.Contains("dynamicAction")).ToArray())
             WorkflowCanvas.Children.Remove(child);
         _addedActionCount = 0;
@@ -264,7 +267,6 @@ public sealed partial class MainWindow : Window
         Canvas.SetTop(node, 520 + (_addedActionCount / 3) * 90);
         WorkflowCanvas.Children.Add(node);
         _dynamicNodes.Add(node);
-        UpdateDynamicLinks();
         _addedActionCount++;
     }
 
@@ -332,24 +334,22 @@ public sealed partial class MainWindow : Window
     {
         foreach (var link in _dynamicLinks) WorkflowCanvas.Children.Remove(link);
         _dynamicLinks.Clear();
-        var previousX = 710d;
-        var previousY = 235d;
-        foreach (var node in _dynamicNodes)
+        foreach (var (from, to) in _manualLinks)
         {
-            var left = Canvas.GetLeft(node);
-            var top = Canvas.GetTop(node);
+            var fromLeft = Canvas.GetLeft(from);
+            var fromTop = Canvas.GetTop(from);
+            var toLeft = Canvas.GetLeft(to);
+            var toTop = Canvas.GetTop(to);
             var link = new Line
             {
-                StartPoint = new Point(previousX, previousY),
-                EndPoint = new Point(left, top + node.Height / 2),
+                StartPoint = new Point(fromLeft + from.Width, fromTop + from.Height / 2),
+                EndPoint = new Point(toLeft, toTop + to.Height / 2),
                 Stroke = new SolidColorBrush(Color.Parse("#A640F4")),
                 StrokeThickness = 3,
                 ZIndex = -1
             };
             WorkflowCanvas.Children.Insert(0, link);
             _dynamicLinks.Add(link);
-            previousX = left + node.Width;
-            previousY = top + node.Height / 2;
         }
     }
 
@@ -358,8 +358,22 @@ public sealed partial class MainWindow : Window
         if (_draggedNode == sender)
         {
             eventArgs.Pointer.Capture(null);
+            if (sender is Border node && Math.Abs(Canvas.GetLeft(node) - _dragNodeLeft) < 3 && Math.Abs(Canvas.GetTop(node) - _dragNodeTop) < 3)
+            {
+                if (_selectedNode is null || _selectedNode == node)
+                {
+                    _selectedNode = node;
+                    TestStatus.Text = _english ? "Source selected — click a destination" : "Source sélectionnée — clique une destination";
+                }
+                else
+                {
+                    if (!_manualLinks.Contains((_selectedNode, node))) _manualLinks.Add((_selectedNode, node));
+                    _selectedNode = null;
+                    TestStatus.Text = _english ? "Link created" : "Lien créé";
+                    UpdateDynamicLinks();
+                }
+            }
             _draggedNode = null;
-            TestStatus.Text = _english ? "Action moved" : "Action déplacée";
         }
     }
 
