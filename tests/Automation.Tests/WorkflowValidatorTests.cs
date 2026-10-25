@@ -8,6 +8,29 @@ namespace Automation.Tests;
 public sealed class WorkflowValidatorTests
 {
     [Fact]
+    public void Validate_AcceptsInitialTwitchObsChain()
+    {
+        var trigger = Guid.NewGuid();
+        var counter = Guid.NewGuid();
+        var scene = Guid.NewGuid();
+        var workflow = new WorkflowDefinition(
+            Guid.NewGuid(), 1, "Follow vers OBS", false,
+            [
+                new WorkflowBlock(trigger, "twitch.follow.received", 1, new JsonObject()),
+                new WorkflowBlock(counter, "variables.increment", 1, new JsonObject()),
+                new WorkflowBlock(scene, "obs.scene.set-current", 1, new JsonObject { ["scene"] = "Merci" })
+            ],
+            [
+                new WorkflowConnection(trigger, "next", counter),
+                new WorkflowConnection(counter, "next", scene)
+            ]);
+
+        var result = new WorkflowValidator(new InitialBlockCatalog()).Validate(workflow);
+
+        Assert.True(result.IsValid, string.Join("; ", result.Diagnostics.Select(diagnostic => diagnostic.Message)));
+    }
+
+    [Fact]
     public void Validate_ReportsAnUnknownBlockAndMissingTrigger()
     {
         var blockId = Guid.NewGuid();
