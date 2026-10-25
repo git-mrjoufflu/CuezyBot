@@ -70,6 +70,18 @@ internal static class PrototypeServices
             .GetDraftAsync(PrototypeWorkflowIds.WorkflowId, cancellationToken) is not null;
     }
 
+    internal static async Task<IReadOnlyList<string>> GetDraftActionLabelsAsync(CancellationToken cancellationToken = default)
+    {
+        await EnsureInitializedAsync(cancellationToken);
+        var workflow = await new SqliteWorkflowRepository(Database).GetDraftAsync(PrototypeWorkflowIds.WorkflowId, cancellationToken);
+        return workflow?.Blocks
+            .Skip(3)
+            .Select(block => block.Parameters["label"]?.GetValue<string>())
+            .Where(label => !string.IsNullOrWhiteSpace(label))
+            .Cast<string>()
+            .ToArray() ?? [];
+    }
+
     internal static async Task<int?> GetPublishedRevisionAsync(CancellationToken cancellationToken = default)
     {
         await EnsureInitializedAsync(cancellationToken);

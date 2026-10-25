@@ -182,6 +182,8 @@
           <StackPanel Orientation="Horizontal" Spacing="5">
             <TextBlock x:Name="TestStatus" Text="Brouillon enregistré" Classes="muted" FontSize="11" VerticalAlignment="Center" Margin="3,0,4,0" />
             <Button Classes="surface" Content="▷  Tester" Click="OnTestClick" Padding="9,7" />
+            <Button x:Name="UndoButton" Classes="surface" Content="↶" ToolTip.Tip="Annuler" Click="OnUndoClick" Padding="8,7" IsEnabled="False" />
+            <Button x:Name="RedoButton" Classes="surface" Content="↷" ToolTip.Tip="Rétablir" Click="OnRedoClick" Padding="8,7" IsEnabled="False" />
             <Button x:Name="SaveWorkflowButton" Classes="surface" Content="Enregistrer" Click="OnSaveWorkflowClick" Padding="9,7" />
             <Button x:Name="StartWorkflowButton" Classes="primary" Content="▶  Démarrer" Click="OnStartWorkflowClick" Padding="9,7" />
           </StackPanel>

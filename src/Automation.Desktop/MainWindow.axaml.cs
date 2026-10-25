@@ -15,6 +15,8 @@ public sealed partial class MainWindow : Window
     private bool _english;
     private int _addedActionCount;
     private readonly List<string> _selectedActions = new();
+    private readonly Stack<string> _undoActions = new();
+    private readonly Stack<string> _redoActions = new();
 
     public MainWindow()
     {
@@ -30,6 +32,11 @@ public sealed partial class MainWindow : Window
             ApplyLanguage(language == "English");
             if (await PrototypeServices.HasPrototypeDraftAsync())
             {
+                foreach (var action in await PrototypeServices.GetDraftActionLabelsAsync())
+                {
+                    _selectedActions.Add(action);
+                    AddActionNode(action);
+                }
                 TestStatus.Text = _english ? "Draft restored" : "Brouillon restauré";
             }
             var publishedRevision = await PrototypeServices.GetPublishedRevisionAsync();
@@ -117,11 +124,50 @@ public sealed partial class MainWindow : Window
                 if (!_selectedActions.Contains(label, StringComparer.OrdinalIgnoreCase))
                 {
                     _selectedActions.Add(label);
+                    _undoActions.Push(label);
+                    _redoActions.Clear();
                     AddActionNode(label);
+                    UpdateHistoryButtons();
                 }
                 eventArgs.Handled = true;
             }
         }
+    }
+
+    private void OnUndoClick(object? sender, RoutedEventArgs eventArgs)
+    {
+        if (_undoActions.Count == 0) return;
+        var label = _undoActions.Pop();
+        _selectedActions.Remove(label);
+        _redoActions.Push(label);
+        RebuildActionNodes();
+        TestStatus.Text = _english ? "Action removed" : "Action annulée";
+        UpdateHistoryButtons();
+    }
+
+    private void OnRedoClick(object? sender, RoutedEventArgs eventArgs)
+    {
+        if (_redoActions.Count == 0) return;
+        var label = _redoActions.Pop();
+        _selectedActions.Add(label);
+        _undoActions.Push(label);
+        RebuildActionNodes();
+        TestStatus.Text = _english ? "Action restored" : "Action rétablie";
+        UpdateHistoryButtons();
+    }
+
+    private void RebuildActionNodes()
+    {
+        foreach (var child in WorkflowCanvas.Children.OfType<Border>().Where(border => border.Classes.Contains("dynamicAction")).ToArray())
+            WorkflowCanvas.Children.Remove(child);
+        _addedActionCount = 0;
+        foreach (var action in _selectedActions) AddActionNode(action);
+    }
+
+    private void UpdateHistoryButtons()
+    {
+        UndoButton.IsEnabled = _undoActions.Count > 0;
+        RedoButton.IsEnabled = _redoActions.Count > 0;
     }
 
     private void AddActionNode(string label)
@@ -136,6 +182,7 @@ public sealed partial class MainWindow : Window
             CornerRadius = new Avalonia.CornerRadius(10),
             Padding = new Avalonia.Thickness(12)
         };
+        node.Classes.Add("dynamicAction");
         node.Child = new StackPanel
         {
             Spacing = 5,
