@@ -243,6 +243,24 @@ public sealed partial class MainWindow : Window
         TestStatus.Text = _english ? "Trigger changed — save and publish to apply" : "Déclencheur modifié — enregistre et publie pour appliquer";
     }
 
+    private void OnActionsTabPressed(object? sender, PointerPressedEventArgs eventArgs)
+    {
+        if (!eventArgs.GetCurrentPoint((Visual)sender!).Properties.IsLeftButtonPressed) return;
+        EventLibrarySection.IsVisible = false;
+        foreach (var section in this.GetVisualDescendants().OfType<Border>().Where(b => b.Classes.Contains("productSection") && b != EventLibrarySection)) section.IsVisible = true;
+        ActionsTab.Background = new SolidColorBrush(Color.Parse("#4A2A7D"));
+        EventsTab.Background = Brushes.Transparent;
+    }
+
+    private void OnEventsTabPressed(object? sender, PointerPressedEventArgs eventArgs)
+    {
+        if (!eventArgs.GetCurrentPoint((Visual)sender!).Properties.IsLeftButtonPressed) return;
+        foreach (var section in this.GetVisualDescendants().OfType<Border>().Where(b => b.Classes.Contains("productSection") && b != EventLibrarySection)) section.IsVisible = false;
+        EventLibrarySection.IsVisible = true;
+        EventsTab.Background = new SolidColorBrush(Color.Parse("#4A2A7D"));
+        ActionsTab.Background = Brushes.Transparent;
+    }
+
     private async void OnRenameWorkflowClick(object? sender, RoutedEventArgs eventArgs)
     {
         if (WorkflowSelector.SelectedIndex < 0) return;
@@ -496,6 +514,19 @@ public sealed partial class MainWindow : Window
             .OfType<Border>().FirstOrDefault(candidate => candidate.Classes.Contains("libraryItem"));
         if (border is not null && eventArgs.GetCurrentPoint(border).Properties.IsLeftButtonPressed)
         {
+            if (border.Classes.Contains("eventItem"))
+            {
+                var trigger = border.Tag as string;
+                if (trigger is not ("manual.run" or "twitch.follow.received")) return;
+                PrototypeServices.CurrentTriggerType = trigger;
+                _workflowTriggerKinds[PrototypeServices.CurrentWorkflowId] = trigger;
+                _switchingWorkflow = true;
+                WorkflowTriggerSelector.SelectedIndex = trigger == "manual.run" ? 0 : 1;
+                _switchingWorkflow = false;
+                TestStatus.Text = _english ? "Trigger selected — save and publish to apply" : "Déclencheur sélectionné — enregistre et publie pour appliquer";
+                eventArgs.Handled = true;
+                return;
+            }
             var label = border.Child is TextBlock textBlock ? textBlock.Text : null;
             if (!string.IsNullOrWhiteSpace(label))
             {
@@ -1329,7 +1360,8 @@ public sealed partial class MainWindow : Window
                 ["Follow avec alerte"] = "Follow with alert", ["Nouvel abonné"] = "New subscriber", ["Raid + message"] = "Raid + message", ["Cheer + son"] = "Cheer + sound",
                 ["Envoyer un message"] = "Send a message", ["Créer un clip"] = "Create a clip", ["Modifier un titre"] = "Edit title", ["Gérer les points de chaîne"] = "Manage channel points", ["Récupérer un utilisateur"] = "Get a user",
                 ["Changer de scène"] = "Change scene", ["Afficher une source"] = "Show a source", ["Masquer une source"] = "Hide a source", ["Démarrer un replay"] = "Start replay", ["Prendre une capture"] = "Take a screenshot",
-                ["Ajouter une condition"] = "Add a condition", ["Attendre"] = "Wait", ["Modifier une variable"] = "Edit a variable"
+                ["Ajouter une condition"] = "Add a condition", ["Attendre"] = "Wait", ["Modifier une variable"] = "Edit a variable",
+                ["Déclencheurs"] = "Triggers", ["Exécution manuelle"] = "Manual run", ["Nouveau follower Twitch"] = "New Twitch follower"
             }
             : new Dictionary<string, string>
             {
@@ -1343,7 +1375,8 @@ public sealed partial class MainWindow : Window
                 ["Follow with alert"] = "Follow avec alerte", ["New subscriber"] = "Nouvel abonné", ["Cheer + sound"] = "Cheer + son",
                 ["Send a message"] = "Envoyer un message", ["Create a clip"] = "Créer un clip", ["Edit title"] = "Modifier un titre", ["Manage channel points"] = "Gérer les points de chaîne", ["Get a user"] = "Récupérer un utilisateur",
                 ["Change scene"] = "Changer de scène", ["Show a source"] = "Afficher une source", ["Hide a source"] = "Masquer une source", ["Start replay"] = "Démarrer un replay", ["Take a screenshot"] = "Prendre une capture",
-                ["Add a condition"] = "Ajouter une condition", ["Wait"] = "Attendre", ["Edit a variable"] = "Modifier une variable"
+                ["Add a condition"] = "Ajouter une condition", ["Wait"] = "Attendre", ["Edit a variable"] = "Modifier une variable",
+                ["Triggers"] = "Déclencheurs", ["Manual run"] = "Exécution manuelle", ["New Twitch follower"] = "Nouveau follower Twitch"
             };
 
         translations["Brouillon enregistré"] = _english ? "Draft saved" : "Brouillon enregistré";

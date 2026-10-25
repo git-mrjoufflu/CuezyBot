@@ -12,6 +12,7 @@
     <Project Path="src/Automation.Runtime/Automation.Runtime.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/Automation.Runtime.SoakTests/Automation.Runtime.SoakTests.csproj" />
     <Project Path="tests/Automation.Desktop.SmokeTests/Automation.Desktop.SmokeTests.csproj" />
     <Project Path="tests/Automation.Tests/Automation.Tests.csproj" />
   </Folder>

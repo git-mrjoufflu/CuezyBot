@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><IsPackable>false</IsPackable></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/Automation.Engine/Automation.Engine.csproj" />
+    <ProjectReference Include="../../src/Automation.Persistence.Sqlite/Automation.Persistence.Sqlite.csproj" />
+  </ItemGroup>
+</Project>

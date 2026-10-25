@@ -332,11 +332,20 @@
         <TextBox x:Name="ActionSearch" Height="38" CornerRadius="9" PlaceholderText="Rechercher une action…" TextChanged="OnActionSearchChanged" />
         <Border Grid.Row="1" Height="1" Background="Transparent" Margin="0,10,0,0" />
         <Grid Grid.Row="2" Margin="0,10,0,12" ColumnDefinitions="*,*" Background="#11162B">
-          <Border Grid.Column="0" Padding="8" Background="#4A2A7D" CornerRadius="8"><TextBlock Text="Actions" HorizontalAlignment="Center" FontWeight="SemiBold" /></Border>
-          <Border Grid.Column="1" Padding="8" CornerRadius="8"><TextBlock Text="Événements" HorizontalAlignment="Center" Classes="muted" /></Border>
+          <Border x:Name="ActionsTab" Grid.Column="0" Padding="8" Background="#4A2A7D" CornerRadius="8" PointerPressed="OnActionsTabPressed"><TextBlock Text="Actions" HorizontalAlignment="Center" FontWeight="SemiBold" /></Border>
+          <Border x:Name="EventsTab" Grid.Column="1" Padding="8" CornerRadius="8" PointerPressed="OnEventsTabPressed"><TextBlock Text="Événements" HorizontalAlignment="Center" Classes="muted" /></Border>
         </Grid>
         <ScrollViewer Grid.Row="3" HorizontalScrollBarVisibility="Disabled" HorizontalContentAlignment="Stretch" PointerPressed="OnLibraryActionPressed">
           <StackPanel Spacing="10" HorizontalAlignment="Stretch">
+            <Border x:Name="EventLibrarySection" Classes="productSection" IsVisible="False">
+              <StackPanel Spacing="6">
+                <Button Classes="sectionHeader">
+                  <Grid ColumnDefinitions="Auto,*,Auto"><Border Width="28" Height="28" CornerRadius="8" Background="#6A2FA5"><TextBlock Text="⚡" Foreground="#E6C8FF" HorizontalAlignment="Center" VerticalAlignment="Center" /></Border><TextBlock Grid.Column="1" Margin="9,0,0,0" Text="Déclencheurs" FontWeight="SemiBold" VerticalAlignment="Center" /><TextBlock Grid.Column="2" Text="⌃" Foreground="#C9CEE1" FontSize="16" VerticalAlignment="Center" /></Grid>
+                </Button>
+                <Border Classes="libraryItem eventItem" Tag="manual.run"><TextBlock Text="▶  Exécution manuelle" /></Border>
+                <Border Classes="libraryItem eventItem" Tag="twitch.follow.received"><TextBlock Text="♥  Nouveau follower Twitch" /></Border>
+              </StackPanel>
+            </Border>
             <Border x:Name="TwitchActionSection" Classes="productSection" IsVisible="False">
               <StackPanel Spacing="6">
               <Button Classes="sectionHeader" Click="OnTwitchSectionClick">
