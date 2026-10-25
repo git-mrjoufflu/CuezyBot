@@ -503,7 +503,7 @@ public sealed partial class MainWindow : Window
             var toLeft = Canvas.GetLeft(to);
             var toTop = Canvas.GetTop(to);
             var start = new Point(fromLeft + from.Width, fromTop + from.Height / 2);
-            var end = new Point(toLeft, toTop + to.Height / 2);
+            var end = new Point(toLeft - 2, toTop + to.Height / 2);
             var dx = end.X - start.X;
             var dy = end.Y - start.Y;
             var length = Math.Max(1, Math.Sqrt(dx * dx + dy * dy));
@@ -511,9 +511,9 @@ public sealed partial class MainWindow : Window
             var uy = dy / length;
             var px = -uy;
             var py = ux;
-            var headBase = new Point(end.X - ux * 13, end.Y - uy * 13);
-            var wingA = new Point(headBase.X + px * 6, headBase.Y + py * 6);
-            var wingB = new Point(headBase.X - px * 6, headBase.Y - py * 6);
+            var headBase = new Point(end.X - ux * 17, end.Y - uy * 17);
+            var wingA = new Point(headBase.X + px * 8, headBase.Y + py * 8);
+            var wingB = new Point(headBase.X - px * 8, headBase.Y - py * 8);
             var geometry = new StreamGeometry();
             using (var context = geometry.Open())
             {
@@ -528,7 +528,8 @@ public sealed partial class MainWindow : Window
                 Data = geometry,
                 Stroke = from.BorderBrush,
                 StrokeThickness = 3,
-                ZIndex = -1
+                StrokeLineCap = PenLineCap.Round,
+                ZIndex = 0
             };
             link.PointerPressed += OnWorkflowLinkPressed;
             WorkflowCanvas.Children.Insert(0, link);
