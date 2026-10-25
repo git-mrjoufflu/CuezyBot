@@ -282,13 +282,13 @@ public sealed partial class MainWindow : Window
         foreach (var item in new[] { ("manual.run", "▶  Exécution manuelle", "▶  Manual run"), ("twitch.follow.received", "♥  Nouveau follower Twitch", "♥  New Twitch follower") })
         { var button = new Button { Content = _english ? item.Item3 : item.Item2, HorizontalContentAlignment = Avalonia.Layout.HorizontalAlignment.Left }; button.Click += (_, _) => dialog.Close(item.Item1); stack.Children.Add(button); }
         foreach (var group in new[] {
-            ("Twitch", new[] { "Envoyer un message", "Créer un clip", "Modifier un titre", "Gérer les points de chaîne", "Récupérer un utilisateur" }),
-            ("OBS Studio", new[] { "Changer de scène", "Visibilité d’une source", "Démarrer un replay", "Prendre une capture" }),
-            ("CORE", new[] { "Ajouter une condition", "Attendre", "Modifier une variable", "Jouer un son" }) })
+            ("Twitch", new[] { ("Envoyer un message", "Send a message"), ("Créer un clip", "Create a clip"), ("Modifier un titre", "Edit title"), ("Gérer les points de chaîne", "Manage channel points"), ("Récupérer un utilisateur", "Get a user") }),
+            ("OBS Studio", new[] { ("Changer de scène", "Change scene"), ("Visibilité d’une source", "Source visibility"), ("Démarrer un replay", "Start replay"), ("Prendre une capture", "Take a screenshot") }),
+            ("CORE", new[] { ("Ajouter une condition", "Add a condition"), ("Attendre", "Wait"), ("Modifier une variable", "Edit a variable"), ("Jouer un son", "Play a sound") }) })
         {
             stack.Children.Add(new TextBlock { Text = group.Item1, FontWeight = FontWeight.Bold, Margin = new Thickness(0, 10, 0, 0) });
-            foreach (var label in group.Item2)
-            { var button = new Button { Content = label, HorizontalContentAlignment = Avalonia.Layout.HorizontalAlignment.Left }; button.Click += (_, _) => dialog.Close($"action:{label}"); stack.Children.Add(button); }
+            foreach (var item in group.Item2)
+            { var button = new Button { Content = _english ? item.Item2 : item.Item1, HorizontalContentAlignment = Avalonia.Layout.HorizontalAlignment.Left }; button.Click += (_, _) => dialog.Close($"action:{item.Item1}"); stack.Children.Add(button); }
         }
         dialog.Content = new ScrollViewer { Content = stack };
         var result = await dialog.ShowDialog<string?>(this);
