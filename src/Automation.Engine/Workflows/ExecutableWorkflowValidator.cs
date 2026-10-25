@@ -19,7 +19,9 @@ public static class ExecutableWorkflowValidator
             switch (block.Type)
             {
                 case "twitch.follow.received": break;
+                case "manual.run": break;
                 case "obs.scene.set-current":
+                case "obs.screenshot":
                     Required("scene", "Choisis une scène OBS.", "Choose an OBS scene.");
                     break;
                 case "obs.set-source-visible":
@@ -28,6 +30,10 @@ public static class ExecutableWorkflowValidator
                         Error("sources.required", "Coche au moins une source OBS.", "Select at least one OBS source.");
                     break;
                 case "obs.replay.start": break;
+                case "audio.play":
+                    if (block.Parameters["file"]?.ToString() is not { Length: > 0 } file || !File.Exists(file))
+                        Error("audio.file.missing", "Choisis un fichier audio existant.", "Choose an existing audio file.");
+                    break;
                 case "twitch.create-clip": break;
                 case "twitch.get-user":
                     Required("login", "Indique un utilisateur Twitch.", "Enter a Twitch login.");
@@ -39,6 +45,7 @@ public static class ExecutableWorkflowValidator
                     break;
                 case "variables.set-integer":
                 case "variables.increment":
+                case "core.condition":
                     Required("name", "Indique le nom de la variable.", "Enter a variable name.");
                     if (!long.TryParse(block.Parameters["value"]?.ToString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out _))
                         Error("variable.value.invalid", "La valeur doit être un nombre entier.", "The value must be an integer.");
@@ -57,7 +64,7 @@ public static class ExecutableWorkflowValidator
                     break;
             }
         }
-        if (workflow.Blocks.All(block => block.Type == "twitch.follow.received"))
+        if (workflow.Blocks.All(block => block.Type is "twitch.follow.received" or "manual.run"))
             errors.Add(new("workflow.empty", english ? "Add at least one action." : "Ajoute au moins une action."));
         return errors;
     }

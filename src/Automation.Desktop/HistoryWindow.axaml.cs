@@ -151,6 +151,9 @@ public sealed partial class HistoryWindow : Window
         ExecutionStatus.Pending => english ? "Pending" : "En attente",
         ExecutionStatus.Cancelled => english ? "Cancelled" : "Annulée",
         ExecutionStatus.Interrupted => english ? "Interrupted" : "Interrompue",
+        ExecutionStatus.UnknownOutcome => english ? "Outcome uncertain" : "Résultat incertain",
+        ExecutionStatus.Expired => english ? "Expired" : "Expirée",
+        ExecutionStatus.Skipped => english ? "Skipped" : "Ignorée",
         _ => status.ToString()
     };
 

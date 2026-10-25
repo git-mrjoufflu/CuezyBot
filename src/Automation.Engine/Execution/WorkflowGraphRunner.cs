@@ -7,7 +7,8 @@ public sealed class WorkflowGraphRunner
 {
     public async Task RunAsync(WorkflowDefinition workflow,
         Func<WorkflowBlock, CancellationToken, Task> execute,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        Func<WorkflowBlock, CancellationToken, Task<string?>>? chooseOutput = null)
     {
         var blocks = workflow.Blocks.ToDictionary(block => block.Id);
         var edges = workflow.Connections.Distinct().ToArray();
@@ -15,6 +16,7 @@ public sealed class WorkflowGraphRunner
             throw new InvalidOperationException("workflow.connection.missing");
         var incoming = blocks.Keys.ToDictionary(id => id, id => edges.Count(edge => edge.ToBlockId == id));
         var ready = new Queue<Guid>(workflow.Blocks.Where(block => incoming[block.Id] == 0).Select(block => block.Id));
+        var active = ready.ToHashSet();
         var ordered = new List<WorkflowBlock>();
         while (ready.TryDequeue(out var id))
         {
@@ -25,8 +27,12 @@ public sealed class WorkflowGraphRunner
         if (ordered.Count != blocks.Count) throw new InvalidOperationException("workflow.cycle");
         foreach (var block in ordered)
         {
+            if (!active.Contains(block.Id)) continue;
             cancellationToken.ThrowIfCancellationRequested();
             await execute(block, cancellationToken);
+            var output = chooseOutput is null ? null : await chooseOutput(block, cancellationToken);
+            foreach (var edge in edges.Where(edge => edge.FromBlockId == block.Id && (output is null || edge.Output == output)))
+                active.Add(edge.ToBlockId);
         }
     }
 }

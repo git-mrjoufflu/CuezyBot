@@ -14,9 +14,10 @@ public sealed class PublishedWorkflowExecutionTests : IAsyncLifetime
     public ValueTask DisposeAsync() { if (Directory.Exists(directory)) Directory.Delete(directory, true); return ValueTask.CompletedTask; }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task Runner_UsesRequestedRevisionAndRecordsConnectorResult(bool fail)
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task Runner_UsesRequestedRevisionAndRecordsConnectorResult(bool fail, bool timeout)
     {
         var token = TestContext.Current.CancellationToken;
         var database = new SqliteDatabase(new AppDataPaths(directory));
@@ -37,16 +38,50 @@ public sealed class PublishedWorkflowExecutionTests : IAsyncLifetime
             if (block.Type != "twitch.follow.received")
             {
                 calls.Add(block.Parameters["scene"]!.GetValue<string>());
+                if (timeout) throw new TimeoutException("OBS response lost after request");
                 if (fail) throw new IOException("Simulated OBS failure");
             }
             return Task.FromResult("Executed");
         });
-        Assert.Equal(fail ? ExecutionStatus.Failed : ExecutionStatus.Succeeded, await runner.RunNextAsync(token));
+        var expected = timeout ? ExecutionStatus.UnknownOutcome : fail ? ExecutionStatus.Failed : ExecutionStatus.Succeeded;
+        Assert.Equal(expected, await runner.RunNextAsync(token));
         Assert.Equal(new[] { "Original" }, calls);
         Assert.Null(await runner.RunNextAsync(token));
         var history = Assert.Single(await new SqliteExecutionHistoryReader(database).GetRecentAsync(50, token));
         Assert.Equal(2, history.Steps.Count);
-        Assert.Equal(fail ? ExecutionStatus.Failed : ExecutionStatus.Succeeded, history.Steps.Last().Status);
+        Assert.Equal(expected, history.Steps.Last().Status);
+    }
+
+    [Fact]
+    public async Task CancellationDuringDelay_IsRecordedAndStopsDownstream()
+    {
+        var token = TestContext.Current.CancellationToken;
+        var database = new SqliteDatabase(new AppDataPaths(directory)); await database.InitializeAsync(token);
+        var repository = new SqliteWorkflowRepository(database);
+        var first = new WorkflowBlock(Guid.NewGuid(), "core.delay", 1, new JsonObject());
+        var last = new WorkflowBlock(Guid.NewGuid(), "obs.set-source-visible", 1, new JsonObject());
+        var workflow = new WorkflowDefinition(Guid.NewGuid(), 1, "Cancel", true, [first, last], [new(first.Id, "next", last.Id)]);
+        await repository.PublishAsync(workflow, token);
+        var envelope = new EventEnvelope(Guid.NewGuid(), "test", "test", "cancel", "manual.run", 1, DateTimeOffset.UtcNow, new JsonObject());
+        var request = new ExecutionRequest(Guid.NewGuid(), envelope.Id, workflow.Id, 1, DateTimeOffset.UtcNow);
+        await new SqliteEventAdmissionStore(database).TryAdmitAsync(envelope, [request], token);
+        using var cancel = CancellationTokenSource.CreateLinkedTokenSource(token);
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var calls = 0;
+        var runner = new WorkflowExecutionRunner(new SqliteExecutionStore(database), repository.GetRevisionAsync, async (_, ct) =>
+        {
+            calls++; entered.TrySetResult();
+            await Task.Delay(TimeSpan.FromHours(1), ct);
+            return "Unexpected completion";
+        });
+        var running = runner.RunNextAsync(cancel.Token, request.Id);
+        await entered.Task.WaitAsync(token);
+        cancel.Cancel();
+        Assert.Equal(ExecutionStatus.Cancelled, await running);
+        Assert.Equal(1, calls);
+        var history = Assert.Single(await new SqliteExecutionHistoryReader(database).GetRecentAsync(50, token));
+        Assert.Equal(ExecutionStatus.Cancelled, history.Status);
+        Assert.Equal(ExecutionStatus.Cancelled, Assert.Single(history.Steps).Status);
     }
 
     [Fact]

@@ -9,7 +9,7 @@ namespace Automation.Connectors.Obs;
 
 public sealed class ObsWebSocketClient : IObsController, IAsyncDisposable
 {
-    private const int MaximumMessageBytes = 1024 * 1024;
+    private const int MaximumMessageBytes = 16 * 1024 * 1024;
     private readonly ClientWebSocket socket = new();
     private readonly SemaphoreSlim sendGate = new(1, 1);
     private readonly ConcurrentDictionary<string, TaskCompletionSource<JsonObject>> pendingRequests = new();
@@ -106,6 +106,18 @@ public sealed class ObsWebSocketClient : IObsController, IAsyncDisposable
 
     public async Task StartReplayBufferAsync(CancellationToken cancellationToken = default) =>
         await SendRequestAsync("StartReplayBuffer", new JsonObject(), TimeSpan.FromSeconds(10), cancellationToken);
+
+    public async Task<byte[]> GetScreenshotAsync(string sourceName, CancellationToken cancellationToken = default)
+    {
+        var response = await SendRequestAsync("GetSourceScreenshot", new JsonObject
+        {
+            ["sourceName"] = sourceName, ["imageFormat"] = "png", ["imageWidth"] = 1280
+        }, TimeSpan.FromSeconds(10), cancellationToken);
+        var data = response["responseData"]?["imageData"]?.GetValue<string>() ?? throw new InvalidDataException("OBS screenshot missing.");
+        const string prefix = "data:image/png;base64,";
+        if (!data.StartsWith(prefix, StringComparison.Ordinal)) throw new InvalidDataException("OBS screenshot is not a PNG data URL.");
+        return Convert.FromBase64String(data[prefix.Length..]);
+    }
 
     public async ValueTask DisposeAsync()
     {

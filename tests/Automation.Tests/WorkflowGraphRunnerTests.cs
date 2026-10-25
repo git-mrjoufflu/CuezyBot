@@ -9,6 +9,18 @@ public sealed class WorkflowGraphRunnerTests
     private static WorkflowBlock Block(string name) => new(Guid.NewGuid(), name, 1, new JsonObject());
 
     [Fact]
+    public async Task Condition_ExecutesChosenBranchAndSharedContinuationOnlyOnce()
+    {
+        var condition = Block("condition"); var yes = Block("yes"); var no = Block("no"); var join = Block("join");
+        var workflow = new WorkflowDefinition(Guid.NewGuid(), 1, "Branches", true, [condition, yes, no, join],
+            [new(condition.Id, "yes", yes.Id), new(condition.Id, "no", no.Id), new(yes.Id, "next", join.Id), new(no.Id, "next", join.Id)]);
+        var calls = new List<string>();
+        await new WorkflowGraphRunner().RunAsync(workflow, (block, _) => { calls.Add(block.Type); return Task.CompletedTask; },
+            TestContext.Current.CancellationToken, (block, _) => Task.FromResult<string?>(block.Id == condition.Id ? "no" : null));
+        Assert.Equal(new[] { "condition", "no", "join" }, calls);
+    }
+
+    [Fact]
     public async Task SharedDestination_RunsOnceAfterBothSources()
     {
         var a = Block("a"); var b = Block("b"); var c = Block("c");

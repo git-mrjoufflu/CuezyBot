@@ -15,6 +15,7 @@ internal static class PrototypeServices
 {
     internal static Guid CurrentWorkflowId { get; set; } = PrototypeWorkflowIds.WorkflowId;
     internal static string CurrentWorkflowName { get; set; } = "Mon Live Automatisation";
+    internal static string CurrentTriggerType { get; set; } = "manual.run";
     internal static readonly Dictionary<string, bool> SourceVisibility = new(StringComparer.Ordinal);
     internal static readonly Dictionary<string, JsonObject> ActionOptions = new(StringComparer.Ordinal);
 
@@ -43,11 +44,14 @@ internal static class PrototypeServices
         await new SqliteWorkflowRepository(Database).DeleteAsync(id);
     }
 
-    internal static IReadOnlyList<string> ValidateEditor(IReadOnlyCollection<string> actions, IReadOnlyCollection<(string From, string To)> links) =>
-        new WorkflowValidator(new InitialBlockCatalog()).Validate(CreatePrototypeWorkflow(actions, links)).Diagnostics
+    internal static IReadOnlyList<Automation.Contracts.Workflows.WorkflowDiagnostic> ValidateEditorDetails(IReadOnlyCollection<string> actions, IReadOnlyCollection<(string From, string To)> links)
+    {
+        var workflow = CreatePrototypeWorkflow(actions, links);
+        return new WorkflowValidator(new InitialBlockCatalog()).Validate(workflow).Diagnostics
             .Select(diagnostic => diagnostic.Code == "workflow.cycle" && UiLanguageState.IsEnglish
-                ? "The workflow contains a loop. Remove a connection to avoid endless execution."
-                : diagnostic.Message).Concat(ExecutableWorkflowValidator.Validate(CreatePrototypeWorkflow(actions, links), UiLanguageState.IsEnglish).Select(diagnostic => diagnostic.Message)).ToArray();
+                ? diagnostic with { Message = "The workflow contains a loop. Remove a connection to avoid endless execution." }
+                : diagnostic).Concat(ExecutableWorkflowValidator.Validate(workflow, UiLanguageState.IsEnglish)).ToArray();
+    }
     private static readonly AppDataPaths Paths = new();
     private static readonly SqliteDatabase Database = new(Paths);
     private static bool initialized;
@@ -83,7 +87,8 @@ internal static class PrototypeServices
         try
         {
             var repository = new SqliteWorkflowRepository(Database);
-            var workflows = await repository.GetEnabledPublishedAsync(cancellationToken);
+            var workflows = (await repository.GetEnabledPublishedAsync(cancellationToken))
+                .Where(workflow => workflow.Blocks.Any(block => block.Type == "twitch.follow.received")).ToArray();
             var requests = workflows.Select(workflow => new ExecutionRequest(Guid.NewGuid(), eventEnvelope.Id, workflow.Id, workflow.Revision, DateTimeOffset.UtcNow)).ToArray();
             var admission = await new SqliteEventAdmissionStore(Database).TryAdmitAsync(eventEnvelope, requests, cancellationToken);
             ExecutionStatus? status = null;
@@ -131,7 +136,22 @@ internal static class PrototypeServices
             executionCancellation = CancellationTokenSource.CreateLinkedTokenSource(ct);
             Running[id] = executionCancellation;
             return await repository.GetRevisionAsync(id, revision, ct);
-        }, (block, ct) => ExecuteBlockAsync(block, executionCancellation?.Token ?? ct));
+        }, (block, ct) => ExecuteBlockAsync(block, executionCancellation?.Token ?? ct),
+        async (block, ct) =>
+        {
+            if (block.Type != "core.condition") return null;
+            var name = block.Parameters["name"]!.GetValue<string>();
+            var actual = await new SqlitePersistentVariableStore(Database).GetIntegerAsync(name, executionCancellation?.Token ?? ct)
+                ?? throw new InvalidOperationException($"Variable not found: {name}");
+            var expected = long.Parse(block.Parameters["value"]!.ToString(), System.Globalization.CultureInfo.InvariantCulture);
+            var result = block.Parameters["comparison"]?.ToString() switch
+            {
+                "greater" => actual > expected,
+                "less" => actual < expected,
+                _ => actual == expected
+            };
+            return result ? "yes" : "no";
+        });
         foreach (var requestId in requestIds)
         {
             ExecutionStatus? next;
@@ -142,14 +162,20 @@ internal static class PrototypeServices
                 executionCancellation?.Dispose(); executionCancellation = null;
             }
             if (next is null) continue;
-            if (result != ExecutionStatus.Failed) result = next;
+            static int Severity(ExecutionStatus status) => status switch
+            {
+                ExecutionStatus.UnknownOutcome => 4, ExecutionStatus.Failed => 3, ExecutionStatus.Cancelled => 2, _ => 1
+            };
+            if (result is null || Severity(next.Value) > Severity(result.Value)) result = next;
         }
         return result;
     }
 
     private static async Task<string> ExecuteBlockAsync(WorkflowBlock block, CancellationToken token)
     {
+        token.ThrowIfCancellationRequested();
         if (block.Type == "twitch.follow.received") return "Follower event received";
+        if (block.Type == "manual.run") return "Manual run";
         if (block.Parameters["label"] is null) throw new InvalidOperationException("Republish this legacy prototype workflow before running it.");
         string Required(string key) => block.Parameters[key]?.ToString() is { Length: > 0 } value ? value
             : throw new InvalidOperationException($"Missing parameter: {key}");
@@ -172,6 +198,14 @@ internal static class PrototypeServices
                 if (obs?.IsConnected != true) throw new InvalidOperationException("OBS disconnected");
                 await obs.StartReplayBufferAsync(token);
                 return "OBS replay buffer started";
+            case "obs.screenshot":
+                if (obs?.IsConnected != true) throw new InvalidOperationException("OBS disconnected");
+                var image = await obs.GetScreenshotAsync(Required("scene"), token);
+                var directory = System.IO.Path.Combine(Paths.DataDirectory, "screenshots");
+                Directory.CreateDirectory(directory);
+                var filename = System.IO.Path.Combine(directory, $"capture-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}.png");
+                await File.WriteAllBytesAsync(filename, image, token);
+                return "OBS screenshot: " + filename;
             case "twitch.update-title":
                 var identity = TwitchSessionState.Identity ?? throw new InvalidOperationException("Twitch disconnected");
                 var credentials = TwitchSessionState.Token ?? throw new InvalidOperationException("Twitch disconnected");
@@ -195,6 +229,10 @@ internal static class PrototypeServices
                     throw new InvalidOperationException("Delay must be between 0 and 3600 seconds");
                 await Task.Delay(TimeSpan.FromSeconds(seconds), token);
                 return $"Wait: {seconds} s";
+            case "core.condition": return "Condition";
+            case "audio.play":
+                await Automation.Platform.Audio.LocalAudioPlayer.PlayAsync(Required("file"), token);
+                return "Audio played";
             case "variables.set-integer":
             case "variables.increment":
                 var name = Required("name");
@@ -280,14 +318,44 @@ internal static class PrototypeServices
         foreach (var (type, scope) in new[] { ("twitch.send-message", "user:write:chat"), ("twitch.create-clip", "clips:edit") })
             if (workflow.Blocks.Any(block => block.Type == type) && TwitchSessionState.Identity?.Scopes.Contains(scope) != true)
                 throw new InvalidOperationException(UiLanguageState.IsEnglish ? $"Reconnect Twitch to grant {scope}." : $"Reconnecte Twitch pour autoriser {scope}.");
+        await ValidateConnectionsAsync(workflow, cancellationToken);
         await repository.PublishAsync(workflow, cancellationToken);
+    }
+
+    private static async Task ValidateConnectionsAsync(WorkflowDefinition workflow, CancellationToken token)
+    {
+        string Text(string fr, string en) => UiLanguageState.IsEnglish ? en : fr;
+        var obsBlocks = workflow.Blocks.Where(block => block.Type.StartsWith("obs.", StringComparison.Ordinal)).ToArray();
+        if (obsBlocks.Length > 0)
+        {
+            var obs = ObsSessionState.Client;
+            if (obs?.IsConnected != true) throw new InvalidOperationException(Text("Connecte OBS avant de publier.", "Connect OBS before publishing."));
+            var scenes = await obs.GetSceneNamesAsync(token);
+            foreach (var block in obsBlocks)
+            {
+                if (block.Type == "obs.replay.start") continue;
+                var scene = block.Parameters["scene"]!.ToString();
+                if (!scenes.Contains(scene)) throw new InvalidOperationException(Text($"Scène OBS introuvable : {scene}", $"OBS scene not found: {scene}"));
+                if (block.Type == "obs.set-source-visible")
+                {
+                    var available = await obs.GetSourceNamesAsync(scene, token);
+                    var selected = block.Parameters["sources"]?.AsArray().Select(value => value!.GetValue<string>())
+                        ?? new[] { block.Parameters["source"]!.ToString() };
+                    var missing = selected.Where(name => !available.Contains(name)).ToArray();
+                    if (missing.Length > 0) throw new InvalidOperationException(Text("Sources OBS introuvables : ", "OBS sources not found: ") + string.Join(", ", missing));
+                }
+            }
+        }
+        if (workflow.Blocks.Any(block => block.Type.StartsWith("twitch.", StringComparison.Ordinal) && block.Type != "twitch.follow.received")
+            && (TwitchSessionState.Identity is null || TwitchSessionState.Token is null))
+            throw new InvalidOperationException(Text("Connecte Twitch avant de publier.", "Connect Twitch before publishing."));
     }
 
     private static WorkflowDefinition CreatePrototypeWorkflow(IReadOnlyCollection<string>? selectedActions, IReadOnlyCollection<(string From, string To)>? manualLinks) 
     {
         var blocks = new List<WorkflowBlock>
         {
-            new(PrototypeWorkflowIds.TriggerBlockId, "twitch.follow.received", 1, new JsonObject())
+            new(PrototypeWorkflowIds.TriggerBlockId, CurrentTriggerType, 1, new JsonObject())
         };
         var connections = new List<WorkflowConnection>
         {
@@ -311,7 +379,12 @@ internal static class PrototypeServices
         {
             if (actionIds.TryGetValue(from, out var fromId) && actionIds.TryGetValue(to, out var toId) &&
                 !connections.Any(connection => connection.FromBlockId == fromId && connection.ToBlockId == toId))
-                connections.Add(new WorkflowConnection(fromId, "next", toId));
+            {
+                var type = blocks.Single(block => block.Id == fromId).Type;
+                var output = type == "core.condition"
+                    ? ActionOptions.GetValueOrDefault(from)?["branches"]?[to]?.ToString() ?? "yes" : "next";
+                connections.Add(new WorkflowConnection(fromId, output, toId));
+            }
         }
 
         // The follower entry point feeds roots only. User cards are connected
@@ -329,7 +402,7 @@ internal static class PrototypeServices
             connections);
     }
 
-    private static string ActionTypeFor(string label) => label.ToLowerInvariant() switch
+    internal static string ActionTypeFor(string label) => label.ToLowerInvariant() switch
     {
         var value when value.Contains("clip") => "twitch.create-clip",
         var value when value.Contains("titre") || value.Contains("title") => "twitch.update-title",
@@ -341,6 +414,7 @@ internal static class PrototypeServices
         var value when value.Contains("replay") => "obs.replay.start",
         var value when value.Contains("attendre") || value.Contains("wait") => "core.delay",
         var value when value.Contains("condition") => "core.condition",
+        var value when value.Contains("sound") || value.Contains("son") => "audio.play",
         var value when value.Contains("variable") => "variables.set-integer",
         _ => "core.action"
     };

@@ -7,6 +7,7 @@ public sealed class InitialBlockCatalog : IBlockCatalog
 {
     private static readonly IReadOnlyCollection<BlockDescriptor> Blocks =
     [
+        new("manual.run", 1, BlockCategory.Core, BlockKind.Trigger, "Exécution manuelle", "Démarre avec le bouton Exécuter.", new HashSet<string>(StringComparer.Ordinal) { "next" }),
         new(
             "twitch.follow.received",
             1,
@@ -47,6 +48,7 @@ public sealed class InitialBlockCatalog : IBlockCatalog
         ,new("obs.replay.start", 1, BlockCategory.Obs, BlockKind.Action, "Démarrer un replay", "Démarre le tampon de replay OBS.", new HashSet<string>(StringComparer.Ordinal) { "next" })
         ,new("obs.set-source-visible", 1, BlockCategory.Obs, BlockKind.Action, "Afficher une source", "Modifie la visibilité d’une source OBS.", new HashSet<string>(StringComparer.Ordinal) { "next" })
         ,new("core.delay", 1, BlockCategory.Core, BlockKind.Action, "Attendre", "Attend avant de poursuivre.", new HashSet<string>(StringComparer.Ordinal) { "next" })
+        ,new("audio.play", 1, BlockCategory.Core, BlockKind.Action, "Jouer un son", "Lit un fichier audio local.", new HashSet<string>(StringComparer.Ordinal) { "next" })
         ,new("core.action", 1, BlockCategory.Core, BlockKind.Action, "Action", "Exécute une action générique.", new HashSet<string>(StringComparer.Ordinal) { "next" })
         ,new("variables.set-integer", 1, BlockCategory.Core, BlockKind.Action, "Modifier une variable", "Définit une variable entière persistante.", new HashSet<string>(StringComparer.Ordinal) { "next" })
     ];
