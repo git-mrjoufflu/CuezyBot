@@ -112,14 +112,7 @@
           <TextBlock Text="✎" Classes="muted" VerticalAlignment="Center" />
         </StackPanel>
 
-        <Border Grid.Column="2" Background="#11162B" BorderBrush="#2C3353" BorderThickness="1" CornerRadius="10" Padding="6,5">
-          <StackPanel Orientation="Horizontal" Spacing="8">
-            <TextBlock x:Name="TestStatus" Text="Brouillon enregistré" Classes="muted" FontSize="12" VerticalAlignment="Center" Margin="3,0,3,0" />
-            <Button Classes="surface" Content="▷  Tester" Click="OnTestClick" />
-            <Button x:Name="SaveWorkflowButton" Classes="surface" Content="Enregistrer" Click="OnSaveWorkflowClick" />
-            <Button x:Name="StartWorkflowButton" Classes="primary" Content="▶  Démarrer" Click="OnStartWorkflowClick" />
-          </StackPanel>
-        </Border>
+        <TextBlock Grid.Column="2" x:Name="TestStatus" Text="Brouillon enregistré" Classes="muted" FontSize="12" VerticalAlignment="Center" HorizontalAlignment="Right" />
       </Grid>
     </Border>
 
@@ -332,13 +325,20 @@
     </Grid>
 
     <Border Grid.Row="1" Grid.Column="2" Background="#0C1022" BorderBrush="#292D49" BorderThickness="1,0,0,0" Padding="14">
-      <Grid RowDefinitions="Auto,Auto,*">
+      <Grid RowDefinitions="Auto,Auto,Auto,*">
         <TextBox Height="38" CornerRadius="9" PlaceholderText="Rechercher une action…" />
-        <Grid Grid.Row="1" Margin="0,12,0,14" ColumnDefinitions="*,*" Background="#11162B">
+        <Border Grid.Row="1" Background="#11162B" BorderBrush="#2C3353" BorderThickness="1" CornerRadius="10" Padding="5" Margin="0,10,0,0">
+          <StackPanel Orientation="Horizontal" Spacing="5">
+            <Button Classes="surface" Content="▷  Tester" Click="OnTestClick" Padding="9,7" />
+            <Button x:Name="SaveWorkflowButton" Classes="surface" Content="Enregistrer" Click="OnSaveWorkflowClick" Padding="9,7" />
+            <Button x:Name="StartWorkflowButton" Classes="primary" Content="▶  Démarrer" Click="OnStartWorkflowClick" Padding="9,7" />
+          </StackPanel>
+        </Border>
+        <Grid Grid.Row="2" Margin="0,10,0,12" ColumnDefinitions="*,*" Background="#11162B">
           <Border Grid.Column="0" Padding="8" Background="#4A2A7D" CornerRadius="8"><TextBlock Text="Actions" HorizontalAlignment="Center" FontWeight="SemiBold" /></Border>
           <Border Grid.Column="1" Padding="8" CornerRadius="8"><TextBlock Text="Événements" HorizontalAlignment="Center" Classes="muted" /></Border>
         </Grid>
-        <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Disabled" HorizontalContentAlignment="Stretch">
+        <ScrollViewer Grid.Row="3" HorizontalScrollBarVisibility="Disabled" HorizontalContentAlignment="Stretch">
           <StackPanel Spacing="10" HorizontalAlignment="Stretch">
             <Border x:Name="TwitchActionSection" Classes="productSection" IsVisible="False">
               <StackPanel Spacing="6">
