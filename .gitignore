@@ -1,0 +1,11 @@
+bin/
+obj/
+.vs/
+.idea/
+.vscode/
+
+# Données locales de l’application
+data/
+
+# Publications portables
+artifacts/

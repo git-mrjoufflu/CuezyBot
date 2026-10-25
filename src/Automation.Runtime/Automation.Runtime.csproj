@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Automation.Connectors.Obs/Automation.Connectors.Obs.csproj" />
+    <ProjectReference Include="../Automation.Domain/Automation.Domain.csproj" />
+    <ProjectReference Include="../Automation.Engine/Automation.Engine.csproj" />
+    <ProjectReference Include="../Automation.Persistence.Sqlite/Automation.Persistence.Sqlite.csproj" />
+  </ItemGroup>
+</Project>

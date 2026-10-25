@@ -1,0 +1,17 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Automation.Domain/Automation.Domain.csproj" />
+    <Project Path="src/Automation.Desktop/Automation.Desktop.csproj" />
+    <Project Path="src/Automation.Contracts/Automation.Contracts.csproj" />
+    <Project Path="src/Automation.Application/Automation.Application.csproj" />
+    <Project Path="src/Automation.Connectors.Obs/Automation.Connectors.Obs.csproj" />
+    <Project Path="src/Automation.Connectors.Twitch/Automation.Connectors.Twitch.csproj" />
+    <Project Path="src/Automation.Engine/Automation.Engine.csproj" />
+    <Project Path="src/Automation.Persistence.Sqlite/Automation.Persistence.Sqlite.csproj" />
+    <Project Path="src/Automation.Platform/Automation.Platform.csproj" />
+    <Project Path="src/Automation.Runtime/Automation.Runtime.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Automation.Tests/Automation.Tests.csproj" />
+  </Folder>
+</Solution>

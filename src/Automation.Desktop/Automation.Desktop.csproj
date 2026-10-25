@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <AvaloniaUseCompiledBindingsByDefault>false</AvaloniaUseCompiledBindingsByDefault>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Avalonia.Desktop" Version="12.1.4" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="12.1.4" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.4" />
+    <ProjectReference Include="../Automation.Connectors.Obs/Automation.Connectors.Obs.csproj" />
+    <ProjectReference Include="../Automation.Connectors.Twitch/Automation.Connectors.Twitch.csproj" />
+    <ProjectReference Include="../Automation.Application/Automation.Application.csproj" />
+    <ProjectReference Include="../Automation.Persistence.Sqlite/Automation.Persistence.Sqlite.csproj" />
+    <ProjectReference Include="../Automation.Platform/Automation.Platform.csproj" />
+  </ItemGroup>
+</Project>

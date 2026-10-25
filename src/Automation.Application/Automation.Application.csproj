@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../Automation.Contracts/Automation.Contracts.csproj" />
+    <ProjectReference Include="../Automation.Domain/Automation.Domain.csproj" />
+    <ProjectReference Include="../Automation.Engine/Automation.Engine.csproj" />
+  </ItemGroup>
+</Project>

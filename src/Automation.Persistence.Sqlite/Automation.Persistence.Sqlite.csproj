@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.13" />
+    <ProjectReference Include="../Automation.Contracts/Automation.Contracts.csproj" />
+    <ProjectReference Include="../Automation.Domain/Automation.Domain.csproj" />
+  </ItemGroup>
+</Project>

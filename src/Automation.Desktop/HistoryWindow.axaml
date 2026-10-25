@@ -1,0 +1,94 @@
+<Window
+    x:Class="Automation.Desktop.HistoryWindow"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="Historique — CuezyBot"
+    Width="850"
+    Height="700"
+    MinWidth="680"
+    MinHeight="520"
+    WindowStartupLocation="CenterOwner"
+    Background="#0D1125">
+  <Window.Styles>
+    <Style Selector="TextBlock"><Setter Property="FontFamily" Value="Inter" /><Setter Property="Foreground" Value="#F4F3FF" /></Style>
+    <Style Selector="TextBlock.muted"><Setter Property="Foreground" Value="#9AA1BD" /></Style>
+    <Style Selector="TextBlock.label"><Setter Property="Foreground" Value="#777F9D" /><Setter Property="FontSize" Value="11" /><Setter Property="FontWeight" Value="SemiBold" /></Style>
+    <Style Selector="Button"><Setter Property="FontFamily" Value="Inter" /><Setter Property="CornerRadius" Value="8" /><Setter Property="Padding" Value="14,10" /></Style>
+  </Window.Styles>
+
+  <Grid Margin="26" RowDefinitions="Auto,Auto,*">
+    <Grid ColumnDefinitions="*,Auto">
+      <StackPanel>
+        <TextBlock Text="Historique des événements" FontSize="24" FontWeight="SemiBold" />
+        <TextBlock Text="Ouvre une alerte pour voir son événement et chaque étape exécutée." Classes="muted" />
+      </StackPanel>
+      <Button Grid.Column="1" Content="Actualiser" Click="OnRefreshClick" VerticalAlignment="Center" />
+    </Grid>
+    <Border Grid.Row="1" Margin="0,18,0,12" Padding="13" CornerRadius="9" Background="#151A31" BorderBrush="#2C3353" BorderThickness="1">
+      <TextBlock x:Name="HistoryStatus" Text="Chargement de l’historique…" Classes="muted" />
+    </Border>
+    <ScrollViewer Grid.Row="2">
+      <ItemsControl x:Name="HistoryItems">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate>
+            <Border Margin="0,0,0,12" CornerRadius="11" Background="#151A31" BorderBrush="#2C3353" BorderThickness="1">
+              <Expander Padding="16">
+                <Expander.Header>
+                  <Grid ColumnDefinitions="46,*,Auto" Margin="0,0,8,0">
+                    <Border Width="38" Height="38" CornerRadius="10" Background="#4A206F" VerticalAlignment="Center">
+                      <TextBlock Text="⚡" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <StackPanel Grid.Column="1" Margin="10,0" VerticalAlignment="Center">
+                      <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="16" />
+                      <TextBlock Text="{Binding Summary}" Classes="muted" FontSize="12" />
+                    </StackPanel>
+                    <Border Grid.Column="2" Padding="10,5" CornerRadius="12" Background="#174B38" VerticalAlignment="Center">
+                      <TextBlock Text="{Binding StatusLabel}" Foreground="#72F0AA" FontWeight="SemiBold" FontSize="12" />
+                    </Border>
+                  </Grid>
+                </Expander.Header>
+                <StackPanel Margin="46,16,0,4" Spacing="14">
+                  <Grid ColumnDefinitions="*,*" ColumnSpacing="16">
+                    <Border Grid.Column="0" Padding="13" CornerRadius="9" Background="#10152A">
+                      <StackPanel Spacing="5">
+                        <TextBlock Text="ÉVÉNEMENT TWITCH" Classes="label" />
+                        <TextBlock Text="{Binding FollowerName}" FontSize="17" FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding FollowerDetails}" Classes="muted" />
+                        <TextBlock Text="{Binding ReceivedLabel}" Classes="muted" FontSize="12" />
+                      </StackPanel>
+                    </Border>
+                    <Border Grid.Column="1" Padding="13" CornerRadius="9" Background="#10152A">
+                      <StackPanel Spacing="5">
+                        <TextBlock Text="EXÉCUTION" Classes="label" />
+                        <TextBlock Text="{Binding DurationLabel}" FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding ExecutionIdLabel}" Classes="muted" FontSize="11" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding MessageIdLabel}" Classes="muted" FontSize="11" TextWrapping="Wrap" />
+                      </StackPanel>
+                    </Border>
+                  </Grid>
+                  <StackPanel Spacing="7">
+                    <TextBlock Text="ÉTAPES DU PARCOURS" Classes="label" />
+                    <ItemsControl ItemsSource="{Binding Steps}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                          <Grid Margin="0,4" ColumnDefinitions="22,*,Auto">
+                            <TextBlock Text="✓" Foreground="#53D994" />
+                            <TextBlock Grid.Column="1" Text="{Binding Message}" />
+                            <TextBlock Grid.Column="2" Text="{Binding Duration}" Classes="muted" FontSize="12" />
+                          </Grid>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </StackPanel>
+                  <Border IsVisible="{Binding HasError}" Padding="12" CornerRadius="8" Background="#331A25">
+                    <TextBlock Text="{Binding Error}" Foreground="#FF7587" TextWrapping="Wrap" />
+                  </Border>
+                </StackPanel>
+              </Expander>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </ScrollViewer>
+  </Grid>
+</Window>

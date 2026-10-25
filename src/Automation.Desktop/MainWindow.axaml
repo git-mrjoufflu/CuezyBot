@@ -1,0 +1,402 @@
+<Window
+    x:Class="Automation.Desktop.MainWindow"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="CuezyBot"
+    Width="1500"
+    Height="900"
+    MinWidth="1180"
+    MinHeight="720"
+    Background="#070A18">
+  <Window.Styles>
+    <Style Selector="TextBlock">
+      <Setter Property="FontFamily" Value="Inter" />
+      <Setter Property="Foreground" Value="#F4F3FF" />
+    </Style>
+    <Style Selector="TextBlock.muted">
+      <Setter Property="Foreground" Value="#9299B6" />
+    </Style>
+    <Style Selector="Button">
+      <Setter Property="FontFamily" Value="Inter" />
+      <Setter Property="CornerRadius" Value="7" />
+      <Setter Property="Padding" Value="12,8" />
+    </Style>
+    <Style Selector="Button.primary">
+      <Setter Property="Background" Value="#8A36F5" />
+      <Setter Property="Foreground" Value="White" />
+    </Style>
+    <Style Selector="Button.surface">
+      <Setter Property="Background" Value="#171B34" />
+      <Setter Property="Foreground" Value="#E8E7F5" />
+    </Style>
+    <Style Selector="Button.nav">
+      <Setter Property="HorizontalContentAlignment" Value="Left" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Foreground" Value="#CDD0E3" />
+      <Setter Property="Padding" Value="13,10" />
+    </Style>
+    <Style Selector="Button.nav.active">
+      <Setter Property="Background" Value="#392868" />
+      <Setter Property="Foreground" Value="White" />
+    </Style>
+    <Style Selector="Border.node">
+      <Setter Property="Background" Value="#151A32" />
+      <Setter Property="BorderThickness" Value="2" />
+      <Setter Property="CornerRadius" Value="11" />
+      <Setter Property="Padding" Value="0" />
+    </Style>
+    <Style Selector="Border.libraryItem">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="CornerRadius" Value="7" />
+      <Setter Property="Padding" Value="9,8" />
+    </Style>
+    <Style Selector="Border.libraryItem:pointerover">
+      <Setter Property="Background" Value="#202744" />
+    </Style>
+    <Style Selector="Button.sectionHeader">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Padding" Value="7,6" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+    </Style>
+    <Style Selector="Button.sectionHeader:pointerover">
+      <Setter Property="Background" Value="#1D2340" />
+    </Style>
+    <Style Selector="Border.productSection">
+      <Setter Property="Background" Value="#10162B" />
+      <Setter Property="BorderBrush" Value="#2B3556" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="11" />
+      <Setter Property="Padding" Value="4" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+    </Style>
+  </Window.Styles>
+
+  <Grid RowDefinitions="58,*,34" ColumnDefinitions="200,*,300">
+    <Border Grid.Row="0" Grid.ColumnSpan="3" Background="#0B0F22" BorderBrush="#292D49" BorderThickness="0,0,0,1">
+      <Grid Margin="18,0" ColumnDefinitions="200,*,Auto">
+        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="9" VerticalAlignment="Center">
+          <Border Width="34" Height="34" CornerRadius="11">
+            <Border.Background>
+              <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                <GradientStop Color="#42BFFF" Offset="0" />
+                <GradientStop Color="#9B35FF" Offset="1" />
+              </LinearGradientBrush>
+            </Border.Background>
+            <TextBlock Text="◉" FontSize="20" HorizontalAlignment="Center" VerticalAlignment="Center" />
+          </Border>
+          <TextBlock FontSize="20" FontWeight="Bold" VerticalAlignment="Center">
+            <Run Text="Cuezy" /><Run Text="Bot" Foreground="#B14AFF" />
+          </TextBlock>
+        </StackPanel>
+
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+          <TextBlock Text="Mon Live Automatisation" FontWeight="SemiBold" FontSize="15" />
+          <TextBlock Text="✎" Classes="muted" VerticalAlignment="Center" />
+        </StackPanel>
+
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="9" VerticalAlignment="Center">
+          <TextBlock x:Name="TestStatus" Text="Brouillon enregistré" Classes="muted" FontSize="12" VerticalAlignment="Center" Margin="0,0,5,0" />
+          <Button Classes="surface" Content="▷  Tester" Click="OnTestClick" />
+          <Button Classes="surface" Content="Enregistrer" />
+          <Button Classes="primary" Content="▶  Démarrer" />
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <Border Grid.Row="1" Grid.Column="0" Background="#0D1125" BorderBrush="#292D49" BorderThickness="0,0,1,0" Padding="12,16">
+      <Grid RowDefinitions="*,Auto">
+        <StackPanel Spacing="4">
+          <Button Classes="nav" Content="⌂   Accueil" />
+          <Button Classes="nav active" Content="⌘   Workflows" />
+          <Button Classes="nav" Content="⚡   Événements" Click="OnHistoryClick" />
+          <Button Classes="nav" Content="◇   Actions" />
+          <Button Classes="nav" Content="⌁   Intégrations" Click="OnIntegrationsClick" />
+          <Button Classes="nav" Content="𝑥   Variables" />
+          <Button Classes="nav" Content="▣   Pages" />
+          <Button Classes="nav" Content="⚙   Paramètres" />
+        </StackPanel>
+
+        <Border Grid.Row="1" Padding="12" CornerRadius="9" Background="#12172D" BorderBrush="#282E4C" BorderThickness="1">
+          <StackPanel Spacing="8">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <Border Width="30" Height="30" CornerRadius="15" Background="#52308B">
+                <TextBlock Text="C" HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="Bold" />
+              </Border>
+              <StackPanel>
+                <TextBlock Text="Créateur" FontWeight="SemiBold" FontSize="12" />
+                <TextBlock Text="Espace local" Classes="muted" FontSize="10" />
+              </StackPanel>
+            </StackPanel>
+            <Border Height="1" Background="#282E4C" />
+          </StackPanel>
+        </Border>
+      </Grid>
+    </Border>
+
+    <Grid Grid.Row="1" Grid.Column="1" Background="#080C1B" ClipToBounds="True">
+      <Canvas>
+        <Canvas.Background>
+          <DrawingBrush TileMode="Tile" DestinationRect="0,0,32,32" SourceRect="0,0,32,32">
+            <DrawingBrush.Drawing>
+              <GeometryDrawing Brush="#080C1B">
+                <GeometryDrawing.Pen>
+                  <Pen Brush="#151B31" Thickness="1" />
+                </GeometryDrawing.Pen>
+                <GeometryDrawing.Geometry>
+                  <RectangleGeometry Rect="0,0,32,32" />
+                </GeometryDrawing.Geometry>
+              </GeometryDrawing>
+            </DrawingBrush.Drawing>
+          </DrawingBrush>
+        </Canvas.Background>
+
+        <Path Data="M 280,225 C 325,225 318,275 360,275" Stroke="#4C9CFF" StrokeThickness="3" />
+        <Path Data="M 570,275 C 625,275 610,170 670,170" Stroke="#53D994" StrokeThickness="3" />
+        <Path Data="M 570,275 C 620,275 615,355 670,355" Stroke="#A640F4" StrokeThickness="3" />
+        <Path Data="M 465,327 C 465,425 525,445 575,445" Stroke="#FF465F" StrokeThickness="3" />
+        <Path Data="M 785,445 C 830,445 825,445 865,445" Stroke="#A640F4" StrokeThickness="3" />
+
+        <Border Canvas.Left="235" Canvas.Top="218" Width="12" Height="12" CornerRadius="6" Background="#4C9CFF" />
+        <Border Canvas.Left="354" Canvas.Top="269" Width="12" Height="12" CornerRadius="6" Background="#4C9CFF" />
+        <Border Canvas.Left="564" Canvas.Top="269" Width="12" Height="12" CornerRadius="6" Background="#53D994" />
+        <Border Canvas.Left="664" Canvas.Top="164" Width="12" Height="12" CornerRadius="6" Background="#53D994" />
+        <Border Canvas.Left="664" Canvas.Top="349" Width="12" Height="12" CornerRadius="6" Background="#A640F4" />
+        <Border Canvas.Left="459" Canvas.Top="321" Width="12" Height="12" CornerRadius="6" Background="#FF465F" />
+        <Border Canvas.Left="569" Canvas.Top="439" Width="12" Height="12" CornerRadius="6" Background="#A640F4" />
+        <Border Canvas.Left="779" Canvas.Top="439" Width="12" Height="12" CornerRadius="6" Background="#A640F4" />
+
+        <Border Canvas.Left="75" Canvas.Top="175" Width="210" Height="100" Classes="node" BorderBrush="#9B42FF">
+          <Grid RowDefinitions="32,*">
+            <Border Background="#4A206F" CornerRadius="9,9,0,0" Padding="10,0">
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Text="⚡  Événement" Foreground="#DFA8FF" FontWeight="SemiBold" VerticalAlignment="Center" FontSize="12" />
+                <TextBlock Grid.Column="1" Text="×" VerticalAlignment="Center" />
+              </Grid>
+            </Border>
+            <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="10" Margin="12" VerticalAlignment="Center">
+              <Border Width="36" Height="36" CornerRadius="8" Background="#6F35BE">
+                <TextBlock Text="T" HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="Bold" />
+              </Border>
+              <TextBlock Text="Nouveau follow" VerticalAlignment="Center" FontWeight="SemiBold" />
+            </StackPanel>
+          </Grid>
+        </Border>
+
+        <Border Canvas.Left="360" Canvas.Top="225" Width="210" Height="105" Classes="node" BorderBrush="#3788F5">
+          <Grid RowDefinitions="32,*">
+            <Border Background="#173C73" CornerRadius="9,9,0,0" Padding="10,0">
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Text="⌁  Condition" Foreground="#7EB8FF" FontWeight="SemiBold" VerticalAlignment="Center" FontSize="12" />
+                <TextBlock Grid.Column="1" Text="×" VerticalAlignment="Center" />
+              </Grid>
+            </Border>
+            <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="10" Margin="12" VerticalAlignment="Center">
+              <Border Width="36" Height="36" CornerRadius="8" Background="#275AA0">
+                <TextBlock Text="♛" HorizontalAlignment="Center" VerticalAlignment="Center" />
+              </Border>
+              <TextBlock Text="Est un abonné ?" VerticalAlignment="Center" FontWeight="SemiBold" />
+            </StackPanel>
+          </Grid>
+        </Border>
+
+        <Border Canvas.Left="605" Canvas.Top="183" Padding="17,6" CornerRadius="14" Background="#197246" BorderBrush="#45DD8D" BorderThickness="1">
+          <TextBlock Text="Oui" FontWeight="SemiBold" />
+        </Border>
+        <Border Canvas.Left="600" Canvas.Top="345" Padding="17,6" CornerRadius="14" Background="#8C202E" BorderBrush="#FF5368" BorderThickness="1">
+          <TextBlock Text="Non" FontWeight="SemiBold" />
+        </Border>
+
+        <Border Canvas.Left="670" Canvas.Top="115" Width="225" Height="110" Classes="node" BorderBrush="#35D57B">
+          <Grid RowDefinitions="32,*">
+            <Border Background="#145D38" CornerRadius="9,9,0,0" Padding="10,0">
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Text="◆  Action" Foreground="#72F0AA" FontWeight="SemiBold" VerticalAlignment="Center" FontSize="12" />
+                <TextBlock Grid.Column="1" Text="×" VerticalAlignment="Center" />
+              </Grid>
+            </Border>
+            <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="10" Margin="12" VerticalAlignment="Center">
+              <Border Width="40" Height="40" CornerRadius="20" BorderBrush="#FFFFFF" BorderThickness="1">
+                <TextBlock Text="OBS" FontSize="10" HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="Bold" />
+              </Border>
+              <TextBlock Text="Afficher une alerte&#10;OBS" VerticalAlignment="Center" FontWeight="SemiBold" />
+            </StackPanel>
+          </Grid>
+        </Border>
+
+        <Border Canvas.Left="670" Canvas.Top="300" Width="225" Height="110" Classes="node" BorderBrush="#9C42FA">
+          <Grid RowDefinitions="32,*">
+            <Border Background="#48206F" CornerRadius="9,9,0,0" Padding="10,0">
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Text="◆  Action" Foreground="#D39AFF" FontWeight="SemiBold" VerticalAlignment="Center" FontSize="12" />
+                <TextBlock Grid.Column="1" Text="×" VerticalAlignment="Center" />
+              </Grid>
+            </Border>
+            <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="10" Margin="12" VerticalAlignment="Center">
+              <Border Width="40" Height="40" CornerRadius="9" Background="#6840A7">
+                <TextBlock Text="D" HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="Bold" />
+              </Border>
+              <TextBlock Text="Envoyer un message&#10;Discord" VerticalAlignment="Center" FontWeight="SemiBold" />
+            </StackPanel>
+          </Grid>
+        </Border>
+
+        <Border Canvas.Left="575" Canvas.Top="400" Width="210" Height="92" Classes="node" BorderBrush="#9C42FA">
+          <StackPanel Orientation="Horizontal" Spacing="10" Margin="12" VerticalAlignment="Center">
+            <Border Width="40" Height="40" CornerRadius="9" Background="#693CB0">
+              <TextBlock Text="♫" FontSize="22" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+            <StackPanel VerticalAlignment="Center">
+              <TextBlock Text="Action" Foreground="#C98AFF" FontSize="11" />
+              <TextBlock Text="Jouer un son" FontWeight="SemiBold" />
+            </StackPanel>
+          </StackPanel>
+        </Border>
+
+        <Border Canvas.Left="865" Canvas.Top="400" Width="220" Height="92" Classes="node" BorderBrush="#9C42FA">
+          <StackPanel Orientation="Horizontal" Spacing="10" Margin="12" VerticalAlignment="Center">
+            <Border Width="40" Height="40" CornerRadius="9" Background="#693CB0">
+              <TextBlock Text="＋" FontSize="20" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+            <StackPanel VerticalAlignment="Center">
+              <TextBlock Text="Action" Foreground="#C98AFF" FontSize="11" />
+              <TextBlock Text="Ajouter au compteur" FontWeight="SemiBold" />
+            </StackPanel>
+          </StackPanel>
+        </Border>
+
+        <Border Canvas.Left="30" Canvas.Bottom="22" Width="590" Height="132" Background="#0E1328" BorderBrush="#303653" BorderThickness="1" CornerRadius="13" Padding="16">
+          <Grid RowDefinitions="Auto,*">
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Text="▣  Bibliothèque de modèles" FontWeight="SemiBold" />
+              <TextBlock Grid.Column="1" Text="Voir tout  ›" Foreground="#B66AFF" FontSize="12" />
+            </Grid>
+            <Grid Grid.Row="1" Margin="0,12,0,0" ColumnDefinitions="*,*,*,*" ColumnSpacing="10">
+              <Border Grid.Column="0" Background="#171C35" CornerRadius="9" Padding="10">
+                <StackPanel HorizontalAlignment="Center" Spacing="5"><TextBlock Text="♥" Foreground="#C34EFF" FontSize="24" HorizontalAlignment="Center" /><TextBlock Text="Follow avec alerte" FontSize="11" /></StackPanel>
+              </Border>
+              <Border Grid.Column="1" Background="#171C35" CornerRadius="9" Padding="10">
+                <StackPanel HorizontalAlignment="Center" Spacing="5"><TextBlock Text="★" Foreground="#4199FF" FontSize="24" HorizontalAlignment="Center" /><TextBlock Text="Nouvel abonné" FontSize="11" /></StackPanel>
+              </Border>
+              <Border Grid.Column="2" Background="#171C35" CornerRadius="9" Padding="10">
+                <StackPanel HorizontalAlignment="Center" Spacing="5"><TextBlock Text="♛" Foreground="#4AE3A0" FontSize="24" HorizontalAlignment="Center" /><TextBlock Text="Raid + message" FontSize="11" /></StackPanel>
+              </Border>
+              <Border Grid.Column="3" Background="#171C35" CornerRadius="9" Padding="10">
+                <StackPanel HorizontalAlignment="Center" Spacing="5"><TextBlock Text="◆" Foreground="#FFAE55" FontSize="24" HorizontalAlignment="Center" /><TextBlock Text="Cheer + son" FontSize="11" /></StackPanel>
+              </Border>
+            </Grid>
+          </Grid>
+        </Border>
+
+        <StackPanel Canvas.Right="18" Canvas.Bottom="20" Orientation="Horizontal" Spacing="7">
+          <Button Classes="surface" Content="−" />
+          <Border Background="#171B34" CornerRadius="7" Padding="12,9"><TextBlock Text="100 %" Classes="muted" /></Border>
+          <Button Classes="surface" Content="＋" />
+          <Button Classes="surface" Content="Centrer" />
+        </StackPanel>
+      </Canvas>
+    </Grid>
+
+    <Border Grid.Row="1" Grid.Column="2" Background="#0C1022" BorderBrush="#292D49" BorderThickness="1,0,0,0" Padding="14">
+      <Grid RowDefinitions="Auto,Auto,*">
+        <TextBox Height="38" CornerRadius="9" PlaceholderText="Rechercher une action…" />
+        <Grid Grid.Row="1" Margin="0,12,0,14" ColumnDefinitions="*,*" Background="#11162B">
+          <Border Grid.Column="0" Padding="8" Background="#4A2A7D" CornerRadius="8"><TextBlock Text="Actions" HorizontalAlignment="Center" FontWeight="SemiBold" /></Border>
+          <Border Grid.Column="1" Padding="8" CornerRadius="8"><TextBlock Text="Événements" HorizontalAlignment="Center" Classes="muted" /></Border>
+        </Grid>
+        <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Disabled" HorizontalContentAlignment="Stretch">
+          <StackPanel Spacing="10" HorizontalAlignment="Stretch">
+            <Border x:Name="TwitchActionSection" Classes="productSection" IsVisible="False">
+              <StackPanel Spacing="6">
+              <Button Classes="sectionHeader" Click="OnTwitchSectionClick">
+                <Grid ColumnDefinitions="Auto,*,Auto">
+                  <Border Width="28" Height="28" CornerRadius="8" Background="#9146FF"><TextBlock Text="T" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" /></Border>
+                  <TextBlock Grid.Column="1" Margin="9,0,0,0" Text="Twitch" FontWeight="SemiBold" VerticalAlignment="Center" />
+                  <TextBlock x:Name="TwitchSectionChevron" Grid.Column="2" Text="⌃" Foreground="#C9CEE1" FontSize="16" VerticalAlignment="Center" />
+                </Grid>
+              </Button>
+              <StackPanel x:Name="TwitchActions" Spacing="6">
+                <Border Classes="libraryItem"><TextBlock Text="▣  Envoyer un message" /></Border>
+                <Border Classes="libraryItem"><TextBlock Text="▣  Créer un clip" /></Border>
+                <Border Classes="libraryItem"><TextBlock Text="✎  Modifier un titre" /></Border>
+                <Border Classes="libraryItem"><TextBlock Text="◎  Gérer les points de chaîne" /></Border>
+                <Border Classes="libraryItem"><TextBlock Text="♟  Récupérer un utilisateur" /></Border>
+              </StackPanel>
+              </StackPanel>
+            </Border>
+            <Border x:Name="ObsActionSection" Classes="productSection" IsVisible="False">
+              <StackPanel Spacing="6">
+              <Button Classes="sectionHeader" Click="OnObsSectionClick">
+                <Grid ColumnDefinitions="Auto,*,Auto">
+                  <Border Width="28" Height="28" CornerRadius="14" Background="#343A4D"><TextBlock Text="OBS" FontSize="8" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" /></Border>
+                  <TextBlock Grid.Column="1" Margin="9,0,0,0" Text="OBS Studio" FontWeight="SemiBold" VerticalAlignment="Center" />
+                  <TextBlock x:Name="ObsSectionChevron" Grid.Column="2" Text="⌃" Foreground="#C9CEE1" FontSize="16" VerticalAlignment="Center" />
+                </Grid>
+              </Button>
+              <StackPanel x:Name="ObsActions" Spacing="6">
+                <Border Classes="libraryItem"><TextBlock Text="◉  Changer de scène" /></Border>
+                <Border Classes="libraryItem"><TextBlock Text="▻  Afficher une source" /></Border>
+                <Border Classes="libraryItem"><TextBlock Text="▻  Masquer une source" /></Border>
+                <Border Classes="libraryItem"><TextBlock Text="●  Démarrer un replay" /></Border>
+                <Border Classes="libraryItem"><TextBlock Text="▧  Prendre une capture" /></Border>
+              </StackPanel>
+              </StackPanel>
+            </Border>
+            <Border Classes="productSection">
+              <StackPanel Spacing="6">
+              <Button Classes="sectionHeader" Click="OnCoreSectionClick">
+                <Grid ColumnDefinitions="Auto,*,Auto"><Border Width="28" Height="28" CornerRadius="8" Background="#245A91"><TextBlock Text="◆" Foreground="#7DBEFF" HorizontalAlignment="Center" VerticalAlignment="Center" /></Border><TextBlock Grid.Column="1" Margin="9,0,0,0" Text="CORE" FontWeight="SemiBold" VerticalAlignment="Center" /><TextBlock x:Name="CoreSectionChevron" Grid.Column="2" Text="⌃" Foreground="#C9CEE1" FontSize="16" VerticalAlignment="Center" /></Grid>
+              </Button>
+              <StackPanel x:Name="CoreActions" Spacing="6">
+                <Border Classes="libraryItem"><TextBlock Text="◇  Ajouter une condition" /></Border>
+                <Border Classes="libraryItem"><TextBlock Text="◷  Attendre" /></Border>
+                <Border Classes="libraryItem"><TextBlock Text="＋  Modifier une variable" /></Border>
+                <Border Classes="libraryItem"><TextBlock Text="♫  Jouer un son" /></Border>
+              </StackPanel>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </Grid>
+    </Border>
+
+    <Border Grid.Row="2" Grid.ColumnSpan="3" Background="#0A0E20" BorderBrush="#292D49" BorderThickness="0,1,0,0">
+      <Grid Margin="16,0" ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center">
+        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
+          <Border Width="8" Height="8" CornerRadius="4" Background="#5EE6A8" />
+          <TextBlock Text="Moteur actif" Foreground="#B8C0D9" FontSize="11" />
+        </StackPanel>
+
+        <TextBlock Grid.Column="1" Text="Données enregistrées localement" Classes="muted" FontSize="11"
+                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+
+        <StackPanel x:Name="IntegrationStatusArea" Grid.Column="2" Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
+          <ToolTip.Tip>
+            <Border Background="#171B34" BorderBrush="#3A4264" BorderThickness="1" CornerRadius="7" Padding="10,7">
+              <StackPanel Spacing="5">
+                <StackPanel Orientation="Horizontal" Spacing="7">
+                  <Ellipse x:Name="IntegrationObsTooltipDot" Width="8" Height="8" Fill="#F1B85B" VerticalAlignment="Center" />
+                  <TextBlock Text="OBS" FontSize="11" />
+                  <TextBlock x:Name="IntegrationObsTooltipStatus" Text="Non connecté" Foreground="#FFD081" FontSize="11" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="7">
+                  <Ellipse x:Name="IntegrationTwitchTooltipDot" Width="8" Height="8" Fill="#F1B85B" VerticalAlignment="Center" />
+                  <TextBlock Text="Twitch" FontSize="11" />
+                  <TextBlock x:Name="IntegrationTwitchTooltipStatus" Text="Non connecté" Foreground="#FFD081" FontSize="11" />
+                </StackPanel>
+              </StackPanel>
+            </Border>
+          </ToolTip.Tip>
+          <TextBlock Text="Intégrations" Classes="muted" FontSize="11" />
+          <Border x:Name="IntegrationStatusDot" Width="8" Height="8" CornerRadius="4" Background="#7C849F" />
+          <TextBlock x:Name="IntegrationCountStatus" Text="0/2 intégrations connectées" Classes="muted" FontSize="11" />
+        </StackPanel>
+      </Grid>
+    </Border>
+  </Grid>
+</Window>

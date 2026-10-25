@@ -1,0 +1,54 @@
+<Window
+    x:Class="Automation.Desktop.IntegrationsWindow"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="Intégrations — CuezyBot"
+    Width="700"
+    Height="470"
+    CanResize="False"
+    WindowStartupLocation="CenterOwner"
+    Background="#0D1125">
+  <Window.Styles>
+    <Style Selector="TextBlock"><Setter Property="FontFamily" Value="Inter" /><Setter Property="Foreground" Value="#F4F3FF" /></Style>
+    <Style Selector="TextBlock.muted"><Setter Property="Foreground" Value="#9AA1BD" /></Style>
+    <Style Selector="Button"><Setter Property="FontFamily" Value="Inter" /><Setter Property="CornerRadius" Value="8" /><Setter Property="Padding" Value="14,10" /></Style>
+    <Style Selector="Button.primary"><Setter Property="Background" Value="#8A36F5" /><Setter Property="Foreground" Value="White" /></Style>
+  </Window.Styles>
+
+  <Grid Margin="28" RowDefinitions="Auto,*,Auto">
+    <StackPanel Spacing="5">
+      <TextBlock Text="Intégrations" FontSize="25" FontWeight="SemiBold" />
+      <TextBlock Text="Connecte les services utilisés dans tes automatisations." Classes="muted" />
+    </StackPanel>
+
+    <Grid Grid.Row="1" Margin="0,25" ColumnDefinitions="*,*" ColumnSpacing="16">
+      <Border Grid.Column="0" Padding="20" CornerRadius="13" Background="#151A31" BorderBrush="#2C3353" BorderThickness="1">
+        <Grid RowDefinitions="Auto,*,Auto">
+          <StackPanel Orientation="Horizontal" Spacing="12">
+            <Border Width="46" Height="46" CornerRadius="23" Background="#F4F3FF">
+              <TextBlock Text="OBS" Foreground="#12131A" FontSize="11" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+            <StackPanel VerticalAlignment="Center"><TextBlock Text="OBS Studio" FontSize="18" FontWeight="SemiBold" /><TextBlock Text="WebSocket 5.x" Classes="muted" /></StackPanel>
+          </StackPanel>
+          <TextBlock Grid.Row="1" Margin="0,18" Text="Change de scène et contrôle OBS depuis les workflows CuezyBot." TextWrapping="Wrap" Classes="muted" />
+          <Button Grid.Row="2" Classes="primary" Content="Configurer OBS" Click="OnObsClick" HorizontalAlignment="Stretch" />
+        </Grid>
+      </Border>
+
+      <Border Grid.Column="1" Padding="20" CornerRadius="13" Background="#151A31" BorderBrush="#6532A6" BorderThickness="1">
+        <Grid RowDefinitions="Auto,*,Auto">
+          <StackPanel Orientation="Horizontal" Spacing="12">
+            <Border Width="46" Height="46" CornerRadius="10" Background="#9147FF">
+              <TextBlock Text="T" FontSize="23" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+            <StackPanel VerticalAlignment="Center"><TextBlock Text="Twitch" FontSize="18" FontWeight="SemiBold" /><TextBlock Text="OAuth et EventSub" Classes="muted" /></StackPanel>
+          </StackPanel>
+          <TextBlock Grid.Row="1" Margin="0,18" Text="Reçois les follows et autres événements autorisés de ta chaîne." TextWrapping="Wrap" Classes="muted" />
+          <Button Grid.Row="2" Classes="primary" Content="Connecter Twitch" Click="OnTwitchClick" HorizontalAlignment="Stretch" />
+        </Grid>
+      </Border>
+    </Grid>
+
+    <Button Grid.Row="2" Content="Fermer" HorizontalAlignment="Right" Click="OnCloseClick" />
+  </Grid>
+</Window>
