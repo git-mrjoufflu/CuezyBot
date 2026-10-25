@@ -164,7 +164,6 @@ internal static class PrototypeServices
             new(PrototypeWorkflowIds.TriggerBlockId, "next", PrototypeWorkflowIds.CounterBlockId),
             new(PrototypeWorkflowIds.CounterBlockId, "next", PrototypeWorkflowIds.ObsBlockId)
         };
-        var previous = PrototypeWorkflowIds.ObsBlockId;
         var actionIds = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
         foreach (var label in selectedActions ?? Array.Empty<string>())
         {
@@ -175,8 +174,6 @@ internal static class PrototypeServices
             if (ActionTypeFor(label) == "obs.set-source-visible")
                 parameters["visible"] = SourceVisibility.GetValueOrDefault(label, true);
             blocks.Add(new WorkflowBlock(id, ActionTypeFor(label), 1, parameters));
-            connections.Add(new WorkflowConnection(previous, "next", id));
-            previous = id;
         }
 
         foreach (var (from, to) in manualLinks ?? Array.Empty<(string From, string To)>())
@@ -185,6 +182,12 @@ internal static class PrototypeServices
                 !connections.Any(connection => connection.FromBlockId == fromId && connection.ToBlockId == toId))
                 connections.Add(new WorkflowConnection(fromId, "next", toId));
         }
+
+        // The prototype entry point feeds roots only. User cards are connected
+        // exclusively by the manual links, never by their insertion order.
+        var incoming = connections.Select(connection => connection.ToBlockId).ToHashSet();
+        foreach (var root in actionIds.Values.Where(id => !incoming.Contains(id)))
+            connections.Add(new WorkflowConnection(PrototypeWorkflowIds.ObsBlockId, "next", root));
 
         return new WorkflowDefinition(
             CurrentWorkflowId,
