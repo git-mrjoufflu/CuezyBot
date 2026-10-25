@@ -102,6 +102,46 @@ public sealed partial class MainWindow : Window
             TestStatus.Text = _english ? $"Editing: {name}" : $"Édition : {name}";
     }
 
+    private async void OnRenameWorkflowClick(object? sender, RoutedEventArgs eventArgs)
+    {
+        if (WorkflowSelector.SelectedIndex < 0) return;
+        var current = _workflowNames[WorkflowSelector.SelectedIndex];
+        var input = new TextBox { Text = current, MinWidth = 320, PlaceholderText = _english ? "Automation name" : "Nom de l’automatisation" };
+        var dialog = new Window
+        {
+            Title = _english ? "Rename automation" : "Renommer l’automatisation",
+            Width = 420, Height = 170, CanResize = false, WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            Content = new StackPanel { Margin = new Avalonia.Thickness(20), Spacing = 14, Children =
+            {
+                input,
+                new Button { Content = _english ? "Confirm" : "Confirmer", HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right }
+            }}
+        };
+        ((Button)((StackPanel)dialog.Content!).Children[1]).Click += (_, _) => dialog.Close(input.Text?.Trim());
+        var result = await dialog.ShowDialog<string?>(this);
+        if (!string.IsNullOrWhiteSpace(result))
+        {
+            _workflowNames[WorkflowSelector.SelectedIndex] = result;
+            WorkflowSelector.ItemsSource = _workflowNames.ToArray();
+            WorkflowSelector.SelectedIndex = Math.Min(WorkflowSelector.SelectedIndex, _workflowNames.Count - 1);
+            TestStatus.Text = _english ? "Automation renamed" : "Automatisation renommée";
+        }
+    }
+
+    private void OnDeleteWorkflowClick(object? sender, RoutedEventArgs eventArgs)
+    {
+        if (_workflowNames.Count <= 1 || WorkflowSelector.SelectedIndex < 0)
+        {
+            TestStatus.Text = _english ? "Keep at least one automation" : "Garde au moins une automatisation";
+            return;
+        }
+        _workflowNames.RemoveAt(WorkflowSelector.SelectedIndex);
+        WorkflowSelector.ItemsSource = _workflowNames.ToArray();
+        WorkflowSelector.SelectedIndex = 0;
+        ClearWorkflowCanvas();
+        TestStatus.Text = _english ? "Automation deleted" : "Automatisation supprimée";
+    }
+
     private void ClearWorkflowCanvas()
     {
         _selectedActions.Clear();

@@ -111,6 +111,8 @@
           <ComboBox x:Name="WorkflowSelector" Width="210" SelectedIndex="0" SelectionChanged="OnWorkflowSelected">
           </ComboBox>
           <Button Classes="surface" Content="＋" ToolTip.Tip="Nouvelle automatisation" Click="OnNewWorkflowClick" Padding="8,5" />
+          <Button Classes="surface" Content="✎" ToolTip.Tip="Renommer" Click="OnRenameWorkflowClick" Padding="8,5" />
+          <Button Classes="surface" Content="🗑" ToolTip.Tip="Supprimer" Click="OnDeleteWorkflowClick" Padding="8,5" />
         </StackPanel>
 
         <Border Grid.Column="2" />
