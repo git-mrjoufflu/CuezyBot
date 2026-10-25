@@ -133,6 +133,7 @@ public sealed partial class HistoryWindow : Window
                 .Replace("Variable not found:", "Variable introuvable :", StringComparison.Ordinal)
                 .Replace("Select at least one OBS source", "Coche au moins une source OBS", StringComparison.Ordinal)
                 .Replace("OBS screenshot:", "Capture OBS :", StringComparison.Ordinal)
+                .Replace("Previous session ended before completion. Not replayed automatically; external effects may already have occurred.", "La session précédente s’est arrêtée avant la fin. Aucun rejeu automatique ; des effets externes ont peut-être déjà été appliqués.", StringComparison.Ordinal)
                 .Replace("OBS replay buffer started", "Tampon de replay OBS démarré", StringComparison.Ordinal)
                 .Replace("OBS scene:", "Scène OBS :", StringComparison.Ordinal)
                 .Replace("Wait:", "Attente :", StringComparison.Ordinal)

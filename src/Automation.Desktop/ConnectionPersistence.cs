@@ -20,6 +20,7 @@ internal static class ConnectionPersistence
     private static readonly IApplicationSettingsStore Settings = new SqliteApplicationSettingsStore(Database);
     private static readonly ISecretStore Secrets = PlatformSecretStore.Create();
     private static bool initialized;
+    private static readonly SemaphoreSlim InitializationGate = new(1, 1);
 
     internal static async Task SaveLanguageAsync(string language, CancellationToken cancellationToken = default)
     {
@@ -159,8 +160,14 @@ internal static class ConnectionPersistence
             return;
         }
 
-        await Database.InitializeAsync(cancellationToken);
-        initialized = true;
+        await InitializationGate.WaitAsync(cancellationToken);
+        try
+        {
+            if (initialized) return;
+            await Database.InitializeAsync(cancellationToken);
+            initialized = true;
+        }
+        finally { InitializationGate.Release(); }
     }
 }
 

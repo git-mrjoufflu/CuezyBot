@@ -7,6 +7,20 @@ namespace Automation.Persistence.Sqlite.Stores;
 
 public sealed class SqliteExecutionStore(SqliteDatabase database) : IExecutionStore
 {
+    public async Task<int> RecoverAbandonedAsync(CancellationToken cancellationToken = default)
+    {
+        await using var connection = database.OpenConnection();
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            UPDATE execution_requests SET
+                status = CASE WHEN status = 'Running' THEN 'Interrupted' ELSE 'Expired' END,
+                completed_at = $completedAt,
+                error = 'Previous session ended before completion. Not replayed automatically; external effects may already have occurred.'
+            WHERE status IN ('Running', 'Pending');
+            """;
+        command.Parameters.AddWithValue("$completedAt", DateTimeOffset.UtcNow.ToString("O"));
+        return await command.ExecuteNonQueryAsync(cancellationToken);
+    }
     public Task<ExecutionRequest?> TryClaimNextAsync(CancellationToken cancellationToken = default) => ClaimAsync(null, cancellationToken);
 
     public Task<ExecutionRequest?> TryClaimAsync(Guid requestId, CancellationToken cancellationToken = default) => ClaimAsync(requestId, cancellationToken);

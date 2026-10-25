@@ -444,6 +444,7 @@ internal static class PrototypeServices
             if (!initialized)
             {
                 await Database.InitializeAsync(cancellationToken);
+                await new SqliteExecutionStore(Database).RecoverAbandonedAsync(cancellationToken);
                 initialized = true;
             }
         }
