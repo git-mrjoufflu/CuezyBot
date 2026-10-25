@@ -195,19 +195,55 @@ public sealed partial class MainWindow : Window
         node.PointerPressed += OnActionNodePressed;
         node.PointerMoved += OnActionNodeMoved;
         node.PointerReleased += OnActionNodeReleased;
-        node.Child = new StackPanel
+        var deleteButton = new Button
         {
-            Spacing = 5,
+            Content = "×",
+            Background = Brushes.Transparent,
+            BorderBrush = Brushes.Transparent,
+            Padding = new Avalonia.Thickness(4, 0),
+            FontSize = 15,
+            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
+            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+        };
+        ToolTip.SetTip(deleteButton, _english ? "Delete action" : "Supprimer l’action");
+        deleteButton.Click += (_, _) => DeleteActionNode(node);
+        node.Child = new Grid
+        {
+            RowDefinitions = new RowDefinitions("Auto,*"),
             Children =
             {
-                new TextBlock { Text = _english ? "Action" : "Action", Foreground = new SolidColorBrush(Color.Parse("#D39AFF")), FontSize = 11 },
-                new TextBlock { Text = label.TrimStart('▣', '✎', '◎', '♟', '◉', '▻', '●', '▧', '◇', '◷', '＋', '♫', ' '), FontWeight = Avalonia.Media.FontWeight.SemiBold }
+                new Grid
+                {
+                    Children =
+                    {
+                        new TextBlock { Text = "◆  Action", Foreground = new SolidColorBrush(Color.Parse("#D39AFF")), FontSize = 11 },
+                        deleteButton
+                    }
+                },
+                new TextBlock
+                {
+                    [Grid.RowProperty] = 1,
+                    Text = label.TrimStart('▣', '✎', '◎', '♟', '◉', '▻', '●', '▧', '◇', '◷', '＋', '♫', ' '),
+                    FontWeight = Avalonia.Media.FontWeight.SemiBold,
+                    VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center
+                }
             }
         };
         Canvas.SetLeft(node, 70 + (_addedActionCount % 3) * 230);
         Canvas.SetTop(node, 520 + (_addedActionCount / 3) * 90);
         WorkflowCanvas.Children.Add(node);
         _addedActionCount++;
+    }
+
+    private void DeleteActionNode(Border node)
+    {
+        if (node.Tag is not string label) return;
+        _selectedActions.Remove(label);
+        _undoActions.Push(label);
+        _redoActions.Clear();
+        RebuildActionNodes();
+        TestStatus.Text = _english ? "Action deleted" : "Action supprimée";
+        UpdateHistoryButtons();
     }
 
     private void OnActionNodePressed(object? sender, PointerPressedEventArgs eventArgs)
