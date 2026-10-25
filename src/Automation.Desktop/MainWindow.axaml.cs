@@ -496,7 +496,9 @@ public sealed partial class MainWindow : Window
     {
         foreach (var link in _dynamicLinks) WorkflowCanvas.Children.Remove(link);
         _dynamicLinks.Clear();
-        var targetGroups = _manualLinks.GroupBy(link => link.To).ToDictionary(group => group.Key, group => group.ToList());
+        var targetGroups = _manualLinks.GroupBy(link => link.To).ToDictionary(
+            group => group.Key,
+            group => group.OrderBy(link => Canvas.GetTop(link.From)).ToList());
         foreach (var (from, to) in _manualLinks)
         {
             var fromLeft = Canvas.GetLeft(from);
