@@ -27,6 +27,7 @@ public sealed partial class MainWindow : Window
     private readonly Dictionary<Line, (Border From, Border To)> _linkMap = new();
     private readonly List<string> _workflowNames = new() { "Mon Live Automatisation" };
     private readonly Dictionary<string, List<string>> _workflowActions = new(StringComparer.OrdinalIgnoreCase);
+    private string _activeWorkflowName = "Mon Live Automatisation";
     private Point _dragPointerStart;
     private double _dragNodeLeft;
     private double _dragNodeTop;
@@ -90,10 +91,12 @@ public sealed partial class MainWindow : Window
     private void OnNewWorkflowClick(object? sender, RoutedEventArgs eventArgs)
     {
         var name = _english ? $"New automation {_workflowNames.Count + 1}" : $"Nouvelle automatisation {_workflowNames.Count + 1}";
+        _workflowActions[_activeWorkflowName] = _selectedActions.ToList();
         _workflowNames.Add(name);
         _workflowActions[name] = new List<string>();
         WorkflowSelector.ItemsSource = _workflowNames.ToArray();
         WorkflowSelector.SelectedIndex = _workflowNames.Count - 1;
+        _activeWorkflowName = name;
         ClearWorkflowCanvas();
         TestStatus.Text = _english ? "New automation created" : "Nouvelle automatisation créée";
     }
@@ -104,14 +107,14 @@ public sealed partial class MainWindow : Window
         {
             if (_workflowNames.Contains(name))
             {
-                var current = _workflowNames.FirstOrDefault(existing => existing != name);
-                if (current is not null) _workflowActions[current] = _selectedActions.ToList();
+                _workflowActions[_activeWorkflowName] = _selectedActions.ToList();
                 ClearWorkflowCanvas();
                 foreach (var action in _workflowActions.TryGetValue(name, out var actions) ? actions : [])
                 {
                     _selectedActions.Add(action);
                     AddActionNode(action);
                 }
+                _activeWorkflowName = name;
             }
             TestStatus.Text = _english ? $"Editing: {name}" : $"Édition : {name}";
         }
@@ -145,6 +148,7 @@ public sealed partial class MainWindow : Window
             }
             WorkflowSelector.ItemsSource = _workflowNames.ToArray();
             WorkflowSelector.SelectedItem = result;
+            _activeWorkflowName = result;
             TestStatus.Text = _english ? "Automation renamed" : "Automatisation renommée";
         }
     }
