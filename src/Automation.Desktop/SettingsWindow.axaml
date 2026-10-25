@@ -30,10 +30,10 @@
     <TextBlock Text="Intégrations" FontSize="17" FontWeight="SemiBold" Margin="0,8,0,0" />
     <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
       <Border Grid.Column="0" Background="#151A30" BorderBrush="#303858" BorderThickness="1" CornerRadius="10" Padding="13">
-        <StackPanel Spacing="9"><TextBlock Text="OBS Studio" FontWeight="SemiBold" /><TextBlock Text="Contrôle des scènes et sources." Classes="muted" FontSize="11" TextWrapping="Wrap" /><Button Classes="primary" Content="Configurer OBS" Click="OnObsClick" /></StackPanel>
+        <StackPanel Spacing="9"><TextBlock Text="OBS Studio" FontWeight="SemiBold" /><TextBlock x:Name="ObsStatus" Text="Non connecté" Classes="muted" FontSize="11" TextWrapping="Wrap" /><Button x:Name="ObsButton" Classes="primary" Content="Configurer OBS" Click="OnObsClick" /></StackPanel>
       </Border>
       <Border Grid.Column="1" Background="#151A30" BorderBrush="#6336A4" BorderThickness="1" CornerRadius="10" Padding="13">
-        <StackPanel Spacing="9"><TextBlock Text="Twitch" FontWeight="SemiBold" /><TextBlock Text="OAuth et événements EventSub." Classes="muted" FontSize="11" TextWrapping="Wrap" /><Button Classes="primary" Content="Connecter Twitch" Click="OnTwitchClick" /></StackPanel>
+        <StackPanel Spacing="9"><TextBlock Text="Twitch" FontWeight="SemiBold" /><TextBlock x:Name="TwitchStatus" Text="Non connecté" Classes="muted" FontSize="11" TextWrapping="Wrap" /><Button x:Name="TwitchButton" Classes="primary" Content="Connecter Twitch" Click="OnTwitchClick" /></StackPanel>
       </Border>
     </Grid>
     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
