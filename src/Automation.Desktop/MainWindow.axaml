@@ -178,6 +178,15 @@
           </DrawingBrush>
         </Canvas.Background>
 
+        <Border Canvas.Right="18" Canvas.Top="18" Background="#11162B" BorderBrush="#2C3353" BorderThickness="1" CornerRadius="10" Padding="6,5">
+          <StackPanel Orientation="Horizontal" Spacing="5">
+            <TextBlock x:Name="TestStatus" Text="Brouillon enregistré" Classes="muted" FontSize="11" VerticalAlignment="Center" Margin="3,0,4,0" />
+            <Button Classes="surface" Content="▷  Tester" Click="OnTestClick" Padding="9,7" />
+            <Button x:Name="SaveWorkflowButton" Classes="surface" Content="Enregistrer" Click="OnSaveWorkflowClick" Padding="9,7" />
+            <Button x:Name="StartWorkflowButton" Classes="primary" Content="▶  Démarrer" Click="OnStartWorkflowClick" Padding="9,7" />
+          </StackPanel>
+        </Border>
+
         <Path Data="M 280,225 C 325,225 318,275 360,275" Stroke="#4C9CFF" StrokeThickness="3" />
         <Path Data="M 570,275 C 625,275 610,170 670,170" Stroke="#53D994" StrokeThickness="3" />
         <Path Data="M 570,275 C 620,275 615,355 670,355" Stroke="#A640F4" StrokeThickness="3" />
@@ -327,14 +336,7 @@
     <Border Grid.Row="1" Grid.Column="2" Background="#0C1022" BorderBrush="#292D49" BorderThickness="1,0,0,0" Padding="14">
       <Grid RowDefinitions="Auto,Auto,Auto,*">
         <TextBox Height="38" CornerRadius="9" PlaceholderText="Rechercher une action…" />
-        <Border Grid.Row="1" Background="#11162B" BorderBrush="#2C3353" BorderThickness="1" CornerRadius="10" Padding="5" Margin="0,10,0,0">
-          <StackPanel Orientation="Horizontal" Spacing="5">
-            <TextBlock x:Name="TestStatus" Text="Brouillon enregistré" Classes="muted" FontSize="11" VerticalAlignment="Center" Margin="3,0,4,0" />
-            <Button Classes="surface" Content="▷  Tester" Click="OnTestClick" Padding="9,7" />
-            <Button x:Name="SaveWorkflowButton" Classes="surface" Content="Enregistrer" Click="OnSaveWorkflowClick" Padding="9,7" />
-            <Button x:Name="StartWorkflowButton" Classes="primary" Content="▶  Démarrer" Click="OnStartWorkflowClick" Padding="9,7" />
-          </StackPanel>
-        </Border>
+        <Border Grid.Row="1" Height="1" Background="Transparent" Margin="0,10,0,0" />
         <Grid Grid.Row="2" Margin="0,10,0,12" ColumnDefinitions="*,*" Background="#11162B">
           <Border Grid.Column="0" Padding="8" Background="#4A2A7D" CornerRadius="8"><TextBlock Text="Actions" HorizontalAlignment="Center" FontWeight="SemiBold" /></Border>
           <Border Grid.Column="1" Padding="8" CornerRadius="8"><TextBlock Text="Événements" HorizontalAlignment="Center" Classes="muted" /></Border>
