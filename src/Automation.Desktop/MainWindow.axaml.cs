@@ -181,7 +181,7 @@ public sealed partial class MainWindow : Window
         var node = new Border
         {
             Width = 205,
-            Height = 72,
+            Height = 100,
             Background = new SolidColorBrush(Color.Parse("#48206F")),
             BorderBrush = new SolidColorBrush(Color.Parse("#A640F4")),
             BorderThickness = new Avalonia.Thickness(2),
@@ -207,25 +207,33 @@ public sealed partial class MainWindow : Window
         };
         ToolTip.SetTip(deleteButton, _english ? "Delete action" : "Supprimer l’action");
         deleteButton.Click += (_, _) => DeleteActionNode(node);
+        var header = new Border
+        {
+            Background = new SolidColorBrush(Color.Parse("#4A206F")),
+            CornerRadius = new Avalonia.CornerRadius(8, 8, 0, 0),
+            Padding = new Avalonia.Thickness(10, 0),
+            Child = new Grid
+            {
+                Children =
+                {
+                    new TextBlock { Text = "◆  Action", Foreground = new SolidColorBrush(Color.Parse("#D39AFF")), FontSize = 11, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center },
+                    deleteButton
+                }
+            }
+        };
         node.Child = new Grid
         {
             RowDefinitions = new RowDefinitions("Auto,*"),
             Children =
             {
-                new Grid
-                {
-                    Children =
-                    {
-                        new TextBlock { Text = "◆  Action", Foreground = new SolidColorBrush(Color.Parse("#D39AFF")), FontSize = 11 },
-                        deleteButton
-                    }
-                },
+                header,
                 new TextBlock
                 {
                     [Grid.RowProperty] = 1,
                     Text = label.TrimStart('▣', '✎', '◎', '♟', '◉', '▻', '●', '▧', '◇', '◷', '＋', '♫', ' '),
                     FontWeight = Avalonia.Media.FontWeight.SemiBold,
-                    VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center
+                    VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+                    Margin = new Avalonia.Thickness(12, 0)
                 }
             }
         };
