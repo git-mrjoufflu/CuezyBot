@@ -5,4 +5,5 @@ public sealed record TwitchIdentity(
     string Login,
     string ClientId,
     IReadOnlyList<string> Scopes,
-    DateTimeOffset ExpiresAt);
+    DateTimeOffset ExpiresAt,
+    string? ProfileImageUrl = null);

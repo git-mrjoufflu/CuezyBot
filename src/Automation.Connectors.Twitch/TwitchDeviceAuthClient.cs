@@ -11,6 +11,7 @@ public sealed class TwitchDeviceAuthClient : IDisposable
     private static readonly Uri DeviceEndpoint = new("https://id.twitch.tv/oauth2/device");
     private static readonly Uri TokenEndpoint = new("https://id.twitch.tv/oauth2/token");
     private static readonly Uri ValidateEndpoint = new("https://id.twitch.tv/oauth2/validate");
+    private static readonly Uri UsersEndpoint = new("https://api.twitch.tv/helix/users");
     private readonly HttpClient httpClient;
     private readonly bool ownsHttpClient;
 
@@ -108,12 +109,25 @@ public sealed class TwitchDeviceAuthClient : IDisposable
         await EnsureSuccessAsync(response, cancellationToken);
         var payload = await DeserializeAsync<ValidateResponse>(response, cancellationToken);
 
+        var profileImageUrl = await FetchProfileImageAsync(payload.ClientId, token.AccessToken, cancellationToken);
         return new TwitchIdentity(
             payload.UserId,
             payload.Login,
             payload.ClientId,
             payload.Scopes,
-            DateTimeOffset.UtcNow.AddSeconds(payload.ExpiresIn));
+            DateTimeOffset.UtcNow.AddSeconds(payload.ExpiresIn),
+            profileImageUrl);
+    }
+
+    private async Task<string?> FetchProfileImageAsync(string clientId, string accessToken, CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, UsersEndpoint);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+        request.Headers.Add("Client-Id", clientId);
+        using var response = await httpClient.SendAsync(request, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        var payload = await DeserializeAsync<UsersResponse>(response, cancellationToken);
+        return payload.Data.FirstOrDefault()?.ProfileImageUrl;
     }
 
     public async Task<TwitchUserToken> RefreshAsync(
@@ -215,6 +229,12 @@ public sealed class TwitchDeviceAuthClient : IDisposable
         [property: JsonPropertyName("user_id")] string UserId,
         [property: JsonPropertyName("scopes")] string[] Scopes,
         [property: JsonPropertyName("expires_in")] int ExpiresIn);
+
+    private sealed record UsersResponse(
+        [property: JsonPropertyName("data")] UserResponse[] Data);
+
+    private sealed record UserResponse(
+        [property: JsonPropertyName("profile_image_url")] string? ProfileImageUrl);
 
     private sealed record ErrorResponse(
         [property: JsonPropertyName("message")] string Message);

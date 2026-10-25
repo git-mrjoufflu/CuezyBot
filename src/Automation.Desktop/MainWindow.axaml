@@ -145,7 +145,10 @@
                     <GradientStop Color="#4E2B9C" Offset="1" />
                   </LinearGradientBrush>
                 </Border.Background>
-                <TextBlock x:Name="CreatorAvatar" Text="C" FontSize="15" HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="Bold" />
+                <Grid>
+                  <TextBlock x:Name="CreatorAvatar" Text="C" FontSize="15" HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="Bold" />
+                  <Image x:Name="CreatorImage" IsVisible="False" Stretch="UniformToFill" />
+                </Grid>
               </Border>
               <StackPanel Grid.Column="1" Margin="8,0,0,0">
                 <TextBlock x:Name="CreatorTitle" Text="Créateur" FontWeight="SemiBold" FontSize="13" />

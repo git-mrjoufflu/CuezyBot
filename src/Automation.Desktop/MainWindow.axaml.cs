@@ -2,6 +2,8 @@ using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.VisualTree;
+using Avalonia.Media.Imaging;
+using System.Net.Http;
 
 namespace Automation.Desktop;
 
@@ -25,6 +27,11 @@ public sealed partial class MainWindow : Window
         ObsActionSection.IsVisible = obsConnected;
         TwitchActionSection.IsVisible = twitchConnected;
         CreatorAvatar.Text = twitchConnected ? "T" : "C";
+        CreatorImage.IsVisible = false;
+        if (twitchConnected && TwitchSessionState.Identity?.ProfileImageUrl is { } imageUrl)
+        {
+            _ = LoadCreatorImageAsync(imageUrl);
+        }
         CreatorTitle.Text = twitchConnected && TwitchSessionState.Identity is not null
             ? TwitchSessionState.Identity.Login
             : "Créateur";
@@ -91,6 +98,24 @@ public sealed partial class MainWindow : Window
     {
         content.IsVisible = !content.IsVisible;
         chevron.Text = content.IsVisible ? "⌃" : "⌄";
+    }
+
+    private async Task LoadCreatorImageAsync(string imageUrl)
+    {
+        try
+        {
+            using var client = new HttpClient();
+            await using var stream = await client.GetStreamAsync(imageUrl);
+            var bitmap = new Bitmap(stream);
+            CreatorImage.Source = bitmap;
+            CreatorImage.IsVisible = true;
+            CreatorAvatar.IsVisible = false;
+        }
+        catch
+        {
+            CreatorImage.IsVisible = false;
+            CreatorAvatar.IsVisible = true;
+        }
     }
 
     private void OnLanguageClick(object? sender, RoutedEventArgs eventArgs)
