@@ -1224,6 +1224,7 @@ public sealed partial class MainWindow : Window
     {
         if (sender is not Avalonia.Controls.Shapes.Path line || !_linkMap.TryGetValue(line, out var link)) return;
         if (eventArgs.GetCurrentPoint(line).Properties.PointerUpdateKind != PointerUpdateKind.RightButtonPressed) return;
+        TestStatus.Text = _english ? "Removing link…" : "Suppression du lien…";
         RememberCanvas();
         _manualLinks.Remove(link);
         UpdateDynamicLinks();
@@ -1253,6 +1254,12 @@ public sealed partial class MainWindow : Window
                         _selectedNode = null;
                         return;
                     }
+                    if (_manualLinks.Contains((_selectedNode, node)))
+                    {
+                        TestStatus.Text = _english ? "This link already exists" : "Ce lien existe déjà";
+                        _selectedNode = null;
+                        return;
+                    }
                     var reachable = new HashSet<Border>();
                     var pending = new Stack<Border>(); pending.Push(node);
                     while (pending.TryPop(out var candidate))
@@ -1267,7 +1274,7 @@ public sealed partial class MainWindow : Window
                         return;
                     }
                     RememberCanvas();
-                    if (!_manualLinks.Contains((_selectedNode, node))) _manualLinks.Add((_selectedNode, node));
+                    _manualLinks.Add((_selectedNode, node));
                     if (_selectedNode.Tag is string sourceKey && node.Tag is string targetKey && sourceKey.Contains("condition", StringComparison.OrdinalIgnoreCase)
                         && PrototypeServices.ActionOptions.TryGetValue(sourceKey, out var sourceOptions))
                     {
