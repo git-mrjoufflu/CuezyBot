@@ -37,8 +37,10 @@ public sealed partial class HistoryWindow : Window
             var rows = entries.Select(ToRow).ToArray();
             HistoryItems.ItemsSource = rows;
             HistoryStatus.Text = rows.Length == 0
-                ? "Aucun événement enregistré pour le moment."
-                : $"{rows.Length} événement(s) récent(s). Clique sur une alerte pour l’ouvrir.";
+                ? (UiLanguageState.IsEnglish ? "No events recorded yet." : "Aucun événement enregistré pour le moment.")
+                : (UiLanguageState.IsEnglish
+                    ? $"{rows.Length} recent event(s). Click an alert to open it."
+                    : $"{rows.Length} événement(s) récent(s). Clique sur une alerte pour l’ouvrir.");
         }
         catch (Exception exception)
         {
@@ -56,16 +58,17 @@ public sealed partial class HistoryWindow : Window
             ? entry.CompletedAt.Value - entry.StartedAt.Value
             : (TimeSpan?)null;
 
+        var english = UiLanguageState.IsEnglish;
         return new HistoryRow(
-            $"Nouveau follower : {userName}",
-            $"{entry.EventReceivedAt.ToLocalTime():g} · {entry.Steps.Count} étape(s)",
-            ToFrenchStatus(entry.Status),
+            english ? $"New follower: {userName}" : $"Nouveau follower : {userName}",
+            english ? $"{entry.EventReceivedAt.ToLocalTime():g} · {entry.Steps.Count} step(s)" : $"{entry.EventReceivedAt.ToLocalTime():g} · {entry.Steps.Count} étape(s)",
+            ToStatus(entry.Status, english),
             userName,
             $"@{userLogin} · ID {userId}",
-            $"Reçu le {entry.EventReceivedAt.ToLocalTime():f}",
-            duration is null ? "Durée inconnue" : $"Durée totale : {FormatDuration(duration.Value)}",
-            $"Exécution : {entry.Id:D}",
-            $"Message EventSub : {entry.ProviderEventId}",
+            english ? $"Received {entry.EventReceivedAt.ToLocalTime():f}" : $"Reçu le {entry.EventReceivedAt.ToLocalTime():f}",
+            duration is null ? (english ? "Unknown duration" : "Durée inconnue") : (english ? $"Total duration: {FormatDuration(duration.Value)}" : $"Durée totale : {FormatDuration(duration.Value)}"),
+            english ? $"Execution: {entry.Id:D}" : $"Exécution : {entry.Id:D}",
+            english ? $"EventSub message: {entry.ProviderEventId}" : $"Message EventSub : {entry.ProviderEventId}",
             entry.Steps.Select(step => new StepRow(
                 step.Message,
                 FormatDuration(step.CompletedAt - step.StartedAt))).ToArray(),
@@ -77,14 +80,14 @@ public sealed partial class HistoryWindow : Window
         ? $"{duration.TotalSeconds:0.00} s"
         : $"{duration.TotalMilliseconds:0} ms";
 
-    private static string ToFrenchStatus(ExecutionStatus status) => status switch
+    private static string ToStatus(ExecutionStatus status, bool english) => status switch
     {
-        ExecutionStatus.Succeeded => "Réussie",
-        ExecutionStatus.Failed => "Échouée",
-        ExecutionStatus.Running => "En cours",
-        ExecutionStatus.Pending => "En attente",
-        ExecutionStatus.Cancelled => "Annulée",
-        ExecutionStatus.Interrupted => "Interrompue",
+        ExecutionStatus.Succeeded => english ? "Succeeded" : "Réussie",
+        ExecutionStatus.Failed => english ? "Failed" : "Échouée",
+        ExecutionStatus.Running => english ? "Running" : "En cours",
+        ExecutionStatus.Pending => english ? "Pending" : "En attente",
+        ExecutionStatus.Cancelled => english ? "Cancelled" : "Annulée",
+        ExecutionStatus.Interrupted => english ? "Interrupted" : "Interrompue",
         _ => status.ToString()
     };
 
