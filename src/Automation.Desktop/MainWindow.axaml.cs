@@ -157,7 +157,14 @@ public sealed partial class MainWindow : Window
                 ["Bibliothèque de modèles"] = "Template library", ["Voir tout  ›"] = "View all  ›",
                 ["Twitch"] = "Twitch", ["OBS Studio"] = "OBS Studio", ["CORE"] = "CORE",
                 ["Rechercher une action…"] = "Search for an action…", ["Données enregistrées localement"] = "Data saved locally",
-                ["Moteur actif"] = "Engine active", ["Intégrations"] = "Integrations"
+                ["Moteur actif"] = "Engine active", ["Intégrations"] = "Integrations",
+                ["Nouveau follow"] = "New follow", ["Est un abonné ?"] = "Is a subscriber?", ["Oui"] = "Yes", ["Non"] = "No",
+                ["Afficher une alerte\nOBS"] = "Show an OBS alert", ["Envoyer un message\nDiscord"] = "Send a Discord message",
+                ["Jouer un son"] = "Play a sound", ["Ajouter au compteur"] = "Increment counter",
+                ["Follow avec alerte"] = "Follow with alert", ["Nouvel abonné"] = "New subscriber", ["Raid + message"] = "Raid + message", ["Cheer + son"] = "Cheer + sound",
+                ["Envoyer un message"] = "Send a message", ["Créer un clip"] = "Create a clip", ["Modifier un titre"] = "Edit title", ["Gérer les points de chaîne"] = "Manage channel points", ["Récupérer un utilisateur"] = "Get a user",
+                ["Changer de scène"] = "Change scene", ["Afficher une source"] = "Show a source", ["Masquer une source"] = "Hide a source", ["Démarrer un replay"] = "Start replay", ["Prendre une capture"] = "Take a screenshot",
+                ["Ajouter une condition"] = "Add a condition", ["Attendre"] = "Wait", ["Modifier une variable"] = "Edit a variable"
             }
             : new Dictionary<string, string>
             {
@@ -165,7 +172,13 @@ public sealed partial class MainWindow : Window
                 ["Integrations"] = "Intégrations", ["Settings"] = "Paramètres", ["Test"] = "Tester",
                 ["Save"] = "Enregistrer", ["Start"] = "Démarrer", ["Template library"] = "Bibliothèque de modèles",
                 ["View all  ›"] = "Voir tout  ›", ["Search for an action…"] = "Rechercher une action…",
-                ["Data saved locally"] = "Données enregistrées localement", ["Engine active"] = "Moteur actif"
+                ["Data saved locally"] = "Données enregistrées localement", ["Engine active"] = "Moteur actif",
+                ["New follow"] = "Nouveau follow", ["Is a subscriber?"] = "Est un abonné?", ["Yes"] = "Oui", ["No"] = "Non",
+                ["Show an OBS alert"] = "Afficher une alerte\nOBS", ["Send a Discord message"] = "Envoyer un message\nDiscord", ["Play a sound"] = "Jouer un son", ["Increment counter"] = "Ajouter au compteur",
+                ["Follow with alert"] = "Follow avec alerte", ["New subscriber"] = "Nouvel abonné", ["Cheer + sound"] = "Cheer + son",
+                ["Send a message"] = "Envoyer un message", ["Create a clip"] = "Créer un clip", ["Edit title"] = "Modifier un titre", ["Manage channel points"] = "Gérer les points de chaîne", ["Get a user"] = "Récupérer un utilisateur",
+                ["Change scene"] = "Changer de scène", ["Show a source"] = "Afficher une source", ["Hide a source"] = "Masquer une source", ["Start replay"] = "Démarrer un replay", ["Take a screenshot"] = "Prendre une capture",
+                ["Add a condition"] = "Ajouter une condition", ["Wait"] = "Attendre", ["Edit a variable"] = "Modifier une variable"
             };
 
         foreach (var control in this.GetVisualDescendants().OfType<TextBlock>())
@@ -173,6 +186,14 @@ public sealed partial class MainWindow : Window
             if (control.Text is { } text && translations.TryGetValue(text, out var translated))
             {
                 control.Text = translated;
+            }
+        }
+
+        foreach (var button in this.GetVisualDescendants().OfType<Button>())
+        {
+            if (button.Content is string text && translations.TryGetValue(text, out var translated))
+            {
+                button.Content = translated;
             }
         }
     }
