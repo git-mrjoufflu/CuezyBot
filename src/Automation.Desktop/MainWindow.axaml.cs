@@ -27,6 +27,7 @@ public sealed partial class MainWindow : Window
     private readonly Dictionary<Avalonia.Controls.Shapes.Path, (Border From, Border To)> _linkMap = new();
     private readonly List<string> _workflowNames = new() { "Mon Live Automatisation" };
     private readonly Dictionary<string, List<string>> _workflowActions = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, List<(string From, string To)>> _workflowLinks = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, Dictionary<string, Point>> _workflowPositions = new(StringComparer.OrdinalIgnoreCase);
     private string _activeWorkflowName = "Mon Live Automatisation";
     private bool _switchingWorkflow;
@@ -108,6 +109,7 @@ public sealed partial class MainWindow : Window
         _switchingWorkflow = true;
         var name = _english ? $"New automation {_workflowNames.Count + 1}" : $"Nouvelle automatisation {_workflowNames.Count + 1}";
         _workflowActions[_activeWorkflowName] = _selectedActions.ToList();
+        _workflowLinks[_activeWorkflowName] = GetManualLinkLabels().ToList();
         _workflowPositions[_activeWorkflowName] = _dynamicNodes.Where(node => node.Tag is string).ToDictionary(node => (string)node.Tag!, node => new Point(Canvas.GetLeft(node), Canvas.GetTop(node)));
         _workflowNames.Add(name);
         _workflowActions[name] = new List<string>();
@@ -128,6 +130,8 @@ public sealed partial class MainWindow : Window
             if (_workflowNames.Contains(name))
             {
                 _workflowActions[_activeWorkflowName] = _selectedActions.ToList();
+                _workflowLinks[_activeWorkflowName] = GetManualLinkLabels().ToList();
+                _workflowPositions[_activeWorkflowName] = _dynamicNodes.Where(node => node.Tag is string).ToDictionary(node => (string)node.Tag!, node => new Point(Canvas.GetLeft(node), Canvas.GetTop(node)));
                 ClearWorkflowCanvas();
                 foreach (var action in _workflowActions.TryGetValue(name, out var actions) ? actions : [])
                 {
@@ -137,6 +141,13 @@ public sealed partial class MainWindow : Window
                 if (_workflowPositions.TryGetValue(name, out var positions))
                     foreach (var node in _dynamicNodes)
                         if (node.Tag is string label && positions.TryGetValue(label, out var position)) { Canvas.SetLeft(node, position.X); Canvas.SetTop(node, position.Y); }
+                if (_workflowLinks.TryGetValue(name, out var savedLinks))
+                    foreach (var (from, to) in savedLinks)
+                    {
+                        var source = _dynamicNodes.FirstOrDefault(node => Equals(node.Tag, from));
+                        var target = _dynamicNodes.FirstOrDefault(node => Equals(node.Tag, to));
+                        if (source is not null && target is not null) _manualLinks.Add((source, target));
+                    }
                 UpdateDynamicLinks();
                 _activeWorkflowName = name;
             }
@@ -163,6 +174,10 @@ public sealed partial class MainWindow : Window
         var result = await dialog.ShowDialog<string?>(this);
         if (!string.IsNullOrWhiteSpace(result))
         {
+            _switchingWorkflow = true;
+            _workflowActions[current] = _selectedActions.ToList();
+            _workflowLinks[current] = GetManualLinkLabels().ToList();
+            _workflowPositions[current] = _dynamicNodes.Where(node => node.Tag is string).ToDictionary(node => (string)node.Tag!, node => new Point(Canvas.GetLeft(node), Canvas.GetTop(node)));
             _workflowNames[WorkflowSelector.SelectedIndex] = result;
             var oldName = current;
             if (_workflowActions.TryGetValue(oldName, out var actions))
@@ -172,7 +187,10 @@ public sealed partial class MainWindow : Window
             }
             WorkflowSelector.ItemsSource = _workflowNames.ToArray();
             WorkflowSelector.SelectedItem = result;
+            if (_workflowLinks.Remove(current, out var links)) _workflowLinks[result] = links;
+            if (_workflowPositions.Remove(current, out var positions)) _workflowPositions[result] = positions;
             _activeWorkflowName = result;
+            _switchingWorkflow = false;
             TestStatus.Text = _english ? "Automation renamed" : "Automatisation renommée";
         }
     }
@@ -203,6 +221,10 @@ public sealed partial class MainWindow : Window
         foreach (var node in WorkflowCanvas.Children.OfType<Border>().Where(border => border.Classes.Contains("dynamicAction")).ToArray())
             WorkflowCanvas.Children.Remove(node);
         _addedActionCount = 0;
+        _linkMap.Clear();
+        _selectedNode = null;
+        _undoActions.Clear();
+        _redoActions.Clear();
         UpdateHistoryButtons();
     }
 
