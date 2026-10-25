@@ -26,6 +26,7 @@ public sealed partial class MainWindow : Window
     private readonly List<(Border From, Border To)> _manualLinks = new();
     private readonly Dictionary<Line, (Border From, Border To)> _linkMap = new();
     private readonly List<string> _workflowNames = new() { "Mon Live Automatisation" };
+    private readonly Dictionary<string, List<string>> _workflowActions = new(StringComparer.OrdinalIgnoreCase);
     private Point _dragPointerStart;
     private double _dragNodeLeft;
     private double _dragNodeTop;
@@ -90,6 +91,7 @@ public sealed partial class MainWindow : Window
     {
         var name = _english ? $"New automation {_workflowNames.Count + 1}" : $"Nouvelle automatisation {_workflowNames.Count + 1}";
         _workflowNames.Add(name);
+        _workflowActions[name] = new List<string>();
         WorkflowSelector.ItemsSource = _workflowNames.ToArray();
         WorkflowSelector.SelectedIndex = _workflowNames.Count - 1;
         ClearWorkflowCanvas();
@@ -99,7 +101,20 @@ public sealed partial class MainWindow : Window
     private void OnWorkflowSelected(object? sender, SelectionChangedEventArgs eventArgs)
     {
         if (WorkflowSelector is not null && WorkflowSelector.SelectedItem is string name)
+        {
+            if (_workflowNames.Contains(name))
+            {
+                var current = _workflowNames.FirstOrDefault(existing => existing != name);
+                if (current is not null) _workflowActions[current] = _selectedActions.ToList();
+                ClearWorkflowCanvas();
+                foreach (var action in _workflowActions.TryGetValue(name, out var actions) ? actions : [])
+                {
+                    _selectedActions.Add(action);
+                    AddActionNode(action);
+                }
+            }
             TestStatus.Text = _english ? $"Editing: {name}" : $"Édition : {name}";
+        }
     }
 
     private async void OnRenameWorkflowClick(object? sender, RoutedEventArgs eventArgs)
@@ -122,8 +137,14 @@ public sealed partial class MainWindow : Window
         if (!string.IsNullOrWhiteSpace(result))
         {
             _workflowNames[WorkflowSelector.SelectedIndex] = result;
+            var oldName = current;
+            if (_workflowActions.TryGetValue(oldName, out var actions))
+            {
+                _workflowActions.Remove(oldName);
+                _workflowActions[result] = actions;
+            }
             WorkflowSelector.ItemsSource = _workflowNames.ToArray();
-            WorkflowSelector.SelectedIndex = Math.Min(WorkflowSelector.SelectedIndex, _workflowNames.Count - 1);
+            WorkflowSelector.SelectedItem = result;
             TestStatus.Text = _english ? "Automation renamed" : "Automatisation renommée";
         }
     }
@@ -135,7 +156,9 @@ public sealed partial class MainWindow : Window
             TestStatus.Text = _english ? "Keep at least one automation" : "Garde au moins une automatisation";
             return;
         }
+        var currentWorkflowName = _workflowNames[WorkflowSelector.SelectedIndex];
         _workflowNames.RemoveAt(WorkflowSelector.SelectedIndex);
+        _workflowActions.Remove(currentWorkflowName);
         WorkflowSelector.ItemsSource = _workflowNames.ToArray();
         WorkflowSelector.SelectedIndex = 0;
         ClearWorkflowCanvas();
