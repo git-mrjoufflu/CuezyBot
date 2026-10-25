@@ -109,6 +109,8 @@ public sealed partial class MainWindow : Window
                     _workflowNames.Add(name);
                     _workflowIds[name] = draft.Id;
                     _workflowTriggerKinds[draft.Id] = draft.Blocks.Any(block => block.Type == "twitch.follow.received") ? "twitch.follow.received" : "manual.run";
+                    PrototypeServices.CurrentTriggerTypes.Clear();
+                    PrototypeServices.CurrentTriggerTypes.AddRange(draft.Blocks.Where(block => block.Type is "manual.run" or "twitch.follow.received").Select(block => block.Type).Distinct());
                     _workflowActions[name] = draft.Blocks.Select(block => block.Parameters["label"]?.GetValue<string>()).OfType<string>().ToList();
                     var labels = draft.Blocks.Where(block => block.Parameters["label"] is not null).ToDictionary(block => block.Id, block => block.Parameters["label"]!.GetValue<string>());
                     _workflowLinks[name] = draft.Connections.Where(link => labels.ContainsKey(link.FromBlockId) && labels.ContainsKey(link.ToBlockId)).Select(link => (labels[link.FromBlockId], labels[link.ToBlockId])).ToList();
@@ -181,6 +183,7 @@ public sealed partial class MainWindow : Window
         PrototypeServices.CurrentWorkflowId = _workflowIds[name];
         PrototypeServices.CurrentWorkflowName = name;
         PrototypeServices.CurrentTriggerType = "manual.run";
+        PrototypeServices.CurrentTriggerTypes.Clear(); PrototypeServices.CurrentTriggerTypes.Add("manual.run");
         _workflowTriggerKinds[_workflowIds[name]] = "manual.run";
         WorkflowTriggerSelector.SelectedIndex = 0;
         _workflowActions[name] = new List<string>();
@@ -226,6 +229,7 @@ public sealed partial class MainWindow : Window
                 PrototypeServices.CurrentWorkflowId = _workflowIds[name];
                 PrototypeServices.CurrentWorkflowName = name;
                 PrototypeServices.CurrentTriggerType = _workflowTriggerKinds.GetValueOrDefault(PrototypeServices.CurrentWorkflowId, "manual.run");
+                PrototypeServices.CurrentTriggerTypes.Clear(); PrototypeServices.CurrentTriggerTypes.Add(PrototypeServices.CurrentTriggerType);
                 var switching = _switchingWorkflow;
                 _switchingWorkflow = true;
                 WorkflowTriggerSelector.SelectedIndex = PrototypeServices.CurrentTriggerType == "manual.run" ? 0 : 1;
@@ -241,6 +245,7 @@ public sealed partial class MainWindow : Window
     {
         if (_switchingWorkflow || WorkflowTriggerSelector is null || WorkflowTriggerSelector.SelectedIndex < 0 || TestStatus is null) return;
         PrototypeServices.CurrentTriggerType = WorkflowTriggerSelector.SelectedIndex == 0 ? "manual.run" : "twitch.follow.received";
+        PrototypeServices.CurrentTriggerTypes.Clear(); PrototypeServices.CurrentTriggerTypes.Add(PrototypeServices.CurrentTriggerType);
         _workflowTriggerKinds[PrototypeServices.CurrentWorkflowId] = PrototypeServices.CurrentTriggerType;
         UpdateTriggerNode();
         TestStatus.Text = _english ? "Trigger changed — save and publish to apply" : "Déclencheur modifié — enregistre et publie pour appliquer";
@@ -524,6 +529,7 @@ public sealed partial class MainWindow : Window
                 if (trigger is not ("manual.run" or "twitch.follow.received")) return;
                 PrototypeServices.CurrentTriggerType = trigger;
                 _workflowTriggerKinds[PrototypeServices.CurrentWorkflowId] = trigger;
+                if (!PrototypeServices.CurrentTriggerTypes.Contains(trigger)) PrototypeServices.CurrentTriggerTypes.Add(trigger);
                 UpdateTriggerNode();
                 _switchingWorkflow = true;
                 WorkflowTriggerSelector.SelectedIndex = trigger == "manual.run" ? 0 : 1;

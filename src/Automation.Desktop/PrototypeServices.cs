@@ -16,6 +16,7 @@ internal static class PrototypeServices
     internal static Guid CurrentWorkflowId { get; set; } = PrototypeWorkflowIds.WorkflowId;
     internal static string CurrentWorkflowName { get; set; } = "Mon Live Automatisation";
     internal static string CurrentTriggerType { get; set; } = "manual.run";
+    internal static List<string> CurrentTriggerTypes { get; } = new() { "manual.run" };
     internal static readonly Dictionary<string, bool> SourceVisibility = new(StringComparer.Ordinal);
     internal static readonly Dictionary<string, JsonObject> ActionOptions = new(StringComparer.Ordinal);
 
@@ -356,10 +357,9 @@ internal static class PrototypeServices
 
     private static WorkflowDefinition CreatePrototypeWorkflow(IReadOnlyCollection<string>? selectedActions, IReadOnlyCollection<(string From, string To)>? manualLinks) 
     {
-        var blocks = new List<WorkflowBlock>
-        {
-            new(PrototypeWorkflowIds.TriggerBlockId, CurrentTriggerType, 1, new JsonObject())
-        };
+        var triggerTypes = CurrentTriggerTypes.Count == 0 ? new[] { CurrentTriggerType } : CurrentTriggerTypes.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        var blocks = triggerTypes.Select((type, index) => new WorkflowBlock(
+            index == 0 ? PrototypeWorkflowIds.TriggerBlockId : Guid.NewGuid(), type, 1, new JsonObject())).ToList();
         var connections = new List<WorkflowConnection>
         {
         };
@@ -394,7 +394,8 @@ internal static class PrototypeServices
         // exclusively by the manual links, never by their insertion order.
         var incoming = connections.Select(connection => connection.ToBlockId).ToHashSet();
         foreach (var root in actionIds.Values.Where(id => !incoming.Contains(id)))
-            connections.Add(new WorkflowConnection(PrototypeWorkflowIds.TriggerBlockId, "next", root));
+            foreach (var trigger in blocks.Where(block => block.Type is "manual.run" or "twitch.follow.received"))
+                connections.Add(new WorkflowConnection(trigger.Id, "next", root));
 
         return new WorkflowDefinition(
             CurrentWorkflowId,
