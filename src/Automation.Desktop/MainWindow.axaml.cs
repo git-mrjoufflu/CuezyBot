@@ -28,6 +28,7 @@ public sealed partial class MainWindow : Window
     private readonly List<string> _workflowNames = new() { "Mon Live Automatisation" };
     private readonly Dictionary<string, List<string>> _workflowActions = new(StringComparer.OrdinalIgnoreCase);
     private string _activeWorkflowName = "Mon Live Automatisation";
+    private bool _switchingWorkflow;
     private Point _dragPointerStart;
     private double _dragNodeLeft;
     private double _dragNodeTop;
@@ -90,6 +91,7 @@ public sealed partial class MainWindow : Window
 
     private void OnNewWorkflowClick(object? sender, RoutedEventArgs eventArgs)
     {
+        _switchingWorkflow = true;
         var name = _english ? $"New automation {_workflowNames.Count + 1}" : $"Nouvelle automatisation {_workflowNames.Count + 1}";
         _workflowActions[_activeWorkflowName] = _selectedActions.ToList();
         _workflowNames.Add(name);
@@ -97,12 +99,14 @@ public sealed partial class MainWindow : Window
         WorkflowSelector.ItemsSource = _workflowNames.ToArray();
         WorkflowSelector.SelectedIndex = _workflowNames.Count - 1;
         _activeWorkflowName = name;
-        Dispatcher.UIThread.Post(ClearWorkflowCanvas);
+        ClearWorkflowCanvas();
+        _switchingWorkflow = false;
         TestStatus.Text = _english ? "New automation created" : "Nouvelle automatisation créée";
     }
 
     private void OnWorkflowSelected(object? sender, SelectionChangedEventArgs eventArgs)
     {
+        if (_switchingWorkflow) return;
         if (WorkflowSelector is not null && WorkflowSelector.SelectedItem is string name)
         {
             if (_workflowNames.Contains(name))
