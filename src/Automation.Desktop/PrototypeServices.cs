@@ -4,6 +4,8 @@ using Automation.Connectors.Twitch;
 using Automation.Domain.Execution;
 using Automation.Domain.Workflows;
 using Automation.Engine.Execution;
+using Automation.Engine.Blocks;
+using Automation.Engine.Workflows;
 using Automation.Persistence.Sqlite.Storage;
 using Automation.Persistence.Sqlite.Stores;
 
@@ -56,7 +58,9 @@ internal static class PrototypeServices
     internal static async Task SavePrototypeDraftAsync(IReadOnlyCollection<string>? selectedActions = null, CancellationToken cancellationToken = default)
     {
         await EnsureInitializedAsync(cancellationToken);
-        await new SqliteWorkflowRepository(Database).SaveDraftAsync(CreatePrototypeWorkflow(selectedActions), cancellationToken);
+        var workflow = CreatePrototypeWorkflow(selectedActions);
+        EnsureValid(workflow);
+        await new SqliteWorkflowRepository(Database).SaveDraftAsync(workflow, cancellationToken);
     }
 
     internal static async Task<bool> HasPrototypeDraftAsync(CancellationToken cancellationToken = default)
@@ -86,16 +90,18 @@ internal static class PrototypeServices
         var repository = new SqliteWorkflowRepository(Database);
         var previous = await repository.GetPublishedAsync(PrototypeWorkflowIds.WorkflowId, cancellationToken);
         var revision = (previous?.Revision ?? 0) + 1;
-        await repository.PublishAsync(CreatePrototypeWorkflow(selectedActions) with { Enabled = true, Revision = revision }, cancellationToken);
+        var workflow = CreatePrototypeWorkflow(selectedActions) with { Enabled = true, Revision = revision };
+        EnsureValid(workflow);
+        await repository.PublishAsync(workflow, cancellationToken);
     }
 
     private static WorkflowDefinition CreatePrototypeWorkflow(IReadOnlyCollection<string>? selectedActions) 
     {
         var blocks = new List<WorkflowBlock>
         {
-            new(PrototypeWorkflowIds.TriggerBlockId, "twitch.follow", 2, new JsonObject()),
-            new(PrototypeWorkflowIds.CounterBlockId, "core.increment", 1, new JsonObject()),
-            new(PrototypeWorkflowIds.ObsBlockId, "obs.set-scene", 1, new JsonObject { ["scene"] = "Merci" })
+            new(PrototypeWorkflowIds.TriggerBlockId, "twitch.follow.received", 1, new JsonObject()),
+            new(PrototypeWorkflowIds.CounterBlockId, "variables.increment", 1, new JsonObject()),
+            new(PrototypeWorkflowIds.ObsBlockId, "obs.scene.set-current", 1, new JsonObject { ["scene"] = "Merci" })
         };
         var connections = new List<WorkflowConnection>
         {
@@ -132,6 +138,15 @@ internal static class PrototypeServices
         var value when value.Contains("condition") => "core.condition",
         _ => "core.action"
     };
+
+    private static void EnsureValid(WorkflowDefinition workflow)
+    {
+        var result = new WorkflowValidator(new InitialBlockCatalog()).Validate(workflow);
+        if (!result.IsValid)
+        {
+            throw new InvalidOperationException(string.Join(" ", result.Diagnostics.Select(diagnostic => diagnostic.Message)));
+        }
+    }
 
     private static async Task EnsureInitializedAsync(CancellationToken cancellationToken)
     {
