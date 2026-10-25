@@ -89,7 +89,7 @@
     </Style>
   </Window.Styles>
 
-  <Grid RowDefinitions="58,*,34" ColumnDefinitions="200,*,300">
+  <Grid RowDefinitions="58,*,46" ColumnDefinitions="200,*,300">
     <Border Grid.Row="0" Grid.ColumnSpan="3" Background="#0B0F22" BorderBrush="#292D49" BorderThickness="0,0,0,1">
       <Grid Margin="18,0" ColumnDefinitions="200,*,Auto">
         <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="9" VerticalAlignment="Center">
@@ -394,11 +394,14 @@
 
     <Border Grid.Row="2" Grid.ColumnSpan="3" Background="#0A0E20" BorderBrush="#292D49" BorderThickness="0,1,0,0">
       <Grid Margin="16,0" ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center">
-        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
+        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
           <Border Width="22" Height="22" CornerRadius="11" ClipToBounds="True" Background="#52308B">
             <Grid><TextBlock x:Name="StatusCreatorAvatarFallback" Text="C" FontSize="10" HorizontalAlignment="Center" VerticalAlignment="Center" /><Image x:Name="StatusCreatorImage" IsVisible="False" Stretch="UniformToFill" /></Grid>
           </Border>
           <StackPanel><TextBlock x:Name="StatusCreatorName" Text="Créateur" Foreground="#E8E7F5" FontSize="11" /><TextBlock Text="Moteur actif" Foreground="#5EE6A8" FontSize="9" /></StackPanel>
+          <Border Classes="profileSettings" PointerPressed="OnSettingsPointerPressed" ToolTip.Tip="Paramètres">
+            <TextBlock Text="⚙" Foreground="#C9B4FF" FontSize="17" HorizontalAlignment="Center" VerticalAlignment="Center" />
+          </Border>
         </StackPanel>
 
         <TextBlock Grid.Column="1" Text="Données enregistrées localement" Classes="muted" FontSize="11"
