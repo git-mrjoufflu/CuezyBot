@@ -45,8 +45,14 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private void OnTestClick(object? sender, RoutedEventArgs eventArgs)
+    private async void OnTestClick(object? sender, RoutedEventArgs eventArgs)
     {
+        if (!await PrototypeServices.HasPrototypeDraftAsync())
+        {
+            TestStatus.Text = _english ? "Save the draft before testing." : "Enregistre le brouillon avant de tester.";
+            return;
+        }
+
         TestStatus.Text = _english
             ? "Simulation successful: 3 steps would run."
             : "Simulation réussie : les 3 étapes seraient exécutées.";
