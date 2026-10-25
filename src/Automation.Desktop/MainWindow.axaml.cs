@@ -334,18 +334,21 @@ public sealed partial class MainWindow : Window
 
     private void OnLibraryActionPressed(object? sender, PointerPressedEventArgs eventArgs)
     {
-        if (eventArgs.Source is Border border && border.Classes.Contains("libraryItem"))
+        var border = (eventArgs.Source as Visual)?.GetSelfAndVisualAncestors()
+            .OfType<Border>().FirstOrDefault(candidate => candidate.Classes.Contains("libraryItem"));
+        if (border is not null && eventArgs.GetCurrentPoint(border).Properties.IsLeftButtonPressed)
         {
             var label = border.Child is TextBlock textBlock ? textBlock.Text : null;
             if (!string.IsNullOrWhiteSpace(label))
             {
                 TestStatus.Text = _english ? $"Action selected: {label}" : $"Action sélectionnée : {label}";
-                if (!_selectedActions.Contains(label, StringComparer.OrdinalIgnoreCase))
                 {
-                    _selectedActions.Add(label);
-                    _undoActions.Push(label);
+                    // Keep a distinct instance key while displaying the original action name.
+                    var instance = $"{label}\u001f{Guid.NewGuid():N}";
+                    _selectedActions.Add(instance);
+                    _undoActions.Push(instance);
                     _redoActions.Clear();
-                    AddActionNode(label);
+                    AddActionNode(instance);
                     UpdateHistoryButtons();
                 }
                 eventArgs.Handled = true;
@@ -487,7 +490,7 @@ public sealed partial class MainWindow : Window
                         },
                         new TextBlock
                         {
-                            Text = label.TrimStart('▣', '✎', '◎', '♟', '◉', '▻', '●', '▧', '◇', '◷', '＋', '♫', ' '),
+                            Text = label.Split('\u001f')[0].TrimStart('▣', '✎', '◎', '♟', '◉', '▻', '●', '▧', '◇', '◷', '＋', '♫', ' '),
                             FontWeight = Avalonia.Media.FontWeight.SemiBold,
                             VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center
                         }
