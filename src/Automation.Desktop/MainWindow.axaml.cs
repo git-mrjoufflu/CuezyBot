@@ -529,7 +529,7 @@ public sealed partial class MainWindow : Window
                 Stroke = from.BorderBrush,
                 StrokeThickness = 3,
                 StrokeLineCap = PenLineCap.Round,
-                ZIndex = 0
+                ZIndex = 10
             };
             link.PointerPressed += OnWorkflowLinkPressed;
             WorkflowCanvas.Children.Insert(0, link);
