@@ -87,6 +87,9 @@ public sealed partial class MainWindow : Window
     {
         var window = new SettingsWindow(_english ? "English" : "Français");
         await window.ShowDialog(this);
+        UpdateIntegrationCount(
+            ObsSessionState.Client?.IsConnected == true,
+            TwitchSessionState.EventSubClient?.IsConnected == true);
         if (window.SavedLanguage is { } language)
         {
             ApplyLanguage(language == "English");
