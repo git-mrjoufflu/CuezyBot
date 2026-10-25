@@ -670,6 +670,9 @@ public sealed partial class MainWindow : Window
                 triggerPicker
             }}
         };
+        _triggerNode.Tag = "__trigger__";
+        _triggerNode.PointerPressed += OnActionNodePressed;
+        _triggerNode.PointerReleased += OnActionNodeReleased;
         _triggerNode.IsHitTestVisible = true;
         triggerPicker.SelectionChanged += (_, _) =>
         {
@@ -1074,6 +1077,12 @@ public sealed partial class MainWindow : Window
     {
         if ((eventArgs.Source as Visual)?.GetSelfAndVisualAncestors().Any(control => control is ComboBox || control is Button || control is TextBox || control is ListBox) == true) return;
         if (sender is not Border node) return;
+        if (node == _triggerNode && eventArgs.GetCurrentPoint(node).Properties.PointerUpdateKind == PointerUpdateKind.RightButtonPressed)
+        {
+            TestStatus.Text = _english ? "The trigger is fixed at the beginning" : "Le déclencheur reste fixé au début";
+            eventArgs.Handled = true;
+            return;
+        }
         var point = eventArgs.GetCurrentPoint(node);
         if (point.Properties.PointerUpdateKind == PointerUpdateKind.RightButtonPressed)
         {
@@ -1214,6 +1223,12 @@ public sealed partial class MainWindow : Window
                 }
                 else
                 {
+                    if (_selectedNode == _triggerNode && node == _triggerNode || _selectedNode != _triggerNode && node == _triggerNode)
+                    {
+                        TestStatus.Text = _english ? "Links can only enter actions from an event" : "Les liens doivent partir d’un événement vers une action";
+                        _selectedNode = null;
+                        return;
+                    }
                     var reachable = new HashSet<Border>();
                     var pending = new Stack<Border>(); pending.Push(node);
                     while (pending.TryPop(out var candidate))
