@@ -121,19 +121,30 @@
           <Button Classes="nav" Content="▣   Pages" />
         </StackPanel>
 
-        <Border Grid.Row="1" Padding="12" CornerRadius="9" Background="#12172D" BorderBrush="#282E4C" BorderThickness="1">
+        <Border Grid.Row="1" Padding="13" CornerRadius="12" BorderBrush="#39466F" BorderThickness="1">
+          <Border.Background>
+            <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+              <GradientStop Color="#1A2040" Offset="0" />
+              <GradientStop Color="#12172D" Offset="1" />
+            </LinearGradientBrush>
+          </Border.Background>
           <StackPanel Spacing="8">
             <Grid ColumnDefinitions="Auto,*,Auto">
-              <Border Width="30" Height="30" CornerRadius="15" Background="#52308B">
-                <TextBlock Text="C" HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="Bold" />
+              <Border Width="36" Height="36" CornerRadius="18">
+                <Border.Background>
+                  <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                    <GradientStop Color="#9A4DFF" Offset="0" />
+                    <GradientStop Color="#4E2B9C" Offset="1" />
+                  </LinearGradientBrush>
+                </Border.Background>
+                <TextBlock Text="C" FontSize="15" HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="Bold" />
               </Border>
               <StackPanel Grid.Column="1" Margin="8,0,0,0">
-                <TextBlock Text="Créateur" FontWeight="SemiBold" FontSize="12" />
-                <TextBlock Text="Espace local" Classes="muted" FontSize="10" />
+                <TextBlock Text="Créateur" FontWeight="SemiBold" FontSize="13" />
+                <TextBlock Text="Espace local  ·  Privé" Classes="muted" FontSize="10" />
               </StackPanel>
-              <Button Grid.Column="2" Classes="surface" Content="⚙" Click="OnSettingsClick" ToolTip.Tip="Paramètres" Padding="5" Width="32" Height="30" FontSize="15" />
+              <Button Grid.Column="2" Classes="surface" Content="⚙" Click="OnSettingsClick" ToolTip.Tip="Paramètres" Padding="5" Width="34" Height="34" FontSize="16" />
             </Grid>
-            <Border Height="1" Background="#282E4C" />
           </StackPanel>
         </Border>
       </Grid>
