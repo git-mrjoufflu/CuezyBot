@@ -26,6 +26,10 @@ public sealed partial class MainWindow : Window
         {
             var language = await ConnectionPersistence.GetLanguageAsync();
             ApplyLanguage(language == "English");
+            if (await PrototypeServices.HasPrototypeDraftAsync())
+            {
+                TestStatus.Text = _english ? "Draft restored" : "Brouillon restauré";
+            }
         }
         catch
         {
