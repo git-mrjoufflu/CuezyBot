@@ -56,7 +56,16 @@ internal static class PrototypeServices
     internal static async Task SavePrototypeDraftAsync(CancellationToken cancellationToken = default)
     {
         await EnsureInitializedAsync(cancellationToken);
-        var workflow = new WorkflowDefinition(
+        await new SqliteWorkflowRepository(Database).SaveDraftAsync(CreatePrototypeWorkflow(), cancellationToken);
+    }
+
+    internal static async Task PublishPrototypeAsync(CancellationToken cancellationToken = default)
+    {
+        await EnsureInitializedAsync(cancellationToken);
+        await new SqliteWorkflowRepository(Database).PublishAsync(CreatePrototypeWorkflow() with { Enabled = true, Revision = 1 }, cancellationToken);
+    }
+
+    private static WorkflowDefinition CreatePrototypeWorkflow() => new(
             PrototypeWorkflowIds.WorkflowId,
             1,
             "Mon Live Automatisation",
@@ -72,8 +81,6 @@ internal static class PrototypeServices
                 new WorkflowConnection(PrototypeWorkflowIds.TriggerBlockId, "next", PrototypeWorkflowIds.CounterBlockId),
                 new WorkflowConnection(PrototypeWorkflowIds.CounterBlockId, "next", PrototypeWorkflowIds.ObsBlockId)
             });
-        await new SqliteWorkflowRepository(Database).SaveDraftAsync(workflow, cancellationToken);
-    }
 
     private static async Task EnsureInitializedAsync(CancellationToken cancellationToken)
     {

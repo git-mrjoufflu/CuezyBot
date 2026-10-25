@@ -53,13 +53,25 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private void OnStartWorkflowClick(object? sender, RoutedEventArgs eventArgs)
+    private async void OnStartWorkflowClick(object? sender, RoutedEventArgs eventArgs)
     {
         var stopping = StartWorkflowButton.Content?.ToString()?.Contains("Stop", StringComparison.Ordinal) == true
             || StartWorkflowButton.Content?.ToString()?.Contains("Arrêter", StringComparison.Ordinal) == true;
+        if (!stopping)
+        {
+            try
+            {
+                await PrototypeServices.PublishPrototypeAsync();
+            }
+            catch (Exception exception)
+            {
+                TestStatus.Text = _english ? $"Publish failed: {exception.Message}" : $"Échec de publication : {exception.Message}";
+                return;
+            }
+        }
         TestStatus.Text = stopping
             ? (_english ? "Automation stopped" : "Automatisation arrêtée")
-            : (_english ? "Automation enabled" : "Automatisation activée");
+            : (_english ? "Automation published and enabled" : "Automatisation publiée et activée");
         StartWorkflowButton.Content = stopping
             ? (_english ? "▶  Start" : "▶  Démarrer")
             : (_english ? "■  Stop" : "■  Arrêter");
