@@ -517,8 +517,10 @@ public sealed partial class MainWindow : Window
             var end = horizontal
                 ? new Point(toCenter.X >= fromCenter.X ? toLeft - 2 : toLeft + to.Width + 2, toCenter.Y + spread)
                 : new Point(toCenter.X + spread, toCenter.Y >= fromCenter.Y ? toTop - 2 : toTop + to.Height + 2);
-            var dx = end.X - start.X;
-            var dy = end.Y - start.Y;
+            var bend = new Point((start.X + end.X) / 2 + spread, start.Y);
+            var finalStart = new Point(bend.X, end.Y);
+            var dx = end.X - finalStart.X;
+            var dy = end.Y - finalStart.Y;
             var length = Math.Max(1, Math.Sqrt(dx * dx + dy * dy));
             var ux = dx / length;
             var uy = dy / length;
@@ -531,6 +533,8 @@ public sealed partial class MainWindow : Window
             using (var context = geometry.Open())
             {
                 context.BeginFigure(start, false);
+                context.LineTo(bend);
+                context.LineTo(new Point(bend.X, end.Y));
                 context.LineTo(end);
                 context.BeginFigure(wingA, false);
                 context.LineTo(end);
