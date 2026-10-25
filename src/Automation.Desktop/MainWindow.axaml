@@ -89,7 +89,7 @@
     </Style>
   </Window.Styles>
 
-  <Grid RowDefinitions="58,*,46" ColumnDefinitions="200,*,300">
+  <Grid RowDefinitions="58,*,46" ColumnDefinitions="200,*,0">
     <Border Grid.Row="0" Grid.ColumnSpan="3" Background="#0B0F22" BorderBrush="#292D49" BorderThickness="0,0,0,1">
       <Grid Margin="18,0" ColumnDefinitions="200,*,Auto">
         <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="9" VerticalAlignment="Center">
@@ -185,6 +185,7 @@
         <Border x:Name="WorkflowToolbar" Canvas.Right="18" Canvas.Top="18" Background="#11162B" BorderBrush="#2C3353" BorderThickness="1" CornerRadius="10" Padding="6,5">
           <StackPanel Orientation="Horizontal" Spacing="5">
             <TextBlock x:Name="TestStatus" Text="Brouillon enregistré" Classes="muted" FontSize="11" VerticalAlignment="Center" Margin="3,0,4,0" MaxWidth="300" TextWrapping="Wrap" />
+            <Button x:Name="AddCanvasItemButton" Classes="primary" Content="＋  Ajouter" Click="OnAddCanvasItemClick" Padding="9,7" ToolTip.Tip="Ajouter un élément au canevas" />
             <Button x:Name="AddCanvasEventButton" Classes="surface" Content="＋  Événement" Click="OnAddCanvasEventClick" Padding="9,7" ToolTip.Tip="Ajouter un événement au canevas" />
             <Button Classes="surface" Content="▷  Tester" Click="OnTestClick" Padding="9,7" />
             <Button x:Name="RunOnceButton" Classes="surface" Content="Exécuter" Click="OnRunOnceClick" Padding="9,7" ToolTip.Tip="Exécuter la version publiée avec des effets réels" />

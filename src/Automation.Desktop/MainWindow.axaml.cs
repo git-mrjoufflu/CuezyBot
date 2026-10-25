@@ -274,6 +274,32 @@ public sealed partial class MainWindow : Window
         TestStatus.Text = _english ? "Event added — connect it to an action" : "Événement ajouté — relie-le à une action";
     }
 
+    private async void OnAddCanvasItemClick(object? sender, RoutedEventArgs eventArgs)
+    {
+        var dialog = new Window { Title = _english ? "Add to canvas" : "Ajouter au canevas", Width = 420, Height = 520, CanResize = false, WindowStartupLocation = WindowStartupLocation.CenterOwner };
+        var stack = new StackPanel { Margin = new Thickness(18), Spacing = 7 };
+        stack.Children.Add(new TextBlock { Text = _english ? "Events" : "Événements", FontWeight = FontWeight.Bold });
+        foreach (var item in new[] { ("manual.run", "▶  Exécution manuelle", "▶  Manual run"), ("twitch.follow.received", "♥  Nouveau follower Twitch", "♥  New Twitch follower") })
+        { var button = new Button { Content = _english ? item.Item3 : item.Item2, HorizontalContentAlignment = Avalonia.Layout.HorizontalAlignment.Left }; button.Click += (_, _) => dialog.Close(item.Item1); stack.Children.Add(button); }
+        stack.Children.Add(new TextBlock { Text = _english ? "Actions" : "Actions", FontWeight = FontWeight.Bold, Margin = new Thickness(0, 10, 0, 0) });
+        foreach (var label in new[] { "Envoyer un message", "Créer un clip", "Modifier un titre", "Changer de scène", "Visibilité d’une source", "Démarrer un replay", "Prendre une capture", "Ajouter une condition", "Attendre", "Modifier une variable", "Jouer un son" })
+        { var button = new Button { Content = label, HorizontalContentAlignment = Avalonia.Layout.HorizontalAlignment.Left }; button.Click += (_, _) => dialog.Close($"action:{label}"); stack.Children.Add(button); }
+        dialog.Content = new ScrollViewer { Content = stack };
+        var result = await dialog.ShowDialog<string?>(this);
+        if (result is null) return;
+        if (result.StartsWith("action:", StringComparison.Ordinal))
+        {
+            var label = result[7..]; var instance = $"{label}\u001f{Guid.NewGuid():N}"; RememberCanvas(); _selectedActions.Add(instance); AddActionNode(instance); UpdateHistoryButtons();
+            TestStatus.Text = _english ? "Action added — connect it in the canvas" : "Action ajoutée — relie-la dans le canevas";
+        }
+        else if (result is "manual.run" or "twitch.follow.received")
+        {
+            if (PrototypeServices.CurrentTriggerTypes.Contains(result)) { TestStatus.Text = _english ? "This event is already on the canvas" : "Cet événement est déjà dans le canevas"; return; }
+            PrototypeServices.CurrentTriggerTypes.Add(result); AddAdditionalTriggerNode(result);
+            TestStatus.Text = _english ? "Event added — connect it in the canvas" : "Événement ajouté — relie-le dans le canevas";
+        }
+    }
+
     private void OnActionsTabPressed(object? sender, PointerPressedEventArgs eventArgs)
     {
         if (!eventArgs.GetCurrentPoint((Visual)sender!).Properties.IsLeftButtonPressed) return;
