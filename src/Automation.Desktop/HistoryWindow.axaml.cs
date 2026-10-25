@@ -12,6 +12,13 @@ public sealed partial class HistoryWindow : Window
     public HistoryWindow()
     {
         InitializeComponent();
+        if (UiLanguageState.IsEnglish)
+        {
+            Title = "History — CuezyBot";
+            HistoryTitle.Text = "Event history";
+            HistoryDescription.Text = "Open an alert to inspect its event and every executed step.";
+            RefreshButton.Content = "Refresh";
+        }
         Opened += OnOpened;
     }
 
@@ -23,7 +30,7 @@ public sealed partial class HistoryWindow : Window
     {
         try
         {
-            HistoryStatus.Text = "Chargement de l’historique…";
+            HistoryStatus.Text = UiLanguageState.IsEnglish ? "Loading history…" : "Chargement de l’historique…";
             var database = new SqliteDatabase(new AppDataPaths());
             await database.InitializeAsync();
             var entries = await new SqliteExecutionHistoryReader(database).GetRecentAsync(50);

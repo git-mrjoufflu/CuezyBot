@@ -19,10 +19,10 @@
   <Grid Margin="26" RowDefinitions="Auto,Auto,*">
     <Grid ColumnDefinitions="*,Auto">
       <StackPanel>
-        <TextBlock Text="Historique des événements" FontSize="24" FontWeight="SemiBold" />
-        <TextBlock Text="Ouvre une alerte pour voir son événement et chaque étape exécutée." Classes="muted" />
+        <TextBlock x:Name="HistoryTitle" Text="Historique des événements" FontSize="24" FontWeight="SemiBold" />
+        <TextBlock x:Name="HistoryDescription" Text="Ouvre une alerte pour voir son événement et chaque étape exécutée." Classes="muted" />
       </StackPanel>
-      <Button Grid.Column="1" Content="Actualiser" Click="OnRefreshClick" VerticalAlignment="Center" />
+      <Button x:Name="RefreshButton" Grid.Column="1" Content="Actualiser" Click="OnRefreshClick" VerticalAlignment="Center" />
     </Grid>
     <Border Grid.Row="1" Margin="0,18,0,12" Padding="13" CornerRadius="9" Background="#151A31" BorderBrush="#2C3353" BorderThickness="1">
       <TextBlock x:Name="HistoryStatus" Text="Chargement de l’historique…" Classes="muted" />

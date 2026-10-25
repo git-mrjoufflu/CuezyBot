@@ -170,6 +170,7 @@ public sealed partial class MainWindow : Window
     internal void ApplyLanguage(bool english)
     {
         _english = english;
+        UiLanguageState.IsEnglish = english;
         var translations = _english
             ? new Dictionary<string, string>
             {

@@ -84,6 +84,7 @@ public sealed partial class SettingsWindow : Window
     private void ApplyLanguage(bool isEnglish)
     {
         english = isEnglish;
+        UiLanguageState.IsEnglish = isEnglish;
         Title = english ? "Settings" : "Paramètres";
         SettingsTitle.Text = english ? "Settings" : "Paramètres";
         SettingsDescription.Text = english ? "Customize how CuezyBot behaves." : "Personnalise le comportement de CuezyBot.";
