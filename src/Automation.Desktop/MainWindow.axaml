@@ -105,7 +105,7 @@
           <Button Classes="surface" Content="▷  Tester" Click="OnTestClick" />
           <Button Classes="surface" Content="Enregistrer" />
           <Button Classes="primary" Content="▶  Démarrer" />
-          <Button Classes="surface" Content="⚙" Click="OnSettingsClick" ToolTip.Tip="Paramètres" Padding="10,8" />
+          <Button Classes="surface" Content="⚙" Click="OnSettingsClick" ToolTip.Tip="Paramètres" Padding="9,6" Width="42" Height="38" FontSize="19" />
         </StackPanel>
       </Grid>
     </Border>
