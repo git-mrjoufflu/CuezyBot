@@ -181,20 +181,52 @@ public sealed partial class MainWindow : Window
                 ["Add a condition"] = "Ajouter une condition", ["Wait"] = "Attendre", ["Edit a variable"] = "Modifier une variable"
             };
 
+        translations["Brouillon enregistré"] = _english ? "Draft saved" : "Brouillon enregistré";
+        translations["Événement"] = _english ? "Event" : "Événement";
+        translations["Condition"] = _english ? "Condition" : "Condition";
+        translations["Démarrer"] = _english ? "Start" : "Démarrer";
+        translations["Est un abonné?"] = _english ? "Is a subscriber?" : "Est un abonné?";
+        translations["Est un abonné ?"] = _english ? "Is a subscriber?" : "Est un abonné ?";
+        translations["Afficher une alerte"] = _english ? "Show an OBS alert" : "Afficher une alerte";
+        translations["Envoyer un message"] = _english ? "Send a message" : "Envoyer un message";
+        translations["Modifier un titre"] = _english ? "Edit title" : "Modifier un titre";
+        translations["Gérer les points de chaîne"] = _english ? "Manage channel points" : "Gérer les points de chaîne";
+        translations["Récupérer un utilisateur"] = _english ? "Get a user" : "Récupérer un utilisateur";
+        translations["Changer de scène"] = _english ? "Change scene" : "Changer de scène";
+        translations["Afficher une source"] = _english ? "Show a source" : "Afficher une source";
+        translations["Masquer une source"] = _english ? "Hide a source" : "Masquer une source";
+        translations["Démarrer un replay"] = _english ? "Start replay" : "Démarrer un replay";
+        translations["Prendre une capture"] = _english ? "Take a screenshot" : "Prendre une capture";
+
         foreach (var control in this.GetVisualDescendants().OfType<TextBlock>())
         {
-            if (control.Text is { } text && translations.TryGetValue(text, out var translated))
+            if (control.Text is { } text)
             {
-                control.Text = translated;
+                control.Text = TranslateText(text, translations);
             }
         }
 
         foreach (var button in this.GetVisualDescendants().OfType<Button>())
         {
-            if (button.Content is string text && translations.TryGetValue(text, out var translated))
+            if (button.Content is string text)
             {
-                button.Content = translated;
+                button.Content = TranslateText(text, translations);
             }
         }
+    }
+
+    private static string TranslateText(string text, IReadOnlyDictionary<string, string> translations)
+    {
+        if (translations.TryGetValue(text, out var exact))
+        {
+            return exact;
+        }
+
+        foreach (var pair in translations.OrderByDescending(pair => pair.Key.Length))
+        {
+            text = text.Replace(pair.Key, pair.Value, StringComparison.Ordinal);
+        }
+
+        return text;
     }
 }
