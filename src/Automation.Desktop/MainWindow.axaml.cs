@@ -40,6 +40,23 @@ public sealed partial class MainWindow : Window
             : "Simulation réussie : les 3 étapes seraient exécutées.";
     }
 
+    private void OnSaveWorkflowClick(object? sender, RoutedEventArgs eventArgs)
+    {
+        TestStatus.Text = _english ? "Draft saved" : "Brouillon enregistré";
+    }
+
+    private void OnStartWorkflowClick(object? sender, RoutedEventArgs eventArgs)
+    {
+        var stopping = StartWorkflowButton.Content?.ToString()?.Contains("Stop", StringComparison.Ordinal) == true
+            || StartWorkflowButton.Content?.ToString()?.Contains("Arrêter", StringComparison.Ordinal) == true;
+        TestStatus.Text = stopping
+            ? (_english ? "Automation stopped" : "Automatisation arrêtée")
+            : (_english ? "Automation enabled" : "Automatisation activée");
+        StartWorkflowButton.Content = stopping
+            ? (_english ? "▶  Start" : "▶  Démarrer")
+            : (_english ? "■  Stop" : "■  Arrêter");
+    }
+
     internal void SetConnectionStatus(string message) => TestStatus.Text = message;
 
     internal void UpdateIntegrationCount(bool obsConnected, bool twitchConnected)
@@ -171,6 +188,15 @@ public sealed partial class MainWindow : Window
     {
         _english = english;
         UiLanguageState.IsEnglish = english;
+        SaveWorkflowButton.Content = english ? "Save" : "Enregistrer";
+        if (StartWorkflowButton.Content?.ToString()?.Contains("Stop", StringComparison.Ordinal) == true || StartWorkflowButton.Content?.ToString()?.Contains("Arrêter", StringComparison.Ordinal) == true)
+        {
+            StartWorkflowButton.Content = english ? "■  Stop" : "■  Arrêter";
+        }
+        else
+        {
+            StartWorkflowButton.Content = english ? "▶  Start" : "▶  Démarrer";
+        }
         var translations = _english
             ? new Dictionary<string, string>
             {
