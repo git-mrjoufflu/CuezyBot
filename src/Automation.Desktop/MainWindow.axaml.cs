@@ -508,7 +508,7 @@ public sealed partial class MainWindow : Window
             var horizontal = Math.Abs(toCenter.X - fromCenter.X) >= Math.Abs(toCenter.Y - fromCenter.Y);
             var targetIndex = targetGroups[to].IndexOf((from, to));
             var targetCount = targetGroups[to].Count;
-            var spread = (targetIndex - (targetCount - 1) / 2d) * 14;
+            var spread = (targetIndex - (targetCount - 1) / 2d) * 26;
             var start = horizontal
                 ? new Point(toCenter.X >= fromCenter.X ? fromLeft + from.Width : fromLeft, fromCenter.Y)
                 : new Point(fromCenter.X, toCenter.Y >= fromCenter.Y ? fromTop + from.Height : fromTop);
