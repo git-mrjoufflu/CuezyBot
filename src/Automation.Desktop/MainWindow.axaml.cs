@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Avalonia.Controls.Shapes;
 using Avalonia;
 using Avalonia.Interactivity;
 using Avalonia.Input;
@@ -20,6 +21,8 @@ public sealed partial class MainWindow : Window
     private readonly Stack<string> _redoActions = new();
     private Border? _draggedNode;
     private Border? _selectedNode;
+    private readonly List<Border> _dynamicNodes = new();
+    private readonly List<Line> _dynamicLinks = new();
     private Point _dragPointerStart;
     private double _dragNodeLeft;
     private double _dragNodeTop;
@@ -164,6 +167,9 @@ public sealed partial class MainWindow : Window
 
     private void RebuildActionNodes()
     {
+        foreach (var link in _dynamicLinks) WorkflowCanvas.Children.Remove(link);
+        _dynamicLinks.Clear();
+        _dynamicNodes.Clear();
         foreach (var child in WorkflowCanvas.Children.OfType<Border>().Where(border => border.Classes.Contains("dynamicAction")).ToArray())
             WorkflowCanvas.Children.Remove(child);
         _addedActionCount = 0;
@@ -257,6 +263,8 @@ public sealed partial class MainWindow : Window
         Canvas.SetLeft(node, 70 + (_addedActionCount % 3) * 230);
         Canvas.SetTop(node, 520 + (_addedActionCount / 3) * 90);
         WorkflowCanvas.Children.Add(node);
+        _dynamicNodes.Add(node);
+        UpdateDynamicLinks();
         _addedActionCount++;
     }
 
@@ -317,6 +325,32 @@ public sealed partial class MainWindow : Window
         var top = Math.Max(8, _dragNodeTop + point.Y - _dragPointerStart.Y);
         Canvas.SetLeft(_draggedNode!, left);
         Canvas.SetTop(_draggedNode!, top);
+        UpdateDynamicLinks();
+    }
+
+    private void UpdateDynamicLinks()
+    {
+        foreach (var link in _dynamicLinks) WorkflowCanvas.Children.Remove(link);
+        _dynamicLinks.Clear();
+        var previousX = 710d;
+        var previousY = 235d;
+        foreach (var node in _dynamicNodes)
+        {
+            var left = Canvas.GetLeft(node);
+            var top = Canvas.GetTop(node);
+            var link = new Line
+            {
+                StartPoint = new Point(previousX, previousY),
+                EndPoint = new Point(left, top + node.Height / 2),
+                Stroke = new SolidColorBrush(Color.Parse("#A640F4")),
+                StrokeThickness = 3,
+                ZIndex = -1
+            };
+            WorkflowCanvas.Children.Insert(0, link);
+            _dynamicLinks.Add(link);
+            previousX = left + node.Width;
+            previousY = top + node.Height / 2;
+        }
     }
 
     private void OnActionNodeReleased(object? sender, PointerReleasedEventArgs eventArgs)
