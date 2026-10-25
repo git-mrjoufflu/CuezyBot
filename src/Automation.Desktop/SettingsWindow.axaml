@@ -3,6 +3,15 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Paramètres" Width="650" Height="620" CanResize="False"
         Background="#0D1125">
+  <Window.Styles>
+    <Style Selector="TextBlock"><Setter Property="FontFamily" Value="Inter" /><Setter Property="Foreground" Value="#F4F3FF" /></Style>
+    <Style Selector="TextBlock.muted"><Setter Property="Foreground" Value="#9AA1BD" /></Style>
+    <Style Selector="Button"><Setter Property="FontFamily" Value="Inter" /><Setter Property="CornerRadius" Value="8" /><Setter Property="Padding" Value="12,8" /><Setter Property="Background" Value="#171B34" /><Setter Property="Foreground" Value="#E8E7F5" /></Style>
+    <Style Selector="Button.primary"><Setter Property="Background" Value="#8A36F5" /><Setter Property="Foreground" Value="#FFFFFF" /></Style>
+    <Style Selector="Button:pointerover"><Setter Property="Background" Value="#292A50" /></Style>
+    <Style Selector="Button.primary:pointerover"><Setter Property="Background" Value="#A44DFF" /></Style>
+    <Style Selector="ComboBox"><Setter Property="FontFamily" Value="Inter" /><Setter Property="Background" Value="#171B34" /><Setter Property="Foreground" Value="#F4F3FF" /><Setter Property="BorderBrush" Value="#3A4264" /><Setter Property="BorderThickness" Value="1" /></Style>
+  </Window.Styles>
   <StackPanel Margin="28" Spacing="18">
     <TextBlock Text="Paramètres" FontSize="24" FontWeight="SemiBold" />
     <TextBlock Text="Personnalise le comportement de CuezyBot." Classes="muted" />
