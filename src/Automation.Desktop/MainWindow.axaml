@@ -204,7 +204,7 @@
         <Border Canvas.Left="569" Canvas.Top="439" Width="12" Height="12" CornerRadius="6" Background="#A640F4" />
         <Border Canvas.Left="779" Canvas.Top="439" Width="12" Height="12" CornerRadius="6" Background="#A640F4" />
 
-        <Border Canvas.Left="75" Canvas.Top="175" Width="210" Height="100" Classes="node" BorderBrush="#9B42FF">
+        <Border x:Name="EventNode" Canvas.Left="75" Canvas.Top="175" Width="210" Height="100" Classes="node" BorderBrush="#9B42FF">
           <Grid RowDefinitions="32,*">
             <Border Background="#4A206F" CornerRadius="9,9,0,0" Padding="10,0">
               <Grid ColumnDefinitions="*,Auto">
@@ -221,7 +221,7 @@
           </Grid>
         </Border>
 
-        <Border Canvas.Left="360" Canvas.Top="225" Width="210" Height="105" Classes="node" BorderBrush="#3788F5">
+        <Border x:Name="ConditionNode" Canvas.Left="360" Canvas.Top="225" Width="210" Height="105" Classes="node" BorderBrush="#3788F5">
           <Grid RowDefinitions="32,*">
             <Border Background="#173C73" CornerRadius="9,9,0,0" Padding="10,0">
               <Grid ColumnDefinitions="*,Auto">
@@ -245,7 +245,7 @@
           <TextBlock Text="Non" FontWeight="SemiBold" />
         </Border>
 
-        <Border Canvas.Left="670" Canvas.Top="115" Width="225" Height="110" Classes="node" BorderBrush="#35D57B">
+        <Border x:Name="ObsAlertNode" Canvas.Left="670" Canvas.Top="115" Width="225" Height="110" Classes="node" BorderBrush="#35D57B">
           <Grid RowDefinitions="32,*">
             <Border Background="#145D38" CornerRadius="9,9,0,0" Padding="10,0">
               <Grid ColumnDefinitions="*,Auto">

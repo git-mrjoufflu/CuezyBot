@@ -32,6 +32,13 @@ public sealed partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        foreach (var node in new[] { EventNode, ConditionNode, ObsAlertNode })
+        {
+            node.PointerPressed += OnActionNodePressed;
+            node.PointerMoved += OnActionNodeMoved;
+            node.PointerReleased += OnActionNodeReleased;
+            node.Tag = node == EventNode ? "New follow" : node == ConditionNode ? "Is a subscriber?" : "Show an OBS alert";
+        }
         Opened += OnMainWindowOpened;
     }
 
