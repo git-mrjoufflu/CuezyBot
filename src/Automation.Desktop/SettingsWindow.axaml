@@ -21,7 +21,7 @@
           <TextBlock Text="Langue / Language" FontWeight="SemiBold" />
           <TextBlock Text="Choisis la langue de l’interface." Classes="muted" FontSize="11" />
         </StackPanel>
-        <ComboBox x:Name="LanguageCombo" Grid.Column="1" SelectedIndex="0">
+        <ComboBox x:Name="LanguageCombo" Grid.Column="1" SelectedIndex="0" SelectionChanged="OnLanguageChanged">
           <ComboBoxItem Content="Français" Tag="Français" />
           <ComboBoxItem Content="English" Tag="English" />
         </ComboBox>

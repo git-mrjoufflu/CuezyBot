@@ -15,10 +15,23 @@ internal static class ConnectionPersistence
     private const string ObsPortKey = "obs.port";
     private const string ObsPasswordSecret = "obs.password";
     private const string TwitchTokenSecret = "twitch.token";
+    private const string LanguageKey = "ui.language";
     private static readonly SqliteDatabase Database = new(new AppDataPaths());
     private static readonly IApplicationSettingsStore Settings = new SqliteApplicationSettingsStore(Database);
     private static readonly ISecretStore Secrets = PlatformSecretStore.Create();
     private static bool initialized;
+
+    internal static async Task SaveLanguageAsync(string language, CancellationToken cancellationToken = default)
+    {
+        await EnsureInitializedAsync(cancellationToken);
+        await Settings.SetAsync(LanguageKey, language, cancellationToken);
+    }
+
+    internal static async Task<string?> GetLanguageAsync(CancellationToken cancellationToken = default)
+    {
+        await EnsureInitializedAsync(cancellationToken);
+        return await Settings.GetAsync(LanguageKey, cancellationToken);
+    }
 
     internal static async Task SaveObsAsync(
         string host,

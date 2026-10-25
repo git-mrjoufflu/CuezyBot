@@ -14,10 +14,27 @@ public sealed partial class App : global::Avalonia.Application
         {
             var mainWindow = new MainWindow();
             desktop.MainWindow = mainWindow;
+            _ = RestoreLanguageAsync(mainWindow);
             _ = RestoreConnectionsAsync(mainWindow);
         }
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    private static async Task RestoreLanguageAsync(MainWindow mainWindow)
+    {
+        try
+        {
+            var language = await ConnectionPersistence.GetLanguageAsync();
+            if (language is not null)
+            {
+                mainWindow.ApplyLanguage(language == "English");
+            }
+        }
+        catch
+        {
+            // The default French UI remains available if the local settings store is unavailable.
+        }
     }
 
     private static async Task RestoreConnectionsAsync(MainWindow mainWindow)

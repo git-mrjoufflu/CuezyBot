@@ -24,6 +24,15 @@ public sealed partial class SettingsWindow : Window
 
     private void OnCancelClick(object? sender, RoutedEventArgs e) => Close();
 
+    private async void OnLanguageChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (LanguageCombo.SelectedItem is ComboBoxItem item && item.Tag is string language)
+        {
+            SavedLanguage = language;
+            await ConnectionPersistence.SaveLanguageAsync(language);
+        }
+    }
+
     private async void OnObsClick(object? sender, RoutedEventArgs e)
     {
         if (ObsSessionState.Client?.IsConnected == true)
