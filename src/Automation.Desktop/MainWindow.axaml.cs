@@ -520,9 +520,7 @@ public sealed partial class MainWindow : Window
             var arrow = new Polygon
             {
                 Points = new Points { new Point(0, 0), new Point(14, 7), new Point(0, 14) },
-                Fill = from.BorderBrush,
-                RenderTransformOrigin = new RelativePoint(0.5, 0.5, RelativeUnit.Relative),
-                RenderTransform = new RotateTransform(Math.Atan2((toTop + to.Height / 2) - (fromTop + from.Height / 2), toLeft - (fromLeft + from.Width)) * 180 / Math.PI)
+                Fill = from.BorderBrush
             };
             Canvas.SetLeft(arrow, toLeft - 14);
             Canvas.SetTop(arrow, toTop + to.Height / 2 - 7);
