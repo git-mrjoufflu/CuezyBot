@@ -97,7 +97,7 @@ public sealed partial class HistoryWindow : Window
             english ? $"Execution: {entry.Id:D}" : $"Exécution : {entry.Id:D}",
             english ? $"EventSub message: {entry.ProviderEventId}" : $"Message EventSub : {entry.ProviderEventId}",
             entry.Steps.Select(step => new StepRow(
-                step.Message,
+                TranslateStepMessage(step.Message, english),
                 FormatDuration(step.CompletedAt - step.StartedAt))).ToArray(),
             entry.Error ?? string.Empty,
             !string.IsNullOrWhiteSpace(entry.Error));
@@ -106,6 +106,27 @@ public sealed partial class HistoryWindow : Window
     private static string FormatDuration(TimeSpan duration) => duration.TotalSeconds >= 1
         ? $"{duration.TotalSeconds:0.00} s"
         : $"{duration.TotalMilliseconds:0} ms";
+
+    private static string TranslateStepMessage(string message, bool english)
+    {
+        if (!english)
+        {
+            return message;
+        }
+
+        if (message.StartsWith("Compteur followersTraites", StringComparison.OrdinalIgnoreCase))
+        {
+            return message.Replace("Compteur followersTraites", "Followers processed counter", StringComparison.OrdinalIgnoreCase);
+        }
+
+        if (message.StartsWith("Scène OBS", StringComparison.OrdinalIgnoreCase))
+        {
+            return message.Replace("Scène OBS", "OBS scene", StringComparison.OrdinalIgnoreCase)
+                .Replace("sélectionnée", "selected", StringComparison.OrdinalIgnoreCase);
+        }
+
+        return message;
+    }
 
     private static string ToStatus(ExecutionStatus status, bool english) => status switch
     {
