@@ -98,7 +98,7 @@ public sealed partial class MainWindow : Window
 
     private void OnWorkflowSelected(object? sender, SelectionChangedEventArgs eventArgs)
     {
-        if (WorkflowSelector.SelectedItem is string name)
+        if (WorkflowSelector is not null && WorkflowSelector.SelectedItem is string name)
             TestStatus.Text = _english ? $"Editing: {name}" : $"Édition : {name}";
     }
 
