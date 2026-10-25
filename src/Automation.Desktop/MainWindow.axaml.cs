@@ -1137,6 +1137,12 @@ public sealed partial class MainWindow : Window
         return ("#4A206F", "#A640F4", "#6F35BE", "#D39AFF");
     }
 
+    private void RestoreNodeBorder(Border node)
+    {
+        var isTrigger = node == _triggerNode || (node.Tag as string)?.StartsWith("__trigger__:", StringComparison.Ordinal) == true;
+        node.BorderBrush = new SolidColorBrush(Color.Parse(isTrigger ? "#26C281" : GetActionPalette(node.Tag as string ?? "").Border));
+    }
+
     private void DeleteActionNode(Border node)
     {
         if (node.Tag is not string label) return;
@@ -1160,7 +1166,7 @@ public sealed partial class MainWindow : Window
         var point = eventArgs.GetCurrentPoint(node);
         if (point.Properties.PointerUpdateKind == PointerUpdateKind.RightButtonPressed)
         {
-            if (_selectedNode is not null) _selectedNode.BorderBrush = new SolidColorBrush(Color.Parse(GetActionPalette(_selectedNode.Tag as string ?? "").Border));
+            if (_selectedNode is not null) RestoreNodeBorder(_selectedNode);
             _selectedNode = node;
             node.BorderBrush = new SolidColorBrush(Color.Parse("#FFD166"));
             node.Focus();
@@ -1291,7 +1297,7 @@ public sealed partial class MainWindow : Window
             {
                 if (_selectedNode is null || _selectedNode == node)
                 {
-                    if (_selectedNode is not null) _selectedNode.BorderBrush = new SolidColorBrush(Color.Parse(GetActionPalette(_selectedNode.Tag as string ?? "").Border));
+                    if (_selectedNode is not null) RestoreNodeBorder(_selectedNode);
                     _selectedNode = node;
                     node.BorderBrush = new SolidColorBrush(Color.Parse("#FFD166"));
                     TestStatus.Text = _english ? "Source selected — click a destination" : "Source sélectionnée — clique une destination";
@@ -1332,7 +1338,7 @@ public sealed partial class MainWindow : Window
                             sourceOptions["branches"] = branches = new System.Text.Json.Nodes.JsonObject();
                         branches[targetKey] = sourceOptions["linkOutput"]?.ToString() ?? "yes";
                     }
-                    _selectedNode.BorderBrush = new SolidColorBrush(Color.Parse(GetActionPalette(_selectedNode.Tag as string ?? "").Border));
+                    RestoreNodeBorder(_selectedNode);
                     _selectedNode = null;
                     TestStatus.Text = _english ? "Link created" : "Lien créé";
                     UpdateDynamicLinks();
