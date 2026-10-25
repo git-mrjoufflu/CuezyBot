@@ -67,27 +67,17 @@
     <Style Selector="Button.sectionHeader:pointerover">
       <Setter Property="Background" Value="#1D2340" />
     </Style>
-    <Style Selector="Button.profileSettings">
+    <Style Selector="Border.profileSettings">
       <Setter Property="Background" Value="Transparent" />
       <Setter Property="BorderBrush" Value="Transparent" />
-      <Setter Property="Foreground" Value="#C9B4FF" />
-      <Setter Property="FontSize" Value="18" />
-      <Setter Property="Padding" Value="2" />
       <Setter Property="Width" Value="30" />
       <Setter Property="Height" Value="30" />
       <Setter Property="MinWidth" Value="30" />
       <Setter Property="MinHeight" Value="30" />
-      <Setter Property="HorizontalContentAlignment" Value="Center" />
-      <Setter Property="VerticalContentAlignment" Value="Center" />
     </Style>
-    <Style Selector="Button.profileSettings:pointerover">
+    <Style Selector="Border.profileSettings:pointerover">
       <Setter Property="Background" Value="#29234A" />
       <Setter Property="BorderBrush" Value="#604B91" />
-      <Setter Property="Width" Value="30" />
-      <Setter Property="Height" Value="30" />
-      <Setter Property="MinWidth" Value="30" />
-      <Setter Property="MinHeight" Value="30" />
-      <Setter Property="FontSize" Value="18" />
     </Style>
     <Style Selector="Border.productSection">
       <Setter Property="Background" Value="#10162B" />
@@ -167,7 +157,9 @@
                 <TextBlock x:Name="CreatorTitle" Text="Créateur" FontWeight="SemiBold" FontSize="13" />
                 <TextBlock x:Name="CreatorSubtitle" Text="Espace local  ·  Privé" Classes="muted" FontSize="10" />
               </StackPanel>
-              <Button Grid.Column="2" Classes="profileSettings" Content="⚙" Click="OnSettingsClick" ToolTip.Tip="Paramètres" />
+              <Border Grid.Column="2" Classes="profileSettings" PointerPressed="OnSettingsPointerPressed" ToolTip.Tip="Paramètres">
+                <TextBlock Text="⚙" Foreground="#C9B4FF" FontSize="18" HorizontalAlignment="Center" VerticalAlignment="Center" />
+              </Border>
             </Grid>
           </StackPanel>
         </Border>

@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.VisualTree;
 using Avalonia.Media.Imaging;
@@ -84,6 +85,9 @@ public sealed partial class MainWindow : Window
             ApplyLanguage(language == "English");
         }
     }
+
+    private void OnSettingsPointerPressed(object? sender, PointerPressedEventArgs eventArgs) =>
+        OnSettingsClick(sender, new RoutedEventArgs());
 
     private void OnTwitchSectionClick(object? sender, RoutedEventArgs eventArgs) =>
         ToggleSection(TwitchActions, TwitchSectionChevron);
