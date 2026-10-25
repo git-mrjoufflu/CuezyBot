@@ -25,6 +25,7 @@ public sealed partial class MainWindow : Window
     private Border? _draggedNode;
     private Border? _selectedNode;
     private readonly List<Border> _dynamicNodes = new();
+    private Border? _triggerNode;
     private readonly Dictionary<Border, Func<Task>> _obsCardRefresh = new();
     private readonly List<Avalonia.Controls.Shapes.Path> _dynamicLinks = new();
     private readonly List<(Border From, Border To)> _manualLinks = new();
@@ -124,6 +125,7 @@ public sealed partial class MainWindow : Window
             }
             if (await PrototypeServices.HasPrototypeDraftAsync())
             {
+                AddTriggerNode();
                 foreach (var action in await PrototypeServices.GetDraftActionLabelsAsync())
                 {
                     _selectedActions.Add(action);
@@ -240,6 +242,7 @@ public sealed partial class MainWindow : Window
         if (_switchingWorkflow || WorkflowTriggerSelector is null || WorkflowTriggerSelector.SelectedIndex < 0 || TestStatus is null) return;
         PrototypeServices.CurrentTriggerType = WorkflowTriggerSelector.SelectedIndex == 0 ? "manual.run" : "twitch.follow.received";
         _workflowTriggerKinds[PrototypeServices.CurrentWorkflowId] = PrototypeServices.CurrentTriggerType;
+        UpdateTriggerNode();
         TestStatus.Text = _english ? "Trigger changed — save and publish to apply" : "Déclencheur modifié — enregistre et publie pour appliquer";
     }
 
@@ -345,6 +348,7 @@ public sealed partial class MainWindow : Window
         _addedActionCount = 0;
         _linkMap.Clear();
         _selectedNode = null;
+        AddTriggerNode();
         _undoActions.Clear();
         _redoActions.Clear();
         UpdateHistoryButtons();
@@ -520,6 +524,7 @@ public sealed partial class MainWindow : Window
                 if (trigger is not ("manual.run" or "twitch.follow.received")) return;
                 PrototypeServices.CurrentTriggerType = trigger;
                 _workflowTriggerKinds[PrototypeServices.CurrentWorkflowId] = trigger;
+                UpdateTriggerNode();
                 _switchingWorkflow = true;
                 WorkflowTriggerSelector.SelectedIndex = trigger == "manual.run" ? 0 : 1;
                 _switchingWorkflow = false;
@@ -576,6 +581,7 @@ public sealed partial class MainWindow : Window
         foreach (var child in WorkflowCanvas.Children.OfType<Border>().Where(border => border.Classes.Contains("dynamicAction")).ToArray())
             WorkflowCanvas.Children.Remove(child);
         _addedActionCount = 0;
+        AddTriggerNode();
         foreach (var action in _selectedActions) AddActionNode(action);
         foreach (var node in _dynamicNodes)
             if (positions.TryGetValue((string)node.Tag!, out var position))
@@ -635,6 +641,35 @@ public sealed partial class MainWindow : Window
             .Where(link => link.From.Tag is string && link.To.Tag is string)
             .Select(link => ((string)link.From.Tag!, (string)link.To.Tag!))
             .ToArray();
+
+    private void AddTriggerNode()
+    {
+        if (_triggerNode is not null) { UpdateTriggerNode(); return; }
+        _triggerNode = new Border
+        {
+            Width = 210, Height = 100, Background = new SolidColorBrush(Color.Parse("#151A32")),
+            BorderBrush = new SolidColorBrush(Color.Parse("#A640F4")), BorderThickness = new Thickness(2),
+            CornerRadius = new CornerRadius(11), Padding = new Thickness(12), IsHitTestVisible = false,
+            Child = new StackPanel { Spacing = 10, Children =
+            {
+                new TextBlock { Text = "⚡  Événement", Foreground = new SolidColorBrush(Color.Parse("#D39AFF")), FontSize = 11 },
+                new TextBlock { Name = "TriggerTitle", FontWeight = FontWeight.SemiBold, FontSize = 15 }
+            }}
+        };
+        Canvas.SetLeft(_triggerNode, 60); Canvas.SetTop(_triggerNode, 80);
+        WorkflowCanvas.Children.Add(_triggerNode);
+        UpdateTriggerNode();
+    }
+
+    private void UpdateTriggerNode()
+    {
+        if (_triggerNode is null) return;
+        var title = _workflowTriggerKinds.GetValueOrDefault(PrototypeServices.CurrentWorkflowId, PrototypeServices.CurrentTriggerType) == "twitch.follow.received"
+            ? (_english ? "New Twitch follower" : "Nouveau follower Twitch")
+            : (_english ? "Manual run" : "Exécution manuelle");
+        if (_triggerNode.Child is StackPanel panel && panel.Children.OfType<TextBlock>().LastOrDefault() is { } text)
+            text.Text = title;
+    }
 
     private void AddActionNode(string label)
     {
