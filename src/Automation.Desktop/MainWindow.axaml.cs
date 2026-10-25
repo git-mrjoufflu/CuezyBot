@@ -1276,10 +1276,20 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private void OnWorkflowLinkPressed(object? sender, PointerPressedEventArgs eventArgs)
+    private async void OnWorkflowLinkPressed(object? sender, PointerPressedEventArgs eventArgs)
     {
         if (sender is not Avalonia.Controls.Shapes.Path line || !_linkMap.TryGetValue(line, out var link)) return;
         if (eventArgs.GetCurrentPoint(line).Properties.PointerUpdateKind != PointerUpdateKind.RightButtonPressed) return;
+        var dialog = new Window { Title = _english ? "Delete link" : "Supprimer le lien", Width = 380, Height = 170, CanResize = false, WindowStartupLocation = WindowStartupLocation.CenterOwner };
+        var cancel = new Button { Content = _english ? "Cancel" : "Annuler" };
+        var remove = new Button { Content = _english ? "Delete" : "Supprimer", Classes = { "danger" } };
+        cancel.Click += (_, _) => dialog.Close(false); remove.Click += (_, _) => dialog.Close(true);
+        dialog.Content = new StackPanel { Margin = new Thickness(20), Spacing = 14, Children = {
+            new TextBlock { Text = _english ? "Do you really want to remove this link?" : "Veux-tu vraiment supprimer ce lien?", TextWrapping = TextWrapping.Wrap },
+            new StackPanel { Orientation = Avalonia.Layout.Orientation.Horizontal, HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right, Spacing = 8, Children = { cancel, remove } }
+        }};
+        var confirmed = await dialog.ShowDialog<bool>(this);
+        if (!confirmed) { TestStatus.Text = _english ? "Link kept" : "Lien conservé"; return; }
         TestStatus.Text = _english ? "Removing link…" : "Suppression du lien…";
         RememberCanvas();
         _manualLinks.Remove(link);
