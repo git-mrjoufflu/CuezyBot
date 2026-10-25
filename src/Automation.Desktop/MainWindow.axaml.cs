@@ -5,6 +5,8 @@ using Avalonia.Media;
 using Avalonia.VisualTree;
 using Avalonia.Media.Imaging;
 using System.Net.Http;
+using Avalonia.Threading;
+using System.IO;
 
 namespace Automation.Desktop;
 
@@ -109,11 +111,15 @@ public sealed partial class MainWindow : Window
         try
         {
             using var client = new HttpClient();
-            await using var stream = await client.GetStreamAsync(imageUrl);
+            var bytes = await client.GetByteArrayAsync(imageUrl);
+            await using var stream = new MemoryStream(bytes);
             var bitmap = new Bitmap(stream);
-            CreatorImage.Source = bitmap;
-            CreatorImage.IsVisible = true;
-            CreatorAvatar.IsVisible = false;
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                CreatorImage.Source = bitmap;
+                CreatorImage.IsVisible = true;
+                CreatorAvatar.IsVisible = false;
+            });
         }
         catch
         {
