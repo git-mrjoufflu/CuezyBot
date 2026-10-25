@@ -29,7 +29,7 @@ public sealed partial class MainWindow : Window
             ? TwitchSessionState.Identity.Login
             : "Créateur";
         CreatorSubtitle.Text = twitchConnected && TwitchSessionState.Identity is not null
-            ? $"@{TwitchSessionState.Identity.Login}  ·  Twitch"
+            ? "Twitch"
             : "Espace local  ·  Privé";
 
         var connected = (obsConnected ? 1 : 0) + (twitchConnected ? 1 : 0);
