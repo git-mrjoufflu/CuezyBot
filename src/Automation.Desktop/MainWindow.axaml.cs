@@ -58,7 +58,9 @@ public sealed partial class MainWindow : Window
             ? (twitchConnected ? "Connected" : "Disconnected")
             : (twitchConnected ? "Connecté" : "Non connecté");
         IntegrationTwitchTooltipStatus.Foreground = new SolidColorBrush(Color.Parse(twitchConnected ? "#72F0AA" : "#FFD081"));
-        IntegrationCountStatus.Text = $"{connected}/2 intégrations connectées";
+        IntegrationCountStatus.Text = _english
+            ? $"{connected}/2 integrations connected"
+            : $"{connected}/2 intégrations connectées";
         IntegrationStatusDot.Background = new SolidColorBrush(Color.Parse(connected switch
         {
             2 => "#53D994",
