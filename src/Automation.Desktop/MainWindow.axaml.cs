@@ -552,8 +552,53 @@ public sealed partial class MainWindow : Window
         if (!PrototypeServices.ActionOptions.TryGetValue(label, out var options))
             PrototypeServices.ActionOptions[label] = options = new System.Text.Json.Nodes.JsonObject();
         var form = new StackPanel { Spacing = 6, Margin = new Thickness(12, 0, 12, 10) };
+        ComboBox? sourcePicker = null;
+        async Task LoadChoices(ComboBox picker, string key)
+        {
+            try
+            {
+                var client = ObsSessionState.Client;
+                if (client?.IsConnected != true)
+                {
+                    ToolTip.SetTip(picker, _english ? "Connect OBS in Settings" : "Connecte OBS dans les paramètres");
+                    return;
+                }
+                var scene = options["scene"]?.ToString();
+                if (key == "source" && string.IsNullOrWhiteSpace(scene)) return;
+                var values = key == "scene" ? await client.GetSceneNamesAsync() : await client.GetSourceNamesAsync(scene!);
+                if (key == "source" && options["scene"]?.ToString() != scene) return;
+                var saved = options[key]?.ToString();
+                picker.ItemsSource = values;
+                picker.SelectedItem = values.Contains(saved) ? saved : null;
+            }
+            catch (Exception exception)
+            {
+                ToolTip.SetTip(picker, (_english ? "OBS list unavailable: " : "Liste OBS indisponible : ") + exception.Message);
+            }
+        }
         foreach (var (key, fr, en) in fields)
         {
+            if (key is "scene" or "source")
+            {
+                var picker = new ComboBox { PlaceholderText = _english ? en : fr, HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch, FontSize = 12 };
+                if (key == "source") sourcePicker = picker;
+                picker.SelectionChanged += (_, _) =>
+                {
+                    if (picker.SelectedItem is not string selected) return;
+                    var changed = options[key]?.ToString() != selected;
+                    options[key] = selected;
+                    if (key == "scene" && changed && sourcePicker is not null)
+                    {
+                        options.Remove("source");
+                        sourcePicker.ItemsSource = Array.Empty<string>();
+                        _ = LoadChoices(sourcePicker, "source");
+                    }
+                };
+                picker.DropDownOpened += (_, _) => { _ = LoadChoices(picker, key); };
+                form.Children.Add(picker);
+                _ = LoadChoices(picker, key);
+                continue;
+            }
             var input = new TextBox
             {
                 PlaceholderText = _english ? en : fr,
