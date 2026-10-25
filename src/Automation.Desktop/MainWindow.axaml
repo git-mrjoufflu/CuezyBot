@@ -108,8 +108,9 @@
         </StackPanel>
 
         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-          <TextBlock Text="Mon Live Automatisation" FontWeight="SemiBold" FontSize="15" />
-          <TextBlock Text="✎" Classes="muted" VerticalAlignment="Center" />
+          <ComboBox x:Name="WorkflowSelector" Width="210" SelectedIndex="0" SelectionChanged="OnWorkflowSelected">
+          </ComboBox>
+          <Button Classes="surface" Content="＋" ToolTip.Tip="Nouvelle automatisation" Click="OnNewWorkflowClick" Padding="8,5" />
         </StackPanel>
 
         <Border Grid.Column="2" />

@@ -25,6 +25,7 @@ public sealed partial class MainWindow : Window
     private readonly List<Line> _dynamicLinks = new();
     private readonly List<(Border From, Border To)> _manualLinks = new();
     private readonly Dictionary<Line, (Border From, Border To)> _linkMap = new();
+    private readonly List<string> _workflowNames = new() { "Mon Live Automatisation" };
     private Point _dragPointerStart;
     private double _dragNodeLeft;
     private double _dragNodeTop;
@@ -32,6 +33,7 @@ public sealed partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        WorkflowSelector.ItemsSource = _workflowNames.ToArray();
         foreach (var node in new[] { EventNode, ConditionNode, ObsAlertNode })
         {
             node.PointerPressed += OnActionNodePressed;
@@ -82,6 +84,35 @@ public sealed partial class MainWindow : Window
         {
             ApplyLanguage(false);
         }
+    }
+
+    private void OnNewWorkflowClick(object? sender, RoutedEventArgs eventArgs)
+    {
+        var name = _english ? $"New automation {_workflowNames.Count + 1}" : $"Nouvelle automatisation {_workflowNames.Count + 1}";
+        _workflowNames.Add(name);
+        WorkflowSelector.ItemsSource = _workflowNames.ToArray();
+        WorkflowSelector.SelectedIndex = _workflowNames.Count - 1;
+        ClearWorkflowCanvas();
+        TestStatus.Text = _english ? "New automation created" : "Nouvelle automatisation créée";
+    }
+
+    private void OnWorkflowSelected(object? sender, SelectionChangedEventArgs eventArgs)
+    {
+        if (WorkflowSelector.SelectedItem is string name)
+            TestStatus.Text = _english ? $"Editing: {name}" : $"Édition : {name}";
+    }
+
+    private void ClearWorkflowCanvas()
+    {
+        _selectedActions.Clear();
+        _manualLinks.Clear();
+        _dynamicNodes.Clear();
+        foreach (var link in _dynamicLinks) WorkflowCanvas.Children.Remove(link);
+        _dynamicLinks.Clear();
+        foreach (var node in WorkflowCanvas.Children.OfType<Border>().Where(border => border.Classes.Contains("dynamicAction")).ToArray())
+            WorkflowCanvas.Children.Remove(node);
+        _addedActionCount = 0;
+        UpdateHistoryButtons();
     }
 
     private async void OnTestClick(object? sender, RoutedEventArgs eventArgs)
