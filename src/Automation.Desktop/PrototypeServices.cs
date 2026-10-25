@@ -55,10 +55,10 @@ internal static class PrototypeServices
         return await service.ProcessAsync(eventEnvelope, cancellationToken);
     }
 
-    internal static async Task SavePrototypeDraftAsync(IReadOnlyCollection<string>? selectedActions = null, CancellationToken cancellationToken = default)
+    internal static async Task SavePrototypeDraftAsync(IReadOnlyCollection<string>? selectedActions = null, IReadOnlyCollection<(string From, string To)>? manualLinks = null, CancellationToken cancellationToken = default)
     {
         await EnsureInitializedAsync(cancellationToken);
-        var workflow = CreatePrototypeWorkflow(selectedActions);
+        var workflow = CreatePrototypeWorkflow(selectedActions, manualLinks);
         EnsureValid(workflow);
         await new SqliteWorkflowRepository(Database).SaveDraftAsync(workflow, cancellationToken);
     }
@@ -96,18 +96,18 @@ internal static class PrototypeServices
         await new SqliteWorkflowRepository(Database).SetEnabledAsync(PrototypeWorkflowIds.WorkflowId, false, cancellationToken);
     }
 
-    internal static async Task PublishPrototypeAsync(IReadOnlyCollection<string>? selectedActions = null, CancellationToken cancellationToken = default)
+    internal static async Task PublishPrototypeAsync(IReadOnlyCollection<string>? selectedActions = null, IReadOnlyCollection<(string From, string To)>? manualLinks = null, CancellationToken cancellationToken = default)
     {
         await EnsureInitializedAsync(cancellationToken);
         var repository = new SqliteWorkflowRepository(Database);
         var previous = await repository.GetPublishedAsync(PrototypeWorkflowIds.WorkflowId, cancellationToken);
         var revision = (previous?.Revision ?? 0) + 1;
-        var workflow = CreatePrototypeWorkflow(selectedActions) with { Enabled = true, Revision = revision };
+        var workflow = CreatePrototypeWorkflow(selectedActions, manualLinks) with { Enabled = true, Revision = revision };
         EnsureValid(workflow);
         await repository.PublishAsync(workflow, cancellationToken);
     }
 
-    private static WorkflowDefinition CreatePrototypeWorkflow(IReadOnlyCollection<string>? selectedActions) 
+    private static WorkflowDefinition CreatePrototypeWorkflow(IReadOnlyCollection<string>? selectedActions, IReadOnlyCollection<(string From, string To)>? manualLinks) 
     {
         var blocks = new List<WorkflowBlock>
         {
@@ -121,12 +121,21 @@ internal static class PrototypeServices
             new(PrototypeWorkflowIds.CounterBlockId, "next", PrototypeWorkflowIds.ObsBlockId)
         };
         var previous = PrototypeWorkflowIds.ObsBlockId;
+        var actionIds = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
         foreach (var label in selectedActions ?? Array.Empty<string>())
         {
             var id = Guid.NewGuid();
+            actionIds[label] = id;
             blocks.Add(new WorkflowBlock(id, ActionTypeFor(label), 1, new JsonObject { ["label"] = label }));
             connections.Add(new WorkflowConnection(previous, "next", id));
             previous = id;
+        }
+
+        foreach (var (from, to) in manualLinks ?? Array.Empty<(string From, string To)>())
+        {
+            if (actionIds.TryGetValue(from, out var fromId) && actionIds.TryGetValue(to, out var toId) &&
+                !connections.Any(connection => connection.FromBlockId == fromId && connection.ToBlockId == toId))
+                connections.Add(new WorkflowConnection(fromId, "next", toId));
         }
 
         return new WorkflowDefinition(

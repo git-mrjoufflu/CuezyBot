@@ -82,7 +82,7 @@ public sealed partial class MainWindow : Window
     {
         try
         {
-            await PrototypeServices.SavePrototypeDraftAsync(_selectedActions);
+            await PrototypeServices.SavePrototypeDraftAsync(_selectedActions, GetManualLinkLabels());
             TestStatus.Text = _english ? "Draft saved" : "Brouillon enregistré";
         }
         catch (Exception exception)
@@ -104,7 +104,7 @@ public sealed partial class MainWindow : Window
                     TestStatus.Text = _english ? "Save the draft before starting." : "Enregistre le brouillon avant de démarrer.";
                     return;
                 }
-                await PrototypeServices.PublishPrototypeAsync(_selectedActions);
+                await PrototypeServices.PublishPrototypeAsync(_selectedActions, GetManualLinkLabels());
             }
             catch (Exception exception)
             {
@@ -186,6 +186,12 @@ public sealed partial class MainWindow : Window
         UndoButton.IsEnabled = _undoActions.Count > 0;
         RedoButton.IsEnabled = _redoActions.Count > 0;
     }
+
+    private IReadOnlyCollection<(string From, string To)> GetManualLinkLabels() =>
+        _manualLinks
+            .Where(link => link.From.Tag is string && link.To.Tag is string)
+            .Select(link => ((string)link.From.Tag!, (string)link.To.Tag!))
+            .ToArray();
 
     private void AddActionNode(string label)
     {
