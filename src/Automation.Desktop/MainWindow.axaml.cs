@@ -756,7 +756,7 @@ public sealed partial class MainWindow : Window
         if (_triggerNode is null) return;
         if (_triggerNode.GetVisualDescendants().OfType<ComboBox>().FirstOrDefault() is { } picker)
         {
-            if (_triggerNode.GetVisualDescendants().OfType<TextBlock>().FirstOrDefault() is { } header) header.Text = _english ? "⚡  Event" : "⚡  Événement";
+            if (_triggerNode.GetVisualDescendants().OfType<TextBlock>().FirstOrDefault() is { } header) header.Text = _workflowTriggerKinds.GetValueOrDefault(PrototypeServices.CurrentWorkflowId, PrototypeServices.CurrentTriggerType) == "twitch.follow.received" ? (_english ? "⚡  New Twitch follower" : "⚡  Nouveau follower Twitch") : (_english ? "⚡  Manual run" : "⚡  Exécution manuelle");
             var selected = picker.SelectedIndex;
             picker.ItemsSource = _english ? new[] { "Manual run", "New Twitch follower" } : new[] { "Exécution manuelle", "Nouveau follower Twitch" };
             picker.SelectedIndex = selected;
@@ -775,7 +775,7 @@ public sealed partial class MainWindow : Window
             RowDefinitions = new RowDefinitions("32,*"),
             Children =
             {
-                new Border { Background = new SolidColorBrush(Color.Parse("#145A43")), CornerRadius = new CornerRadius(9,9,0,0), Padding = new Thickness(10,0), Child = new TextBlock { Text = _english ? "⚡  Event" : "⚡  Événement", Foreground = new SolidColorBrush(Color.Parse("#62E6AE")), FontSize = 11, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center } },
+                new Border { Background = new SolidColorBrush(Color.Parse("#145A43")), CornerRadius = new CornerRadius(9,9,0,0), Padding = new Thickness(10,0), Child = new TextBlock { Text = _english ? $"⚡  {title}" : $"⚡  {title}", Foreground = new SolidColorBrush(Color.Parse("#62E6AE")), FontSize = 11, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center } },
                 new StackPanel { [Grid.RowProperty] = 1, Orientation = Avalonia.Layout.Orientation.Horizontal, Spacing = 10, Margin = new Thickness(12,0), VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center, Children = { new Border { Width = 32, Height = 32, CornerRadius = new CornerRadius(8), Background = new SolidColorBrush(Color.Parse("#20865F")), Child = new TextBlock { Text = "⚡", HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center } }, new TextBlock { Text = title, FontWeight = FontWeight.SemiBold, FontSize = 14 } } }
             }
         };
@@ -826,7 +826,7 @@ public sealed partial class MainWindow : Window
             {
                 Children =
                 {
-                            new TextBlock { Text = "◆  Action", Foreground = new SolidColorBrush(Color.Parse(palette.Text)), FontSize = 11, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center },
+                            new TextBlock { Text = _english ? title.English : title.French, Foreground = new SolidColorBrush(Color.Parse(palette.Text)), FontSize = 11, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center },
                     deleteButton
                 }
             }
@@ -1514,8 +1514,9 @@ public sealed partial class MainWindow : Window
         foreach (var node in _additionalTriggerNodes)
             if (node.GetVisualDescendants().OfType<TextBlock>().ToArray() is var labels && labels.Length > 1)
             {
-                if (labels[0] is { } header) header.Text = english ? "⚡  Event" : "⚡  Événement";
-                if (labels[1] is { } title) title.Text = (node.Tag as string)?.EndsWith("twitch.follow.received", StringComparison.Ordinal) == true ? (english ? "New Twitch follower" : "Nouveau follower Twitch") : (english ? "Manual run" : "Exécution manuelle");
+                var eventTitle = (node.Tag as string)?.EndsWith("twitch.follow.received", StringComparison.Ordinal) == true ? (english ? "New Twitch follower" : "Nouveau follower Twitch") : (english ? "Manual run" : "Exécution manuelle");
+                if (labels[0] is { } header) header.Text = $"⚡  {eventTitle}";
+                if (labels[1] is { } title) title.Text = eventTitle;
             }
         var triggerIndex = WorkflowTriggerSelector.SelectedIndex;
         var switching = _switchingWorkflow;
@@ -1646,6 +1647,12 @@ public sealed partial class MainWindow : Window
                 button.Content = TranslateText(text, translations);
             }
         }
+        foreach (var node in _dynamicNodes)
+            if (node.Tag is string key && node.GetVisualDescendants().OfType<TextBlock>().FirstOrDefault() is { } header)
+            {
+                var actionTitle = LocalizedActionTitle(key);
+                header.Text = _english ? actionTitle.English : actionTitle.French;
+            }
     }
 
     private static string TranslateText(string text, IReadOnlyDictionary<string, string> translations)
