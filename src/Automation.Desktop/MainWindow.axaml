@@ -404,8 +404,7 @@
           </Border>
         </StackPanel>
 
-        <TextBlock Grid.Column="1" Text="Données enregistrées localement" Classes="muted" FontSize="11"
-                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+        <Border Grid.Column="1" />
 
         <StackPanel x:Name="IntegrationStatusArea" Grid.Column="2" Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
           <ToolTip.Tip>
@@ -424,7 +423,6 @@
               </StackPanel>
             </Border>
           </ToolTip.Tip>
-          <TextBlock Text="Intégrations" Classes="muted" FontSize="11" />
           <Border x:Name="IntegrationStatusDot" Width="8" Height="8" CornerRadius="4" Background="#7C849F" />
           <TextBlock x:Name="IntegrationCountStatus" Text="0/2 intégrations connectées" Classes="muted" FontSize="11" />
         </StackPanel>
