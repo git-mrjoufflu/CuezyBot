@@ -137,8 +137,8 @@ public sealed partial class MainWindow : Window
                 }
                 foreach (var (from, to) in await PrototypeServices.GetDraftManualLinksAsync())
                 {
-                    var source = _dynamicNodes.FirstOrDefault(node => string.Equals(node.Tag as string, from, StringComparison.OrdinalIgnoreCase));
-                    var target = _dynamicNodes.FirstOrDefault(node => string.Equals(node.Tag as string, to, StringComparison.OrdinalIgnoreCase));
+                    var source = FindCanvasNode(from);
+                    var target = FindCanvasNode(to);
                     if (source is not null && target is not null && !_manualLinks.Contains((source, target)))
                         _manualLinks.Add((source, target));
                 }
@@ -221,8 +221,8 @@ public sealed partial class MainWindow : Window
                 if (_workflowLinks.TryGetValue(name, out var savedLinks))
                     foreach (var (from, to) in savedLinks)
                     {
-                        var source = _dynamicNodes.FirstOrDefault(node => Equals(node.Tag, from));
-                        var target = _dynamicNodes.FirstOrDefault(node => Equals(node.Tag, to));
+                        var source = FindCanvasNode(from);
+                        var target = FindCanvasNode(to);
                         if (source is not null && target is not null) _manualLinks.Add((source, target));
                     }
                 UpdateDynamicLinks();
@@ -658,8 +658,8 @@ public sealed partial class MainWindow : Window
             }
         foreach (var (from, to) in savedLinks)
         {
-            var source = _dynamicNodes.FirstOrDefault(node => Equals(node.Tag, from));
-            var target = _dynamicNodes.FirstOrDefault(node => Equals(node.Tag, to));
+            var source = FindCanvasNode(from);
+            var target = FindCanvasNode(to);
             if (source is not null && target is not null) _manualLinks.Add((source, target));
         }
         UpdateDynamicLinks();
@@ -690,8 +690,8 @@ public sealed partial class MainWindow : Window
             { Canvas.SetLeft(node, point.X); Canvas.SetTop(node, point.Y); }
         foreach (var (from, to) in snapshot.Links)
         {
-            var source = _dynamicNodes.FirstOrDefault(node => Equals(node.Tag, from));
-            var target = _dynamicNodes.FirstOrDefault(node => Equals(node.Tag, to));
+            var source = FindCanvasNode(from);
+            var target = FindCanvasNode(to);
             if (source is not null && target is not null) _manualLinks.Add((source, target));
         }
         UpdateDynamicLinks();
@@ -708,6 +708,13 @@ public sealed partial class MainWindow : Window
             .Where(link => link.From.Tag is string && link.To.Tag is string)
             .Select(link => ((string)link.From.Tag!, (string)link.To.Tag!))
             .ToArray();
+
+    private Border? FindCanvasNode(string label)
+    {
+        if (string.Equals(label, "__trigger__", StringComparison.Ordinal)) return _triggerNode;
+        return _additionalTriggerNodes.FirstOrDefault(node => Equals(node.Tag, label))
+            ?? _dynamicNodes.FirstOrDefault(node => Equals(node.Tag, label));
+    }
 
     private void AddTriggerNode()
     {
