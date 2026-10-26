@@ -712,14 +712,7 @@ public sealed partial class MainWindow : Window
     private void AddTriggerNode()
     {
         if (_triggerNode is not null) { UpdateTriggerNode(); return; }
-        var triggerPicker = new ComboBox
-        {
-            ItemsSource = _english ? new[] { "Manual run", "New Twitch follower" } : new[] { "Exécution manuelle", "Nouveau follower Twitch" },
-            SelectedIndex = PrototypeServices.CurrentTriggerType == "twitch.follow.received" ? 1 : 0,
-            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch,
-            FontSize = 12,
-            Tag = "triggerPicker"
-        };
+        var triggerTitle = new TextBlock { FontWeight = FontWeight.SemiBold, FontSize = 14 };
         _triggerNode = new Border
         {
             Width = 230, Height = 112, Background = new SolidColorBrush(Color.Parse("#151A32")),
@@ -728,24 +721,13 @@ public sealed partial class MainWindow : Window
             Child = new Grid { RowDefinitions = new RowDefinitions("32,*"), Children =
             {
                 new Border { Background = new SolidColorBrush(Color.Parse("#145A43")), CornerRadius = new CornerRadius(9,9,0,0), Padding = new Thickness(10,0), Child = new TextBlock { Text = "⚡  Événement", Foreground = new SolidColorBrush(Color.Parse("#62E6AE")), FontSize = 11, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center } },
-                new StackPanel { [Grid.RowProperty] = 1, Spacing = 7, Margin = new Thickness(12,8), Children = { triggerPicker } }
+                new StackPanel { [Grid.RowProperty] = 1, Spacing = 7, Margin = new Thickness(12,8), Children = { triggerTitle } }
             }}
         };
         _triggerNode.Tag = "__trigger__";
         _triggerNode.PointerPressed += OnActionNodePressed;
         _triggerNode.PointerReleased += OnActionNodeReleased;
         _triggerNode.IsHitTestVisible = true;
-        triggerPicker.SelectionChanged += (_, _) =>
-        {
-            if (triggerPicker.SelectedIndex < 0) return;
-            var trigger = triggerPicker.SelectedIndex == 1 ? "twitch.follow.received" : "manual.run";
-            PrototypeServices.CurrentTriggerType = trigger;
-            _workflowTriggerKinds[PrototypeServices.CurrentWorkflowId] = trigger;
-            var switching = _switchingWorkflow; _switchingWorkflow = true;
-            WorkflowTriggerSelector.SelectedIndex = triggerPicker.SelectedIndex;
-            _switchingWorkflow = switching;
-            TestStatus.Text = _english ? "Trigger changed — save and publish to apply" : "Déclencheur modifié — enregistre et publie pour appliquer";
-        };
         Canvas.SetLeft(_triggerNode, 60); Canvas.SetTop(_triggerNode, 80);
         WorkflowCanvas.Children.Add(_triggerNode);
         UpdateTriggerNode();
@@ -754,13 +736,10 @@ public sealed partial class MainWindow : Window
     private void UpdateTriggerNode()
     {
         if (_triggerNode is null) return;
-        if (_triggerNode.GetVisualDescendants().OfType<ComboBox>().FirstOrDefault() is { } picker)
-        {
-            if (_triggerNode.GetVisualDescendants().OfType<TextBlock>().FirstOrDefault() is { } header) header.Text = _workflowTriggerKinds.GetValueOrDefault(PrototypeServices.CurrentWorkflowId, PrototypeServices.CurrentTriggerType) == "twitch.follow.received" ? (_english ? "⚡  New Twitch follower" : "⚡  Nouveau follower Twitch") : (_english ? "⚡  Manual run" : "⚡  Exécution manuelle");
-            var selected = picker.SelectedIndex;
-            picker.ItemsSource = _english ? new[] { "Manual run", "New Twitch follower" } : new[] { "Exécution manuelle", "Nouveau follower Twitch" };
-            picker.SelectedIndex = selected;
-        }
+        var title = _workflowTriggerKinds.GetValueOrDefault(PrototypeServices.CurrentWorkflowId, PrototypeServices.CurrentTriggerType) == "twitch.follow.received" ? (_english ? "New Twitch follower" : "Nouveau follower Twitch") : (_english ? "Manual run" : "Exécution manuelle");
+        var labels = _triggerNode.GetVisualDescendants().OfType<TextBlock>().ToArray();
+        if (labels.Length > 0) labels[0].Text = $"⚡  {title}";
+        if (labels.Length > 1) labels[1].Text = title;
     }
 
     private void AddAdditionalTriggerNode(string trigger)

@@ -25,6 +25,10 @@
       <Setter Property="Background" Value="#8A36F5" />
       <Setter Property="Foreground" Value="White" />
     </Style>
+    <Style Selector="Button.eventAdd">
+      <Setter Property="Background" Value="#168A5D" />
+      <Setter Property="Foreground" Value="White" />
+    </Style>
     <Style Selector="Button.surface">
       <Setter Property="Background" Value="#171B34" />
       <Setter Property="Foreground" Value="#E8E7F5" />
@@ -186,7 +190,7 @@
           <StackPanel Orientation="Horizontal" Spacing="5">
             <TextBlock x:Name="TestStatus" Text="Brouillon enregistré" Classes="muted" FontSize="11" VerticalAlignment="Center" Margin="3,0,4,0" MaxWidth="300" TextWrapping="Wrap" />
             <Button x:Name="AddCanvasItemButton" Classes="primary" Content="＋  Action" Click="OnAddCanvasItemClick" Padding="9,7" ToolTip.Tip="Ajouter une action au canevas" />
-            <Button x:Name="AddCanvasEventButton" Classes="surface" Content="＋  Événement" Click="OnAddCanvasEventClick" Padding="9,7" ToolTip.Tip="Ajouter un événement au canevas" />
+            <Button x:Name="AddCanvasEventButton" Classes="eventAdd" Content="＋  Événement" Click="OnAddCanvasEventClick" Padding="9,7" ToolTip.Tip="Ajouter un événement au canevas" />
             <Button Classes="surface" Content="▷  Tester" Click="OnTestClick" Padding="9,7" />
             <Button x:Name="RunOnceButton" Classes="surface" Content="Exécuter" Click="OnRunOnceClick" Padding="9,7" ToolTip.Tip="Exécuter la version publiée avec des effets réels" />
             <Button x:Name="UndoButton" Classes="surface" Content="↶" ToolTip.Tip="Annuler" Click="OnUndoClick" Padding="8,7" IsEnabled="False" />
