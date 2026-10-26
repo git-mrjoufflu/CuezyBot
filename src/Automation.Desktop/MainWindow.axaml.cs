@@ -1152,6 +1152,8 @@ public sealed partial class MainWindow : Window
 
     private static (string Header, string Border, string Icon, string Text) GetActionPalette(string label)
     {
+        if (label.StartsWith("__trigger__", StringComparison.Ordinal))
+            return ("#145A43", "#26C281", "#20865F", "#62E6AE");
         var value = label.ToLowerInvariant();
         if (value.Contains("obs") || value.Contains("scène") || value.Contains("scene") || value.Contains("source") || value.Contains("replay") || value.Contains("capture"))
             return ("#20242C", "#737B8A", "#343A4D", "#DCE2EE");
