@@ -549,6 +549,7 @@ public sealed partial class MainWindow : Window
 
     private async void OnRunOnceClick(object? sender, RoutedEventArgs eventArgs)
     {
+        if (!RunOnceButton.IsEnabled) return;
         RunOnceButton.IsEnabled = false;
         TestStatus.Text = _english ? "Running published workflow…" : "Exécution du workflow publié…";
         try
@@ -778,6 +779,18 @@ public sealed partial class MainWindow : Window
         if (_triggerNode is null) return;
         var title = TwitchTriggerCatalog.Title(PrototypeServices.CurrentTriggerTypes.FirstOrDefault() ?? "manual.run", _english);
         if (_triggerNode.Child is Grid grid && grid.Children[0] is Border { Child: TextBlock header }) header.Text = $"⚡  {title}";
+        ConfigureManualRunButton(_triggerNode, PrototypeServices.CurrentTriggerTypes.FirstOrDefault() ?? "manual.run");
+    }
+
+    private void ConfigureManualRunButton(Border node, string trigger)
+    {
+        if (node.Child is not Grid grid || grid.Children[1] is not StackPanel body) return;
+        body.Children.Clear();
+        if (trigger != "manual.run") return;
+        var run = new Button { Content = _english ? "▶  Run once" : "▶  Exécuter", Classes = { "eventAdd" }, HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch, Tag = "manualRunButton" };
+        ToolTip.SetTip(run, _english ? "Execute the published manual branch with real effects" : "Exécuter la branche manuelle publiée avec des effets réels");
+        run.Click += OnRunOnceClick;
+        body.Children.Add(run);
     }
 
     private void AddAdditionalTriggerNode(string trigger)
@@ -795,6 +808,7 @@ public sealed partial class MainWindow : Window
             }
         };
         node.PointerPressed += OnActionNodePressed; node.PointerReleased += OnActionNodeReleased;
+        ConfigureManualRunButton(node, trigger);
         node.Focusable = true;
         node.KeyDown += OnAdditionalTriggerKeyDown;
         Canvas.SetLeft(node, 60); Canvas.SetTop(node, 210 + _additionalTriggerNodes.Count * 105);
@@ -1664,6 +1678,12 @@ public sealed partial class MainWindow : Window
 
         foreach (var button in this.GetVisualDescendants().OfType<Button>())
         {
+            if (Equals(button.Tag, "manualRunButton"))
+            {
+                button.Content = english ? "▶  Run once" : "▶  Exécuter";
+                ToolTip.SetTip(button, english ? "Execute the published manual branch with real effects" : "Exécuter la branche manuelle publiée avec des effets réels");
+                continue;
+            }
             if (button.Content is string text)
             {
                 button.Content = TranslateText(text, translations);

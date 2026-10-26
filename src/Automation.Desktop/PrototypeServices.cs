@@ -139,6 +139,9 @@ internal static class PrototypeServices
         var repository = new SqliteWorkflowRepository(Database);
         var workflow = await repository.GetPublishedAsync(workflowId, token)
             ?? throw new InvalidOperationException(UiLanguageState.IsEnglish ? "Publish this workflow first using Start." : "Publie d’abord ce workflow avec Démarrer.");
+        var manualTriggers = workflow.Blocks.Where(block => block.Type == "manual.run").Select(block => block.Id).ToHashSet();
+        if (!workflow.Connections.Any(edge => manualTriggers.Contains(edge.FromBlockId)))
+            throw new InvalidOperationException(UiLanguageState.IsEnglish ? "Connect Manual run to an action, then save and publish the workflow." : "Relie Exécution manuelle à une action, puis enregistre et publie le workflow.");
         EnsureValid(workflow);
         var errors = ExecutableWorkflowValidator.Validate(workflow, UiLanguageState.IsEnglish);
         if (errors.Count > 0) throw new InvalidOperationException(string.Join(" · ", errors.Select(error => error.Message)));
@@ -170,7 +173,7 @@ internal static class PrototypeServices
             if (definition is null) return null;
             // Only the matching trigger may activate its outgoing branch.
             var selectedTrigger = manualWorkflow is not null ? "manual.run" : eventTrigger;
-            return WorkflowEventRouter.Select(definition, selectedTrigger, manualWorkflow is not null && !definition.Blocks.Any(block => block.Type == "manual.run"));
+            return WorkflowEventRouter.Select(definition, selectedTrigger);
         }, (block, ct) => manualWorkflow is not null && block.Type == "twitch.follow.received"
             ? Task.FromResult("Manual run") : ExecuteBlockAsync(block, executionCancellation?.Token ?? ct),
         async (block, ct) =>

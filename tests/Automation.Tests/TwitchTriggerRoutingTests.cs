@@ -49,6 +49,19 @@ public sealed class TwitchTriggerRoutingTests
     }
 
     [Fact]
+    public async Task ManualRunNeverActivatesTwitchBranches()
+    {
+        var manual = Guid.NewGuid(); var raid = Guid.NewGuid(); var manualAction = Guid.NewGuid(); var raidAction = Guid.NewGuid();
+        var workflow = new WorkflowDefinition(Guid.NewGuid(), 1, "Manual test", true,
+            [new(manual, "manual.run", 1, new JsonObject()), new(raid, "twitch.channel.raid.received", 1, new JsonObject()), new(manualAction, "core.delay", 1, new JsonObject()), new(raidAction, "core.delay", 1, new JsonObject())],
+            [new(manual, "next", manualAction), new(raid, "next", raidAction)]);
+        var executed = new List<Guid>();
+        await new WorkflowGraphRunner().RunAsync(WorkflowEventRouter.Select(workflow, "manual.run"), (block, _) => { executed.Add(block.Id); return Task.CompletedTask; }, TestContext.Current.CancellationToken);
+        Assert.Equal(new[] { manual, manualAction }, executed);
+        Assert.Empty(WorkflowEventRouter.Select(workflow with { Blocks = workflow.Blocks.Where(block => block.Id != manual).ToArray(), Connections = workflow.Connections.Where(edge => edge.FromBlockId != manual).ToArray() }, "manual.run").Blocks);
+    }
+
+    [Fact]
     public void RaidUsesDestinationChannelAndFollowUsesModeratorCondition()
     {
         Assert.Equal("123", TwitchTriggerCatalog.All.Single(item => item.EventType == "channel.raid").Condition("123")["to_broadcaster_user_id"]!.ToString());
