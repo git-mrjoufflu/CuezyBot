@@ -728,7 +728,7 @@ public sealed partial class MainWindow : Window
             Child = new Grid { RowDefinitions = new RowDefinitions("32,*"), Children =
             {
                 new Border { Background = new SolidColorBrush(Color.Parse("#145A43")), CornerRadius = new CornerRadius(9,9,0,0), Padding = new Thickness(10,0), Child = new TextBlock { Text = "⚡  Événement", Foreground = new SolidColorBrush(Color.Parse("#62E6AE")), FontSize = 11, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center } },
-                new StackPanel { [Grid.RowProperty] = 1, Spacing = 7, Margin = new Thickness(12,8), Children = { new Border { Width = 32, Height = 32, CornerRadius = new CornerRadius(8), Background = new SolidColorBrush(Color.Parse("#20865F")), Child = new TextBlock { Text = "⚡", HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center } }, triggerPicker } }
+                new StackPanel { [Grid.RowProperty] = 1, Spacing = 7, Margin = new Thickness(12,8), Children = { triggerPicker } }
             }}
         };
         _triggerNode.Tag = "__trigger__";
@@ -776,7 +776,7 @@ public sealed partial class MainWindow : Window
             Children =
             {
                 new Border { Background = new SolidColorBrush(Color.Parse("#145A43")), CornerRadius = new CornerRadius(9,9,0,0), Padding = new Thickness(10,0), Child = new TextBlock { Text = _english ? $"⚡  {title}" : $"⚡  {title}", Foreground = new SolidColorBrush(Color.Parse("#62E6AE")), FontSize = 11, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center } },
-                new StackPanel { [Grid.RowProperty] = 1, Orientation = Avalonia.Layout.Orientation.Horizontal, Spacing = 10, Margin = new Thickness(12,0), VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center, Children = { new Border { Width = 32, Height = 32, CornerRadius = new CornerRadius(8), Background = new SolidColorBrush(Color.Parse("#20865F")), Child = new TextBlock { Text = "⚡", HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center } } } }
+                new StackPanel { [Grid.RowProperty] = 1, Margin = new Thickness(12,0), VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center }
             }
         };
         node.PointerPressed += OnActionNodePressed; node.PointerReleased += OnActionNodeReleased;
@@ -844,17 +844,7 @@ public sealed partial class MainWindow : Window
                     Spacing = 10,
                     VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
                     Margin = new Avalonia.Thickness(12, 0),
-                    Children =
-                    {
-                            new Border
-                        {
-                            Width = 34,
-                            Height = 34,
-                            CornerRadius = new Avalonia.CornerRadius(8),
-                            Background = new SolidColorBrush(Color.Parse(palette.Icon)),
-                            Child = new TextBlock { Text = "◆", HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center }
-                        },
-                    }
+                    Children = { }
                 }
             }
         };
