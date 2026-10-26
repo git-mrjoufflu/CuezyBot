@@ -22,6 +22,17 @@ public sealed class TwitchEventSubClient : IAsyncDisposable
 
     public bool IsConnected => socket.State == WebSocketState.Open && receiveTask is not null;
 
+    public async Task SubscribeAsync(string clientId, TwitchUserToken token, string type, string version, JsonObject condition, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(SessionId) || !IsConnected) throw new InvalidOperationException("EventSub n’est pas connecté.");
+        using var request = new HttpRequestMessage(HttpMethod.Post, SubscriptionsEndpoint);
+        request.Headers.Add("Client-Id", clientId);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token.AccessToken);
+        request.Content = JsonContent.Create(new { type, version, condition, transport = new { method = "websocket", session_id = SessionId } });
+        using var response = await httpClient.SendAsync(request, cancellationToken);
+        if (!response.IsSuccessStatusCode) throw new InvalidOperationException($"Twitch a refusé l’abonnement EventSub ({(int)response.StatusCode}).");
+    }
+
     public async Task ConnectAndSubscribeToFollowsAsync(
         string clientId,
         TwitchUserToken token,
