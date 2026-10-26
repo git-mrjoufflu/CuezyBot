@@ -29,8 +29,8 @@ Check(!canvas.Children.OfType<Border>().Any(border => border.Classes.Contains("n
 window.UpdateIntegrationCount(true, false);
 Dispatcher.UIThread.RunJobs();
 var addAction = "◉  Changer de scène";
-Invoke(window, "AddActionNode", addAction + "\u001f" + Guid.NewGuid().ToString("N"));
-Invoke(window, "AddActionNode", addAction + "\u001f" + Guid.NewGuid().ToString("N"));
+window.AddCanvasAction(addAction);
+window.AddCanvasAction(addAction);
 var cards = canvas.Children.OfType<Border>().Where(border => border.Classes.Contains("dynamicAction")).ToArray();
 Check(cards.Length == 2, "Clicking action text twice must add two cards");
 Check(!Equals(cards[0].Tag, cards[1].Tag), "Action instances must be distinct");
@@ -77,23 +77,17 @@ Check(PrototypeServices.CurrentTriggerType == "manual.run", "New automation must
 window.FindControl<ComboBox>("WorkflowSelector")!.SelectedIndex = 0;
 Dispatcher.UIThread.RunJobs();
 var restoredCards = canvas.Children.OfType<Border>().Where(border => border.Classes.Contains("dynamicAction")).ToArray();
-if (restoredCards.Length == 0)
-{
-    Invoke(window, "AddActionNode", "◉  Changer de scène\u001f" + Guid.NewGuid().ToString("N"));
-    Invoke(window, "AddActionNode", "◉  Changer de scène\u001f" + Guid.NewGuid().ToString("N"));
-    restoredCards = canvas.Children.OfType<Border>().Where(border => border.Classes.Contains("dynamicAction")).ToArray();
-}
-Check(restoredCards.Length >= 1, "Switching back must restore the original cards");
+Check(restoredCards.Length == 2, "Switching back must restore the original cards");
 Check(PrototypeServices.CurrentTriggerType == "twitch.follow.received", "Switching back must restore the trigger kind");
-Check(restoredCards[0] is not null, "Switching back must restore a usable card");
-Check(canvas.Children.OfType<Avalonia.Controls.Shapes.Path>().Count() >= 0, "Canvas remains available after switching");
+Check(new Point(Canvas.GetLeft(restoredCards[0]), Canvas.GetTop(restoredCards[0])) == movedPosition, "Switching back must preserve positions");
+Check(canvas.Children.OfType<Avalonia.Controls.Shapes.Path>().Count() == 1, "Switching back must restore manual arrows");
 Invoke(window, "DeleteActionNode", restoredCards[0]);
-Check(canvas.Children.OfType<Border>().Count(border => border.Classes.Contains("dynamicAction")) >= 0, "Delete operation completes");
+Check(canvas.Children.OfType<Border>().Count(border => border.Classes.Contains("dynamicAction")) == 1, "Delete removes one instance");
 Invoke(window, "OnUndoClick", null, new RoutedEventArgs());
-Check(canvas.Children.OfType<Border>().Count(border => border.Classes.Contains("dynamicAction")) >= 0, "Undo deletion completes");
-Check(canvas.Children.OfType<Avalonia.Controls.Shapes.Path>().Count() >= 0, "Undo keeps canvas links available");
+Check(canvas.Children.OfType<Border>().Count(border => border.Classes.Contains("dynamicAction")) == 2, "Undo restores both cards");
+Check(canvas.Children.OfType<Avalonia.Controls.Shapes.Path>().Count() == 1, "Undo restores the arrow");
 Invoke(window, "OnRedoClick", null, new RoutedEventArgs());
-Check(canvas.Children.OfType<Border>().Count(border => border.Classes.Contains("dynamicAction")) >= 0, "Redo deletion completes");
+Check(canvas.Children.OfType<Border>().Count(border => border.Classes.Contains("dynamicAction")) == 1, "Redo removes the same card");
 Invoke(window, "OnZoomInClick", null, new RoutedEventArgs());
 Check(window.FindControl<TextBlock>("CanvasZoomLabel")!.Text == "110 %", "Zoom control must update the scale");
 Invoke(window, "OnCenterCanvasClick", null, new RoutedEventArgs());
@@ -104,6 +98,26 @@ Check(window.FindControl<Button>("AddCanvasItemButton") is not null, "Canvas add
 window.FindControl<TextBox>("ActionSearch")!.Text = "";
 Dispatcher.UIThread.RunJobs();
 Check(window.FindControl<Button>("AddCanvasItemButton")!.IsVisible, "Canvas add menu must remain visible");
+window.AddCanvasEvent("twitch.channel.raid.received");
+window.AddCanvasEvent("twitch.channel.cheer.received");
+Dispatcher.UIThread.RunJobs();
+var triggerCards = canvas.Children.OfType<Border>().Where(border => (border.Tag as string)?.StartsWith("__trigger__:", StringComparison.Ordinal) == true).ToArray();
+Check(triggerCards.Length == 2, "Raid and cheer must create distinct event cards");
+window.AddCanvasEvent("twitch.channel.raid.received");
+Check(canvas.Children.OfType<Border>().Count(border => (border.Tag as string)?.StartsWith("__trigger__:", StringComparison.Ordinal) == true) == 2, "Duplicate event addition must not create another card");
+window.ApplyLanguage(true); Dispatcher.UIThread.RunJobs();
+Check(triggerCards.Any(card => card.GetVisualDescendants().OfType<TextBlock>().Any(label => label.Text == "⚡  Incoming raid")), "Raid card must translate to English");
+Invoke(window, "OnNewWorkflowClick", null, new RoutedEventArgs());
+window.FindControl<ComboBox>("WorkflowSelector")!.SelectedIndex = 0;
+Dispatcher.UIThread.RunJobs();
+Check(PrototypeServices.CurrentTriggerTypes.Contains("twitch.channel.raid.received") && PrototypeServices.CurrentTriggerTypes.Contains("twitch.channel.cheer.received"), "Switching workflows must retain all event types");
+Check(canvas.Children.OfType<Border>().Count(border => (border.Tag as string)?.StartsWith("__trigger__:", StringComparison.Ordinal) == true) == 2, "Switching workflows must restore event cards");
+var selectedActions = (List<string>)typeof(MainWindow).GetField("_selectedActions", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(window)!;
+var triggerEdges = new[] { (From: "__trigger__:twitch.channel.raid.received", To: selectedActions[0]) };
+var definition = (Automation.Domain.Workflows.WorkflowDefinition)typeof(PrototypeServices).GetMethod("CreatePrototypeWorkflow", BindingFlags.NonPublic | BindingFlags.Static)!.Invoke(null, new object[] { selectedActions, triggerEdges })!;
+var raidBlock = definition.Blocks.Single(block => block.Type == "twitch.channel.raid.received");
+Check(definition.Connections.Count == 1 && definition.Connections[0].FromBlockId == raidBlock.Id, "Saved event edge must map to the actual raid trigger without automatic links");
+Check(raidBlock.Parameters["triggerKey"]!.ToString() == triggerEdges[0].From, "Draft must retain the trigger key used to restore its arrow");
 if (args.Length > 0)
 {
     foreach (var card in canvas.Children.OfType<Border>().Where(border => border.Classes.Contains("dynamicAction")).ToArray()) card.IsVisible = false;

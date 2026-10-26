@@ -53,9 +53,10 @@ public sealed class InitialBlockCatalog : IBlockCatalog
         ,new("variables.set-integer", 1, BlockCategory.Core, BlockKind.Action, "Modifier une variable", "Définit une variable entière persistante.", new HashSet<string>(StringComparer.Ordinal) { "next" })
     ];
 
-    public IReadOnlyCollection<BlockDescriptor> GetAll() => Blocks;
+    private static readonly string[] AdditionalTriggers = ["channel.subscribe", "channel.subscription.message", "channel.subscription.gift", "channel.cheer", "channel.raid", "channel.channel_points_custom_reward_redemption.add", "stream.online", "stream.offline", "channel.update"];
+    public IReadOnlyCollection<BlockDescriptor> GetAll() => Blocks.Concat(AdditionalTriggers.Select(type => new BlockDescriptor($"twitch.{type}.received", 1, BlockCategory.Twitch, BlockKind.Trigger, type, type, new HashSet<string>(StringComparer.Ordinal) { "next" }))).ToArray();
 
     public BlockDescriptor? Find(string type, int version) =>
-        Blocks.FirstOrDefault(block =>
+        GetAll().FirstOrDefault(block =>
             block.Type.Equals(type, StringComparison.Ordinal) && block.Version == version);
 }

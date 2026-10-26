@@ -5,6 +5,13 @@ namespace Automation.Connectors.Twitch;
 
 public static class TwitchEventParser
 {
+    public static TwitchNotification ParseNotification(JsonObject message)
+    {
+        var metadata = message["metadata"]?.AsObject() ?? throw new InvalidDataException("Missing Twitch metadata.");
+        var data = message["payload"]?["event"]?.AsObject() ?? throw new InvalidDataException("Missing Twitch event.");
+        return new(RequiredString(metadata, "message_id"), RequiredString(metadata, "subscription_type"),
+            int.Parse(RequiredString(metadata, "subscription_version"), CultureInfo.InvariantCulture), (JsonObject)data.DeepClone());
+    }
     public static TwitchFollowEvent ParseFollow(JsonObject message)
     {
         var metadata = message["metadata"]?.AsObject()

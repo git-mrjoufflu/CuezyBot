@@ -19,6 +19,15 @@ public static class ExecutableWorkflowValidator
             switch (block.Type)
             {
                 case "twitch.follow.received": break;
+                case "twitch.channel.subscribe.received":
+                case "twitch.channel.subscription.message.received":
+                case "twitch.channel.subscription.gift.received":
+                case "twitch.channel.cheer.received":
+                case "twitch.channel.raid.received":
+                case "twitch.channel.channel_points_custom_reward_redemption.add.received":
+                case "twitch.stream.online.received":
+                case "twitch.stream.offline.received":
+                case "twitch.channel.update.received": break;
                 case "manual.run": break;
                 case "obs.scene.set-current":
                 case "obs.screenshot":

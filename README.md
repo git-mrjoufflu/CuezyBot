@@ -8,6 +8,8 @@ CuezyBot is a modern, cross-platform visual automation tool for streamers. Build
 - Persistent OBS WebSocket and Twitch Device Code connections with automatic restoration.
 - French and English interface, including settings, history and connection dialogs.
 - Selecting an action from the library adds it to the canvas and persists it in the next saved or published workflow.
+- The canvas event picker includes manual run and ten Twitch events: follow, subscription, resubscription, gifted subscriptions, cheer, incoming raid, custom channel points redemption, stream online/offline, and channel update.
+- Each Twitch event activates its explicitly connected branch. Extra read permissions require reconnecting Twitch; missing permissions and rejected subscriptions are reported before publishing.
 
 Run the desktop prototype from the repository root:
 

@@ -47,11 +47,11 @@ public sealed class WorkflowValidator(IBlockCatalog catalog) : IWorkflowValidato
         }
 
         var triggers = knownBlocks.Where(pair => pair.Value.Kind == BlockKind.Trigger).ToArray();
-        if (triggers.Length != 1)
+        if (triggers.Length == 0)
         {
             diagnostics.Add(new(
                 "workflow.trigger.count",
-                "L’automatisation doit contenir exactement un déclencheur."));
+                "L’automatisation doit contenir au moins un déclencheur."));
         }
 
         ValidateConnections(workflow, knownBlocks, diagnostics);
@@ -89,6 +89,8 @@ public sealed class WorkflowValidator(IBlockCatalog catalog) : IWorkflowValidato
 
         foreach (var connection in workflow.Connections)
         {
+            if (knownBlocks.TryGetValue(connection.ToBlockId, out var target) && target.Kind == BlockKind.Trigger)
+                diagnostics.Add(new("connection.trigger.input", "Un déclencheur ne peut pas recevoir de connexion.", connection.ToBlockId));
             if (!blockIds.Contains(connection.FromBlockId))
             {
                 diagnostics.Add(new(
@@ -131,14 +133,14 @@ public sealed class WorkflowValidator(IBlockCatalog catalog) : IWorkflowValidato
         IReadOnlyCollection<KeyValuePair<Guid, BlockDescriptor>> triggers,
         ICollection<WorkflowDiagnostic> diagnostics)
     {
-        if (triggers.Count != 1)
+        if (triggers.Count == 0)
         {
             return;
         }
 
         var reachable = new HashSet<Guid>();
         var pending = new Stack<Guid>();
-        pending.Push(triggers.Single().Key);
+        foreach (var trigger in triggers) pending.Push(trigger.Key);
 
         while (pending.TryPop(out var blockId))
         {

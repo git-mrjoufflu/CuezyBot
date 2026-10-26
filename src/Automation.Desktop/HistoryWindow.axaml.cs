@@ -89,7 +89,7 @@ public sealed partial class HistoryWindow : Window
         return new HistoryRow(
             entry.EventType == "manual.run"
                 ? (english ? $"Manual run: {userName}" : $"Exécution manuelle : {userName}")
-                : (english ? $"New follower: {userName}" : $"Nouveau follower : {userName}"),
+                : $"{(Automation.Connectors.Twitch.TwitchTriggerCatalog.All.FirstOrDefault(item => item.EventType == entry.EventType) is { } trigger ? (english ? trigger.English : trigger.French) : entry.EventType)}: {userName}",
             english ? $"{entry.EventReceivedAt.ToLocalTime():g} · {entry.Steps.Count} step(s)" : $"{entry.EventReceivedAt.ToLocalTime():g} · {entry.Steps.Count} étape(s)",
             ToStatus(entry.Status, english),
             userName,

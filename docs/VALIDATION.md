@@ -58,3 +58,11 @@ Résultats confirmés après fermeture complète et nouveau lancement de CuezyBo
 - l’implémentation Windows utilise Credential Manager pour les mêmes contrats de secrets.
 
 Le renouvellement des jetons Twitch publics est implémenté avec rotation du refresh token et mise à jour du coffre. Son déclenchement réel à l’expiration reste à observer sur une session longue.
+
+## 25 octobre 2026 — Routage des événements Twitch supplémentaires
+
+Le catalogue de dix événements est relié au menu « + Événement », aux abonnements EventSub, aux workflows publiés et à l’historique SQLite : follow, abonnement, réabonnement, cadeaux, cheer, raid entrant, récompense personnalisée, live en ligne/hors ligne et informations de chaîne.
+
+Validation automatisée : serveur WebSocket local avec réponses HTTP simulées pour les abonnements, permissions complètes ou partielles ; parsing des dix types avec conservation du payload ; routage des branches raid/cheer ; restauration des cartes multiples, langue FR/EN et sérialisation des liens explicites. Les tests de workflow vérifient aussi la restauration exacte des cartes, des positions et des liens après changement de canevas et annulation.
+
+Les nouveaux accès OAuth sont `channel:read:subscriptions`, `bits:read` et `channel:read:redemptions`. Un jeton existant doit être réautorisé pour ces événements. La publication signale une permission manquante ou un abonnement refusé par Twitch. Aucun événement réel supplémentaire ni action sur un compte de production n’a été déclenché pendant ces tests. Les autres familles Twitch/OBS ne font pas partie de ce lot.

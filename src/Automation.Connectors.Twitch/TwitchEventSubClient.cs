@@ -11,16 +11,25 @@ public sealed class TwitchEventSubClient : IAsyncDisposable
     private static readonly Uri DefaultWebSocketEndpoint = new("wss://eventsub.wss.twitch.tv/ws");
     private static readonly Uri SubscriptionsEndpoint = new("https://api.twitch.tv/helix/eventsub/subscriptions");
     private const int MaximumMessageBytes = 1024 * 1024;
-    private readonly ClientWebSocket socket = new();
-    private readonly HttpClient httpClient = new();
+    private ClientWebSocket socket = new();
+    private readonly HttpClient httpClient;
+    private readonly Uri webSocketEndpoint;
     private readonly CancellationTokenSource lifetime = new();
     private Task? receiveTask;
 
     public event EventHandler<TwitchFollowEvent>? FollowReceived;
+    public event EventHandler<TwitchNotification>? NotificationReceived;
+    public List<string> SubscriptionErrors { get; } = new();
 
     public string? SessionId { get; private set; }
 
-    public bool IsConnected => socket.State == WebSocketState.Open && receiveTask is not null;
+    public bool IsConnected => socket.State == WebSocketState.Open && receiveTask is { IsCompleted: false };
+
+    public TwitchEventSubClient(HttpClient? httpClient = null, Uri? webSocketEndpoint = null)
+    {
+        this.httpClient = httpClient ?? new HttpClient();
+        this.webSocketEndpoint = webSocketEndpoint ?? DefaultWebSocketEndpoint;
+    }
 
     public async Task SubscribeAsync(string clientId, TwitchUserToken token, string type, string version, JsonObject condition, CancellationToken cancellationToken = default)
     {
@@ -44,7 +53,7 @@ public sealed class TwitchEventSubClient : IAsyncDisposable
             throw new InvalidOperationException("Cette instance EventSub a déjà été utilisée.");
         }
 
-        await socket.ConnectAsync(DefaultWebSocketEndpoint, cancellationToken);
+        await socket.ConnectAsync(webSocketEndpoint, cancellationToken);
         var welcome = await ReceiveMessageAsync(socket, cancellationToken);
         var messageType = welcome["metadata"]?["message_type"]?.GetValue<string>();
         if (!string.Equals(messageType, "session_welcome", StringComparison.Ordinal))
@@ -86,6 +95,12 @@ public sealed class TwitchEventSubClient : IAsyncDisposable
 
             throw new InvalidOperationException(
                 $"Twitch a refusé l’abonnement EventSub ({(int)response.StatusCode}) : {detail}");
+        }
+        foreach (var trigger in TwitchTriggerCatalog.All.Where(item => item.EventType != "channel.follow" && (item.Scope.Length == 0 || identity.Scopes.Contains(item.Scope))))
+        {
+            try { await SubscribeAsync(clientId, token, trigger.EventType, trigger.Version, trigger.Condition(identity.UserId), cancellationToken); }
+            catch (HttpRequestException) { SubscriptionErrors.Add(trigger.EventType); }
+            catch (InvalidOperationException) { SubscriptionErrors.Add(trigger.EventType); }
         }
     }
 
@@ -130,18 +145,34 @@ public sealed class TwitchEventSubClient : IAsyncDisposable
             var metadata = message["metadata"]?.AsObject();
             var type = metadata?["message_type"]?.GetValue<string>();
 
-            if (string.Equals(type, "notification", StringComparison.Ordinal) &&
-                string.Equals(metadata?["subscription_type"]?.GetValue<string>(), "channel.follow", StringComparison.Ordinal))
+            if (string.Equals(type, "notification", StringComparison.Ordinal))
             {
-                FollowReceived?.Invoke(this, TwitchEventParser.ParseFollow(message));
+                var notification = TwitchEventParser.ParseNotification(message);
+                NotificationReceived?.Invoke(this, notification);
+                if (notification.EventType == "channel.follow") FollowReceived?.Invoke(this, TwitchEventParser.ParseFollow(message));
             }
             else if (string.Equals(type, "revocation", StringComparison.Ordinal))
             {
-                throw new InvalidOperationException("Twitch a révoqué l’abonnement channel.follow.");
+                var revoked = message["payload"]?["subscription"]?["type"]?.ToString();
+                if (revoked is not null && !SubscriptionErrors.Contains(revoked)) SubscriptionErrors.Add(revoked);
             }
             else if (string.Equals(type, "session_reconnect", StringComparison.Ordinal))
             {
-                throw new InvalidOperationException("Twitch demande une migration de session EventSub ; la reconnexion sera ajoutée au prochain jalon.");
+                var reconnectUrl = message["payload"]?["session"]?["reconnect_url"]?.GetValue<string>()
+                    ?? throw new InvalidDataException("Missing EventSub reconnect URL.");
+                var endpoint = new Uri(reconnectUrl);
+                if (endpoint.Scheme != "wss" || endpoint.Host != DefaultWebSocketEndpoint.Host)
+                    throw new InvalidDataException("Invalid EventSub reconnect endpoint.");
+                var replacement = new ClientWebSocket();
+                try
+                {
+                    await replacement.ConnectAsync(endpoint, cancellationToken);
+                    var welcome = await ReceiveMessageAsync(replacement, cancellationToken);
+                    if (welcome["metadata"]?["message_type"]?.ToString() != "session_welcome") throw new InvalidDataException("Missing EventSub migration welcome.");
+                    SessionId = welcome["payload"]?["session"]?["id"]?.ToString() ?? throw new InvalidDataException("Missing EventSub session.");
+                    var previous = socket; socket = replacement; previous.Dispose();
+                }
+                catch { replacement.Dispose(); throw; }
             }
         }
     }

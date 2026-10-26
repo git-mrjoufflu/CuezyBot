@@ -24,6 +24,12 @@ internal static class PrototypeServices
     {
         await EnsureInitializedAsync(default);
         var drafts = await new SqliteWorkflowRepository(Database).GetAllDraftsAsync();
+        foreach (var draft in drafts)
+        {
+            var triggers = draft.Blocks.Where(block => block.Type == "manual.run" || TwitchTriggerCatalog.FindBlock(block.Type) is not null).ToArray();
+            for (var index = 0; index < triggers.Length; index++)
+                triggers[index].Parameters["triggerKey"] = index == 0 ? "__trigger__" : $"__trigger__:{triggers[index].Type}";
+        }
         foreach (var block in drafts.SelectMany(draft => draft.Blocks))
             if (block.Parameters["label"]?.GetValue<string>() is { } key)
                 ActionOptions[key] = (JsonObject)block.Parameters.DeepClone();
@@ -62,6 +68,28 @@ internal static class PrototypeServices
     private static readonly SemaphoreSlim ExecutionGate = new(1, 1);
     private static readonly System.Net.Http.HttpClient Http = new();
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, CancellationTokenSource> Running = new();
+
+    internal static async Task ProcessNotificationAsync(TwitchNotification notification, CancellationToken cancellationToken = default)
+    {
+        var trigger = TwitchTriggerCatalog.All.FirstOrDefault(item => item.EventType == notification.EventType);
+        if (trigger is null) return;
+        await EnsureInitializedAsync(cancellationToken);
+        var payload = (JsonObject)notification.Data.DeepClone();
+        payload["userName"] = payload["user_name"]?.ToString() ?? payload["from_broadcaster_user_name"]?.ToString() ?? payload["broadcaster_user_name"]?.ToString() ?? trigger.English;
+        payload["userLogin"] = payload["user_login"]?.ToString() ?? payload["from_broadcaster_user_login"]?.ToString() ?? "";
+        payload["userId"] = payload["user_id"]?.ToString() ?? payload["from_broadcaster_user_id"]?.ToString() ?? "";
+        var envelope = new EventEnvelope(Guid.NewGuid(), "twitch", "twitch-principal", notification.MessageId, notification.EventType, notification.Version, DateTimeOffset.UtcNow, payload);
+        await ExecutionGate.WaitAsync(cancellationToken);
+        try
+        {
+            var repository = new SqliteWorkflowRepository(Database);
+            var workflows = (await repository.GetEnabledPublishedAsync(cancellationToken)).Where(workflow => workflow.Blocks.Any(block => block.Type == trigger.BlockType)).ToArray();
+            var requests = workflows.Select(workflow => new ExecutionRequest(Guid.NewGuid(), envelope.Id, workflow.Id, workflow.Revision, DateTimeOffset.UtcNow)).ToArray();
+            if (await new SqliteEventAdmissionStore(Database).TryAdmitAsync(envelope, requests, cancellationToken) == Automation.Contracts.Persistence.EventAdmissionResult.Admitted)
+                await DrainQueueAsync(repository, requests.Select(request => request.Id), cancellationToken, eventTrigger: trigger.BlockType);
+        }
+        finally { ExecutionGate.Release(); }
+    }
 
     internal static async Task<FollowerProcessingResult> ProcessFollowAsync(
         TwitchFollowEvent follow,
@@ -126,7 +154,7 @@ internal static class PrototypeServices
         finally { ExecutionGate.Release(); }
     }
 
-    private static async Task<ExecutionStatus?> DrainQueueAsync(SqliteWorkflowRepository repository, IEnumerable<Guid> requestIds, CancellationToken token, Guid? manualWorkflow = null)
+    private static async Task<ExecutionStatus?> DrainQueueAsync(SqliteWorkflowRepository repository, IEnumerable<Guid> requestIds, CancellationToken token, Guid? manualWorkflow = null, string eventTrigger = "twitch.follow.received")
     {
         ExecutionStatus? result = null;
         Guid runningId = Guid.Empty;
@@ -138,7 +166,11 @@ internal static class PrototypeServices
             runningId = id;
             executionCancellation = CancellationTokenSource.CreateLinkedTokenSource(ct);
             Running[id] = executionCancellation;
-            return await repository.GetRevisionAsync(id, revision, ct);
+            var definition = await repository.GetRevisionAsync(id, revision, ct);
+            if (definition is null) return null;
+            // Only the matching trigger may activate its outgoing branch.
+            var selectedTrigger = manualWorkflow is not null ? "manual.run" : eventTrigger;
+            return WorkflowEventRouter.Select(definition, selectedTrigger, manualWorkflow is not null && !definition.Blocks.Any(block => block.Type == "manual.run"));
         }, (block, ct) => manualWorkflow is not null && block.Type == "twitch.follow.received"
             ? Task.FromResult("Manual run") : ExecuteBlockAsync(block, executionCancellation?.Token ?? ct),
         async (block, ct) =>
@@ -179,6 +211,7 @@ internal static class PrototypeServices
     {
         token.ThrowIfCancellationRequested();
         if (block.Type == "twitch.follow.received") return "Follower event received";
+        if (TwitchTriggerCatalog.FindBlock(block.Type) is { } trigger) return "Event received: " + trigger.English;
         if (block.Type == "manual.run") return "Manual run";
         if (block.Parameters["label"] is null) throw new InvalidOperationException("Republish this legacy prototype workflow before running it.");
         string Required(string key) => block.Parameters[key]?.ToString() is { Length: > 0 } value ? value
@@ -281,7 +314,7 @@ internal static class PrototypeServices
         if (workflow is null) return [];
         var labels = workflow.Blocks.ToDictionary(
             block => block.Id,
-            block => block.Parameters["label"]?.GetValue<string>());
+            block => (block.Parameters["label"] ?? block.Parameters["triggerKey"])?.GetValue<string>());
         return workflow.Connections
             .Where(connection => labels.TryGetValue(connection.FromBlockId, out var from) &&
                                  labels.TryGetValue(connection.ToBlockId, out var to) &&
@@ -317,6 +350,15 @@ internal static class PrototypeServices
         EnsureValid(workflow);
         var executionErrors = ExecutableWorkflowValidator.Validate(workflow, UiLanguageState.IsEnglish);
         if (executionErrors.Count > 0) throw new InvalidOperationException(string.Join(" · ", executionErrors.Select(error => error.Message)));
+        foreach (var trigger in workflow.Blocks.Select(block => TwitchTriggerCatalog.FindBlock(block.Type)).OfType<TwitchTrigger>())
+        {
+            if (TwitchSessionState.EventSubClient?.IsConnected != true)
+                throw new InvalidOperationException(UiLanguageState.IsEnglish ? "Connect Twitch before enabling this event." : "Connecte Twitch avant d’activer cet événement.");
+            if (trigger.Scope.Length > 0 && TwitchSessionState.Identity?.Scopes.Contains(trigger.Scope) != true)
+                throw new InvalidOperationException(UiLanguageState.IsEnglish ? $"Reconnect Twitch to grant {trigger.Scope}." : $"Reconnecte Twitch pour autoriser {trigger.Scope}.");
+            if (TwitchSessionState.EventSubClient.SubscriptionErrors.Contains(trigger.EventType))
+                throw new InvalidOperationException(UiLanguageState.IsEnglish ? $"Twitch refused this event: {trigger.English}." : $"Twitch a refusé cet événement : {trigger.French}.");
+        }
         if (workflow.Blocks.Any(block => block.Type == "twitch.update-title") && TwitchSessionState.Identity?.Scopes.Contains("channel:manage:broadcast") != true)
             throw new InvalidOperationException(UiLanguageState.IsEnglish ? "Reconnect Twitch to grant permission to edit the title." : "Reconnecte Twitch pour autoriser la modification du titre.");
         foreach (var (type, scope) in new[] { ("twitch.send-message", "user:write:chat"), ("twitch.create-clip", "clips:edit") })
@@ -364,6 +406,12 @@ internal static class PrototypeServices
         {
         };
         var actionIds = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
+        foreach (var block in blocks)
+        {
+            var key = block == blocks[0] ? "__trigger__" : $"__trigger__:{block.Type}";
+            block.Parameters["triggerKey"] = key;
+            actionIds[key] = block.Id;
+        }
         foreach (var label in selectedActions ?? Array.Empty<string>())
         {
             var instanceParts = label.Split('\u001f');
@@ -392,10 +440,7 @@ internal static class PrototypeServices
 
         // The follower entry point feeds roots only. User cards are connected
         // exclusively by the manual links, never by their insertion order.
-        var incoming = connections.Select(connection => connection.ToBlockId).ToHashSet();
-        foreach (var root in actionIds.Values.Where(id => !incoming.Contains(id)))
-            foreach (var trigger in blocks.Where(block => block.Type is "manual.run" or "twitch.follow.received"))
-                connections.Add(new WorkflowConnection(trigger.Id, "next", root));
+        // Trigger links are explicit, like every other canvas connection.
 
         return new WorkflowDefinition(
             CurrentWorkflowId,

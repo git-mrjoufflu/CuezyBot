@@ -9,6 +9,7 @@ using Avalonia.Media.Imaging;
 using System.Net.Http;
 using Avalonia.Threading;
 using System.IO;
+using Automation.Connectors.Twitch;
 
 namespace Automation.Desktop;
 
@@ -21,7 +22,7 @@ public sealed partial class MainWindow : Window
     private readonly Stack<CanvasSnapshot> _redoActions = new();
     private CanvasSnapshot? _dragStartSnapshot;
     private sealed record CanvasSnapshot(string[] Actions, Dictionary<string, Point> Positions,
-        (string From, string To)[] Links, Dictionary<string, System.Text.Json.Nodes.JsonObject> Options, Dictionary<string, bool> Visibility);
+        (string From, string To)[] Links, Dictionary<string, System.Text.Json.Nodes.JsonObject> Options, Dictionary<string, bool> Visibility, string[] Triggers);
     private Border? _draggedNode;
     private Border? _selectedNode;
     private readonly List<Border> _dynamicNodes = new();
@@ -40,6 +41,7 @@ public sealed partial class MainWindow : Window
     private readonly Dictionary<string, Guid> _workflowIds = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<Guid> _enabledWorkflowIds = new();
     private readonly Dictionary<Guid, string> _workflowTriggerKinds = new();
+    private readonly Dictionary<Guid, string[]> _workflowTriggers = new();
     private Point _dragPointerStart;
     private double _dragNodeLeft;
     private double _dragNodeTop;
@@ -109,11 +111,10 @@ public sealed partial class MainWindow : Window
                     if (_workflowIds.ContainsKey(name)) name += $" ({draft.Id.ToString()[..8]})";
                     _workflowNames.Add(name);
                     _workflowIds[name] = draft.Id;
-                    _workflowTriggerKinds[draft.Id] = draft.Blocks.Any(block => block.Type == "twitch.follow.received") ? "twitch.follow.received" : "manual.run";
-                    PrototypeServices.CurrentTriggerTypes.Clear();
-                    PrototypeServices.CurrentTriggerTypes.AddRange(draft.Blocks.Where(block => block.Type is "manual.run" or "twitch.follow.received").Select(block => block.Type).Distinct());
+                    _workflowTriggers[draft.Id] = draft.Blocks.Where(block => block.Type == "manual.run" || TwitchTriggerCatalog.FindBlock(block.Type) is not null).Select(block => block.Type).Distinct().ToArray();
+                    _workflowTriggerKinds[draft.Id] = _workflowTriggers[draft.Id].FirstOrDefault() ?? "manual.run";
                     _workflowActions[name] = draft.Blocks.Select(block => block.Parameters["label"]?.GetValue<string>()).OfType<string>().ToList();
-                    var labels = draft.Blocks.Where(block => block.Parameters["label"] is not null).ToDictionary(block => block.Id, block => block.Parameters["label"]!.GetValue<string>());
+                    var labels = draft.Blocks.Where(block => block.Parameters["label"] is not null || block.Parameters["triggerKey"] is not null).ToDictionary(block => block.Id, block => (block.Parameters["label"] ?? block.Parameters["triggerKey"])!.GetValue<string>());
                     _workflowLinks[name] = draft.Connections.Where(link => labels.ContainsKey(link.FromBlockId) && labels.ContainsKey(link.ToBlockId)).Select(link => (labels[link.FromBlockId], labels[link.ToBlockId])).ToList();
                     _workflowPositions[name] = new Dictionary<string, Point>(await ConnectionPersistence.GetWorkflowPositionsAsync(name));
                 }
@@ -121,6 +122,8 @@ public sealed partial class MainWindow : Window
                 PrototypeServices.CurrentWorkflowId = _workflowIds[_activeWorkflowName];
                 PrototypeServices.CurrentWorkflowName = _activeWorkflowName;
                 PrototypeServices.CurrentTriggerType = _workflowTriggerKinds[PrototypeServices.CurrentWorkflowId];
+                PrototypeServices.CurrentTriggerTypes.Clear();
+                PrototypeServices.CurrentTriggerTypes.AddRange(_workflowTriggers[PrototypeServices.CurrentWorkflowId]);
                 WorkflowTriggerSelector.SelectedIndex = PrototypeServices.CurrentTriggerType == "manual.run" ? 0 : 1;
                 WorkflowSelector.ItemsSource = _workflowNames.ToArray();
                 WorkflowSelector.SelectedIndex = 0;
@@ -178,6 +181,7 @@ public sealed partial class MainWindow : Window
         var name = _english ? $"New automation {_workflowNames.Count + 1}" : $"Nouvelle automatisation {_workflowNames.Count + 1}";
         while (_workflowNames.Contains(name)) name += " +";
         _workflowActions[_activeWorkflowName] = _selectedActions.ToList();
+        _workflowTriggers[PrototypeServices.CurrentWorkflowId] = PrototypeServices.CurrentTriggerTypes.ToArray();
         _workflowLinks[_activeWorkflowName] = GetManualLinkLabels().ToList();
         _workflowPositions[_activeWorkflowName] = _dynamicNodes.Where(node => node.Tag is string).ToDictionary(node => (string)node.Tag!, node => new Point(Canvas.GetLeft(node), Canvas.GetTop(node)));
         _workflowNames.Add(name);
@@ -207,6 +211,11 @@ public sealed partial class MainWindow : Window
             if (_workflowNames.Contains(name))
             {
                 _workflowActions[_activeWorkflowName] = _selectedActions.ToList();
+                _workflowTriggers[PrototypeServices.CurrentWorkflowId] = PrototypeServices.CurrentTriggerTypes.ToArray();
+                PrototypeServices.CurrentWorkflowId = _workflowIds[name];
+                PrototypeServices.CurrentTriggerTypes.Clear();
+                PrototypeServices.CurrentTriggerTypes.AddRange(_workflowTriggers.GetValueOrDefault(_workflowIds[name], new[] { "manual.run" }));
+                PrototypeServices.CurrentTriggerType = PrototypeServices.CurrentTriggerTypes[0];
                 _workflowLinks[_activeWorkflowName] = GetManualLinkLabels().ToList();
                 _workflowPositions[_activeWorkflowName] = _dynamicNodes.Where(node => node.Tag is string).ToDictionary(node => (string)node.Tag!, node => new Point(Canvas.GetLeft(node), Canvas.GetTop(node)));
                 ClearWorkflowCanvas();
@@ -231,7 +240,7 @@ public sealed partial class MainWindow : Window
                 PrototypeServices.CurrentWorkflowId = _workflowIds[name];
                 PrototypeServices.CurrentWorkflowName = name;
                 PrototypeServices.CurrentTriggerType = _workflowTriggerKinds.GetValueOrDefault(PrototypeServices.CurrentWorkflowId, "manual.run");
-                PrototypeServices.CurrentTriggerTypes.Clear(); PrototypeServices.CurrentTriggerTypes.Add(PrototypeServices.CurrentTriggerType);
+                UpdateTriggerNode();
                 var switching = _switchingWorkflow;
                 _switchingWorkflow = true;
                 WorkflowTriggerSelector.SelectedIndex = PrototypeServices.CurrentTriggerType == "manual.run" ? 0 : 1;
@@ -255,22 +264,34 @@ public sealed partial class MainWindow : Window
 
     private async void OnAddCanvasEventClick(object? sender, RoutedEventArgs eventArgs)
     {
-        var dialog = new Window { Title = _english ? "Add event" : "Ajouter un événement", Width = 360, Height = 190, CanResize = false, WindowStartupLocation = WindowStartupLocation.CenterOwner };
+        var dialog = new Window { Title = _english ? "Add event" : "Ajouter un événement", Width = 420, Height = 500, CanResize = false, WindowStartupLocation = WindowStartupLocation.CenterOwner };
         var manual = new Button { Content = _english ? "▶  Manual run" : "▶  Exécution manuelle", HorizontalContentAlignment = Avalonia.Layout.HorizontalAlignment.Left };
-        var follower = new Button { Content = _english ? "♥  New Twitch follower" : "♥  Nouveau follower Twitch", HorizontalContentAlignment = Avalonia.Layout.HorizontalAlignment.Left };
-        manual.Click += (_, _) => dialog.Close("manual.run"); follower.Click += (_, _) => dialog.Close("twitch.follow.received");
-        dialog.Content = new StackPanel { Margin = new Thickness(18), Spacing = 10, Children = { new TextBlock { Text = _english ? "Choose an event to add to this canvas" : "Choisis un événement à ajouter à ce canevas", TextWrapping = TextWrapping.Wrap }, manual, follower } };
+        manual.Click += (_, _) => dialog.Close("manual.run");
+        var choices = new StackPanel { Margin = new Thickness(18), Spacing = 10, Children = { new TextBlock { Text = _english ? "Choose an event to add to this canvas" : "Choisis un événement à ajouter à ce canevas", TextWrapping = TextWrapping.Wrap }, manual } };
+        foreach (var item in TwitchTriggerCatalog.All)
+        {
+            var button = new Button { Content = _english ? item.English : item.French, HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch };
+            button.Click += (_, _) => dialog.Close(item.BlockType);
+            choices.Children.Add(button);
+        }
+        dialog.Content = new ScrollViewer { Content = choices };
         var trigger = await dialog.ShowDialog<string?>(this);
-        if (trigger is not ("manual.run" or "twitch.follow.received")) return;
+        if (trigger is null || (trigger != "manual.run" && TwitchTriggerCatalog.FindBlock(trigger) is null)) return;
+        AddCanvasEvent(trigger);
+    }
+
+    internal void AddCanvasEvent(string trigger)
+    {
+        if (trigger != "manual.run" && TwitchTriggerCatalog.FindBlock(trigger) is null) throw new ArgumentException("Unknown trigger", nameof(trigger));
         if (PrototypeServices.CurrentTriggerTypes.Contains(trigger))
         {
             TestStatus.Text = _english ? "This event is already on the canvas" : "Cet événement est déjà dans le canevas";
             return;
         }
+        RememberCanvas();
         PrototypeServices.CurrentTriggerTypes.Add(trigger);
-        PrototypeServices.CurrentTriggerType = trigger;
-        _workflowTriggerKinds[PrototypeServices.CurrentWorkflowId] = trigger;
         AddAdditionalTriggerNode(trigger);
+        UpdateHistoryButtons();
         TestStatus.Text = _english ? "Event added — connect it to an action" : "Événement ajouté — relie-le à une action";
     }
 
@@ -292,7 +313,7 @@ public sealed partial class MainWindow : Window
         if (result is null) return;
         if (result.StartsWith("action:", StringComparison.Ordinal))
         {
-            var label = result[7..]; var instance = $"{label}\u001f{Guid.NewGuid():N}"; RememberCanvas(); _selectedActions.Add(instance); AddActionNode(instance); UpdateHistoryButtons();
+            AddCanvasAction(result[7..]);
             TestStatus.Text = _english ? "Action added — connect it in the canvas" : "Action ajoutée — relie-la dans le canevas";
         }
         else if (result is "manual.run" or "twitch.follow.received")
@@ -301,6 +322,15 @@ public sealed partial class MainWindow : Window
             PrototypeServices.CurrentTriggerTypes.Add(result); AddAdditionalTriggerNode(result);
             TestStatus.Text = _english ? "Event added — connect it in the canvas" : "Événement ajouté — relie-le dans le canevas";
         }
+    }
+
+    internal void AddCanvasAction(string label)
+    {
+        RememberCanvas();
+        var instance = $"{label}\u001f{Guid.NewGuid():N}";
+        _selectedActions.Add(instance);
+        AddActionNode(instance);
+        UpdateHistoryButtons();
     }
 
     private void OnActionsTabPressed(object? sender, PointerPressedEventArgs eventArgs)
@@ -408,6 +438,7 @@ public sealed partial class MainWindow : Window
         foreach (var trigger in _additionalTriggerNodes) WorkflowCanvas.Children.Remove(trigger);
         _additionalTriggerNodes.Clear();
         AddTriggerNode();
+        foreach (var trigger in PrototypeServices.CurrentTriggerTypes.Skip(1)) AddAdditionalTriggerNode(trigger);
         _undoActions.Clear();
         _redoActions.Clear();
         UpdateHistoryButtons();
@@ -669,7 +700,7 @@ public sealed partial class MainWindow : Window
         _dynamicNodes.ToDictionary(node => (string)node.Tag!, node => new Point(Canvas.GetLeft(node), Canvas.GetTop(node))),
         GetManualLinkLabels().ToArray(),
         _selectedActions.Where(PrototypeServices.ActionOptions.ContainsKey).ToDictionary(key => key, key => (System.Text.Json.Nodes.JsonObject)PrototypeServices.ActionOptions[key].DeepClone()),
-        _selectedActions.ToDictionary(key => key, key => PrototypeServices.SourceVisibility.GetValueOrDefault(key, true)));
+        _selectedActions.ToDictionary(key => key, key => PrototypeServices.SourceVisibility.GetValueOrDefault(key, true)), PrototypeServices.CurrentTriggerTypes.ToArray());
 
     private void RememberCanvas()
     {
@@ -680,6 +711,8 @@ public sealed partial class MainWindow : Window
 
     private void RestoreCanvas(CanvasSnapshot snapshot)
     {
+        PrototypeServices.CurrentTriggerTypes.Clear(); PrototypeServices.CurrentTriggerTypes.AddRange(snapshot.Triggers);
+        PrototypeServices.CurrentTriggerType = snapshot.Triggers[0];
         _selectedActions.Clear(); _selectedActions.AddRange(snapshot.Actions);
         _manualLinks.Clear();
         foreach (var (key, value) in snapshot.Options) PrototypeServices.ActionOptions[key] = (System.Text.Json.Nodes.JsonObject)value.DeepClone();
@@ -719,7 +752,6 @@ public sealed partial class MainWindow : Window
     private void AddTriggerNode()
     {
         if (_triggerNode is not null) { UpdateTriggerNode(); return; }
-        var triggerTitle = new TextBlock { FontWeight = FontWeight.SemiBold, FontSize = 14 };
         _triggerNode = new Border
         {
             Width = 230, Height = 112, Background = new SolidColorBrush(Color.Parse("#151A32")),
@@ -727,11 +759,12 @@ public sealed partial class MainWindow : Window
             CornerRadius = new CornerRadius(11), Padding = new Thickness(0), IsHitTestVisible = false,
             Child = new Grid { RowDefinitions = new RowDefinitions("32,*"), Children =
             {
-                new Border { Background = new SolidColorBrush(Color.Parse("#145A43")), CornerRadius = new CornerRadius(9,9,0,0), Padding = new Thickness(10,0), Child = new TextBlock { Text = "⚡  Événement", Foreground = new SolidColorBrush(Color.Parse("#62E6AE")), FontSize = 11, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center } },
-                new StackPanel { [Grid.RowProperty] = 1, Spacing = 7, Margin = new Thickness(12,8), Children = { triggerTitle } }
+                new Border { Background = new SolidColorBrush(Color.Parse("#145A43")), CornerRadius = new CornerRadius(9,9,0,0), Padding = new Thickness(10,0), Child = new TextBlock { Text = $"⚡  {TwitchTriggerCatalog.Title(PrototypeServices.CurrentTriggerTypes.FirstOrDefault() ?? "manual.run", _english)}", Foreground = new SolidColorBrush(Color.Parse("#62E6AE")), FontSize = 11, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center } },
+                new StackPanel { [Grid.RowProperty] = 1, Spacing = 7, Margin = new Thickness(12,8) }
             }}
         };
         _triggerNode.Tag = "__trigger__";
+        _triggerNode.Focusable = true;
         _triggerNode.PointerPressed += OnActionNodePressed;
         _triggerNode.PointerReleased += OnActionNodeReleased;
         _triggerNode.IsHitTestVisible = true;
@@ -743,18 +776,14 @@ public sealed partial class MainWindow : Window
     private void UpdateTriggerNode()
     {
         if (_triggerNode is null) return;
-        var title = _workflowTriggerKinds.GetValueOrDefault(PrototypeServices.CurrentWorkflowId, PrototypeServices.CurrentTriggerType) == "twitch.follow.received" ? (_english ? "New Twitch follower" : "Nouveau follower Twitch") : (_english ? "Manual run" : "Exécution manuelle");
-        var labels = _triggerNode.GetVisualDescendants().OfType<TextBlock>().ToArray();
-        if (labels.Length > 0) labels[0].Text = $"⚡  {title}";
-        if (labels.Length > 1) labels[1].Text = title;
+        var title = TwitchTriggerCatalog.Title(PrototypeServices.CurrentTriggerTypes.FirstOrDefault() ?? "manual.run", _english);
+        if (_triggerNode.Child is Grid grid && grid.Children[0] is Border { Child: TextBlock header }) header.Text = $"⚡  {title}";
     }
 
     private void AddAdditionalTriggerNode(string trigger)
     {
         if (_additionalTriggerNodes.Any(node => Equals(node.Tag, $"__trigger__:{trigger}"))) return;
-        var title = trigger == "twitch.follow.received"
-            ? (_english ? "New Twitch follower" : "Nouveau follower Twitch")
-            : (_english ? "Manual run" : "Exécution manuelle");
+        var title = TwitchTriggerCatalog.Title(trigger, _english);
         var node = new Border { Width = 230, Height = 100, Background = new SolidColorBrush(Color.Parse("#151A32")), BorderBrush = new SolidColorBrush(Color.Parse("#26C281")), BorderThickness = new Thickness(2), CornerRadius = new CornerRadius(11), Padding = new Thickness(0), Tag = $"__trigger__:{trigger}" };
         node.Child = new Grid
         {
@@ -766,6 +795,7 @@ public sealed partial class MainWindow : Window
             }
         };
         node.PointerPressed += OnActionNodePressed; node.PointerReleased += OnActionNodeReleased;
+        node.Focusable = true;
         node.KeyDown += OnAdditionalTriggerKeyDown;
         Canvas.SetLeft(node, 60); Canvas.SetTop(node, 210 + _additionalTriggerNodes.Count * 105);
         WorkflowCanvas.Children.Add(node); _additionalTriggerNodes.Add(node);
@@ -775,9 +805,12 @@ public sealed partial class MainWindow : Window
     {
         if (eventArgs.Key != Key.Delete || sender is not Border node || node.Tag is not string tag || !tag.StartsWith("__trigger__:", StringComparison.Ordinal)) return;
         var trigger = tag[12..];
+        RememberCanvas();
         _additionalTriggerNodes.Remove(node);
         WorkflowCanvas.Children.Remove(node);
         PrototypeServices.CurrentTriggerTypes.Remove(trigger);
+        _manualLinks.RemoveAll(edge => edge.From == node || edge.To == node);
+        UpdateDynamicLinks();
         if (PrototypeServices.CurrentTriggerTypes.Count == 0) PrototypeServices.CurrentTriggerTypes.Add("manual.run");
         ClearSelectionVisuals();
         TestStatus.Text = _english ? "Additional event removed" : "Événement supplémentaire supprimé";
@@ -1143,6 +1176,7 @@ public sealed partial class MainWindow : Window
 
     private void DeleteActionNode(Border node)
     {
+        if (node == _triggerNode || _additionalTriggerNodes.Contains(node)) return;
         if (node.Tag is not string label) return;
         RememberCanvas();
         _selectedActions.Remove(label);
@@ -1189,6 +1223,7 @@ public sealed partial class MainWindow : Window
 
     private void OnActionNodeMoved(object? sender, PointerEventArgs eventArgs)
     {
+        if (sender == _triggerNode || sender is Border trigger && _additionalTriggerNodes.Contains(trigger)) return;
         if (_draggedNode != sender || eventArgs.Pointer.Captured != _draggedNode) return;
         var point = eventArgs.GetCurrentPoint(WorkflowCanvas).Position;
         var left = Math.Max(8, _dragNodeLeft + point.X - _dragPointerStart.X);
@@ -1306,16 +1341,20 @@ public sealed partial class MainWindow : Window
                 }
                 else
                 {
-                    if (_selectedNode == _triggerNode && node == _triggerNode || _selectedNode != _triggerNode && node == _triggerNode)
+                    if (node == _triggerNode || _additionalTriggerNodes.Contains(node))
                     {
                         TestStatus.Text = _english ? "Links can only enter actions from an event" : "Les liens doivent partir d’un événement vers une action";
-                        _selectedNode = null;
+                        ClearSelectionVisuals();
+                        _selectedNode = node;
+                        node.BorderBrush = new SolidColorBrush(Color.Parse("#FFD166"));
+                        _draggedNode = null;
                         return;
                     }
                     if (_manualLinks.Contains((_selectedNode, node)))
                     {
                         TestStatus.Text = _english ? "This link already exists" : "Ce lien existe déjà";
-                        _selectedNode = null;
+                        ClearSelectionVisuals();
+                        _draggedNode = null;
                         return;
                     }
                     var reachable = new HashSet<Border>();
@@ -1493,11 +1532,11 @@ public sealed partial class MainWindow : Window
         _english = english;
         UpdateTriggerNode();
         foreach (var node in _additionalTriggerNodes)
-            if (node.GetVisualDescendants().OfType<TextBlock>().ToArray() is var labels && labels.Length > 1)
+            if (node.GetVisualDescendants().OfType<TextBlock>().ToArray() is var labels && labels.Length > 0)
             {
-                var eventTitle = (node.Tag as string)?.EndsWith("twitch.follow.received", StringComparison.Ordinal) == true ? (english ? "New Twitch follower" : "Nouveau follower Twitch") : (english ? "Manual run" : "Exécution manuelle");
+                var eventTitle = TwitchTriggerCatalog.Title(((string)node.Tag!)[12..], english);
                 if (labels[0] is { } header) header.Text = $"⚡  {eventTitle}";
-                if (labels[1] is { } title) title.Text = eventTitle;
+                if (labels.Length > 1) labels[1].Text = eventTitle;
             }
         var triggerIndex = WorkflowTriggerSelector.SelectedIndex;
         var switching = _switchingWorkflow;
