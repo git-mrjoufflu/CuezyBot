@@ -759,8 +759,22 @@ public sealed partial class MainWindow : Window
             }
         };
         node.PointerPressed += OnActionNodePressed; node.PointerReleased += OnActionNodeReleased;
+        node.KeyDown += OnAdditionalTriggerKeyDown;
         Canvas.SetLeft(node, 60); Canvas.SetTop(node, 210 + _additionalTriggerNodes.Count * 105);
         WorkflowCanvas.Children.Add(node); _additionalTriggerNodes.Add(node);
+    }
+
+    private void OnAdditionalTriggerKeyDown(object? sender, KeyEventArgs eventArgs)
+    {
+        if (eventArgs.Key != Key.Delete || sender is not Border node || node.Tag is not string tag || !tag.StartsWith("__trigger__:", StringComparison.Ordinal)) return;
+        var trigger = tag[12..];
+        _additionalTriggerNodes.Remove(node);
+        WorkflowCanvas.Children.Remove(node);
+        PrototypeServices.CurrentTriggerTypes.Remove(trigger);
+        if (PrototypeServices.CurrentTriggerTypes.Count == 0) PrototypeServices.CurrentTriggerTypes.Add("manual.run");
+        ClearSelectionVisuals();
+        TestStatus.Text = _english ? "Additional event removed" : "Événement supplémentaire supprimé";
+        eventArgs.Handled = true;
     }
 
     private void AddActionNode(string label)
