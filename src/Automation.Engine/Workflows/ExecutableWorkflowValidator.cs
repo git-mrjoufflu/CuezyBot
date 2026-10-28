@@ -1,4 +1,5 @@
 using System.Globalization;
+using Automation.Engine.Variables;
 using Automation.Contracts.Workflows;
 using Automation.Domain.Workflows;
 
@@ -28,7 +29,20 @@ public static class ExecutableWorkflowValidator
                 case "twitch.stream.online.received":
                 case "twitch.stream.offline.received":
                 case "twitch.channel.update.received": break;
+                case "twitch.channel.chat.message.received":
+                    Required("command", "Indique une commande, par exemple !test.", "Enter a command, for example !test.");
+                    if (block.Parameters["cooldownSeconds"] is { } cooldown && (!double.TryParse(cooldown.ToString(), NumberStyles.Float, CultureInfo.InvariantCulture, out var cooldownValue) || cooldownValue < 0 || cooldownValue > 86400))
+                        Error("command.cooldown.invalid", "Le cooldown doit être compris entre 0 et 86400 secondes.", "Cooldown must be between 0 and 86400 seconds.");
+                    break;
+                case "twitch.create-reward":
+                    Required("title", "Indique le nom de la récompense.", "Enter the reward title.");
+                    Required("cost", "Indique le coût en points.", "Enter the reward cost.");
+                    break;
                 case "manual.run": break;
+                case "core.timer":
+                    if (!double.TryParse(block.Parameters["seconds"]?.ToString(), NumberStyles.Float, CultureInfo.InvariantCulture, out var timerSeconds) || !double.IsFinite(timerSeconds) || timerSeconds < 1 || timerSeconds > 86400)
+                        Error("timer.invalid", "L’intervalle doit être compris entre 1 et 86400 secondes.", "Interval must be between 1 and 86400 seconds.");
+                    break;
                 case "obs.scene.set-current":
                 case "obs.screenshot":
                     Required("scene", "Choisis une scène OBS.", "Choose an OBS scene.");
@@ -39,14 +53,22 @@ public static class ExecutableWorkflowValidator
                         Error("sources.required", "Coche au moins une source OBS.", "Select at least one OBS source.");
                     break;
                 case "obs.replay.start": break;
+                case "obs.output.record":
+                case "obs.output.replay":
+                case "obs.output.virtual-camera":
+                    var operation = block.Parameters["operation"]?.ToString() ?? "start";
+                    var allowed = block.Type == "obs.output.record" ? new[] { "start", "stop", "pause", "resume" }
+                        : block.Type == "obs.output.replay" ? new[] { "start", "stop", "save" } : new[] { "start", "stop" };
+                    if (!allowed.Contains(operation)) Error("obs.operation.invalid", "Choisis une opération OBS valide.", "Choose a valid OBS operation.");
+                    break;
                 case "audio.play":
                     if (block.Parameters["file"]?.ToString() is not { Length: > 0 } file || !File.Exists(file))
                         Error("audio.file.missing", "Choisis un fichier audio existant.", "Choose an existing audio file.");
+                    else if (!file.EndsWith(".mp3", StringComparison.OrdinalIgnoreCase) && !file.EndsWith(".wav", StringComparison.OrdinalIgnoreCase))
+                        Error("audio.file.format", "Le fichier doit être au format MP3 ou WAV.", "The file must be MP3 or WAV.");
                     break;
                 case "twitch.create-clip": break;
-                case "twitch.get-user":
-                    Required("login", "Indique un utilisateur Twitch.", "Enter a Twitch login.");
-                    break;
+                case "twitch.get-user": break;
                 case "twitch.send-message":
                     var message = block.Parameters["message"]?.ToString();
                     if (string.IsNullOrWhiteSpace(message) || message.Length > 500)
@@ -58,6 +80,16 @@ public static class ExecutableWorkflowValidator
                     Required("name", "Indique le nom de la variable.", "Enter a variable name.");
                     if (!long.TryParse(block.Parameters["value"]?.ToString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out _))
                         Error("variable.value.invalid", "La valeur doit être un nombre entier.", "The value must be an integer.");
+                    break;
+                case "variables.set-text":
+                    Required("name", "Indique le nom de la variable.", "Enter a variable name.");
+                    if (block.Parameters["value"] is null)
+                        Error("variable.value.invalid", "Indique le texte de la variable.", "Enter the variable text.");
+                    break;
+                case "variables.number-expression":
+                    Required("name", "Indique le nom de la variable.", "Enter a variable name.");
+                    if (!NumericVariableExpression.TryApply(block.Parameters["value"]?.ToString(), 10, out _))
+                        Error("variable.expression.invalid", "Utilise une valeur, +5, -2, x2 ou /2.", "Use a value, +5, -2, x2 or /2.");
                     break;
                 case "twitch.update-title":
                     var title = block.Parameters["title"]?.ToString();
@@ -73,7 +105,7 @@ public static class ExecutableWorkflowValidator
                     break;
             }
         }
-        if (workflow.Blocks.All(block => block.Type is "twitch.follow.received" or "manual.run"))
+        if (workflow.Blocks.All(block => block.Type is "twitch.follow.received" or "manual.run" or "core.timer"))
             errors.Add(new("workflow.empty", english ? "Add at least one action." : "Ajoute au moins une action."));
         return errors;
     }

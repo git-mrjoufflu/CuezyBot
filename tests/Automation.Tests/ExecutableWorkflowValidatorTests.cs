@@ -27,6 +27,18 @@ public sealed class ExecutableWorkflowValidatorTests
         Assert.Empty(ExecutableWorkflowValidator.Validate(valid));
     }
 
+    [Theory]
+    [InlineData("0")]
+    [InlineData("86401")]
+    [InlineData("abc")]
+    public void Timer_RejectsInvalidInterval(string value)
+    {
+        var workflow = new WorkflowDefinition(Guid.NewGuid(), 1, "Timer", false,
+            [new(Guid.NewGuid(), "core.timer", 1, new JsonObject { ["seconds"] = value }),
+             new(Guid.NewGuid(), "core.delay", 1, new JsonObject { ["seconds"] = "0" })], []);
+        Assert.Contains(ExecutableWorkflowValidator.Validate(workflow), error => error.Code == "timer.invalid");
+    }
+
     [Fact]
     public void UnsupportedAction_IsExplicitlyRejectedInBothLanguages()
     {

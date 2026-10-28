@@ -57,6 +57,13 @@ public sealed class ObsSourceVisibilityTests
             Assert.Equal(new[] { "Studio" }, await client.GetSceneNamesAsync(token));
             Assert.Equal(3, (await client.GetSourceNamesAsync("Studio", token)).Count);
             Assert.Equal(new byte[] { 1, 2, 3 }, await client.GetScreenshotAsync("Studio", token));
+            if (!missingSource)
+            {
+                foreach (var operation in new[] { "start", "stop", "pause", "resume" }) await client.ControlOutputAsync("record", operation, token);
+                foreach (var operation in new[] { "start", "stop", "save" }) await client.ControlOutputAsync("replay", operation, token);
+                foreach (var operation in new[] { "start", "stop" }) await client.ControlOutputAsync("virtual-camera", operation, token);
+                await Assert.ThrowsAsync<ArgumentException>(() => client.ControlOutputAsync("record", "invalid", token));
+            }
             if (missingSource)
                 await Assert.ThrowsAsync<InvalidOperationException>(() => client.SetSourceVisibilityAsync("Studio", ["Camera", "Missing"], false, token));
             else await client.SetSourceVisibilityAsync("Studio", ["Camera", "Logo"], false, token);
@@ -66,6 +73,7 @@ public sealed class ObsSourceVisibilityTests
         if (missingSource) Assert.Empty(changes);
         else
         {
+            Assert.Equal(new[] { "StartRecord", "StopRecord", "PauseRecord", "ResumeRecord", "StartReplayBuffer", "StopReplayBuffer", "SaveReplayBuffer", "StartVirtualCam", "StopVirtualCam" }, commands.Select(command => command["requestType"]!.ToString()).Where(type => type is "StartRecord" or "StopRecord" or "PauseRecord" or "ResumeRecord" or "StartReplayBuffer" or "StopReplayBuffer" or "SaveReplayBuffer" or "StartVirtualCam" or "StopVirtualCam"));
             Assert.Equal(new[] { 11, 22 }, changes.Select(command => command["requestData"]!["sceneItemId"]!.GetValue<int>()));
             Assert.All(changes, command => Assert.False(command["requestData"]!["sceneItemEnabled"]!.GetValue<bool>()));
             Assert.All(changes, command => Assert.Equal("Studio", command["requestData"]!["sceneName"]!.GetValue<string>()));

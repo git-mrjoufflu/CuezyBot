@@ -5,6 +5,41 @@ Statut : prototype fonctionnel en développement continu
 Plateformes cibles : Windows et Linux  
 Public : utilisateurs ayant des connaissances faibles à moyennes en informatique
 
+## État vérifié — 26 octobre 2026
+
+Cette section prévaut sur les anciennes descriptions de maquette ci-dessous. Le projet n’est pas encore une version finale distribuable.
+
+| Étape | État vérifié | Travail restant |
+|---|---|---|
+| 0 — Cadrage | Architecture, stockage portable, coffre système et verrou d’instance implémentés | Matrice définitive des environnements pris en charge |
+| 1 — Expérience | Éditeur utilisable avec ajouts depuis le canevas | Essais utilisateurs et visualisation du parcours exécuté |
+| 2 — Moteur | Révisions, admission transactionnelle, déduplication, variables et historique implémentés | Validation réelle complète sous Windows |
+| 3 — Interface | Workflows multiples, événements multiples, liens explicites, paramètres intégrés, annuler/rétablir et FR/EN | Fermeture du moteur, API locale séparée, audit de localisation et accessibilité |
+| 4 — Fiabilité | Résultats incertains, annulation, récupération sans rejeu, verrou d’instance, sauvegardes SQLite, pré-migration et restauration hors ligne | Assistant graphique de restauration, coupures réseau, disque plein, rétention et limites de capacité |
+| 5 — Usages courants | Dix événements Twitch, actions OBS/Twitch, délais, conditions, variables et sons | Autres familles d’événements, commandes chat, modèles et audio OBS |
+| 6 — Avancé | Cycles refusés et branches conditionnelles | Sous-automatisations, boucles bornées, parallélisme et scripts |
+| 7 — Distribution | Compilation Windows et tests automatisés Windows/Linux configurés | Campagne installation/mise à jour/restauration ; installateur non prioritaire |
+
+Dernières vérifications locales : 48 tests automatisés et 42 vérifications d’interface réussis. Les tests utilisent des données temporaires et des connecteurs simulés. La publication Windows a été vérifiée au lot précédent ; elle ne constitue pas un essai manuel complet sous Windows.
+
+Les dix événements Twitch reliés à l’exécution sont : follow, abonnement, réabonnement, cadeaux, cheer, raid entrant, récompense personnalisée, début/fin de live et informations de chaîne. Seul le parcours follower → OBS possède une validation réelle documentée à ce jour.
+
+Décisions UX actualisées : ajout par « + Événement », « + Action » (Twitch/OBS) et « + Système » (conditions, attente, variables et son) dans le canevas ; colonne droite retirée ; paramètres directement sur les cartes ; liens créés explicitement ; vert pour événements, mauve Twitch, gris OBS et bleu Système. « Tester » vérifie la structure ; « Exécuter » produit les effets de la branche manuelle publiée et alimente l’historique.
+
+Navigation principale : Accueil, Workflows, Historique et Variables. Les anciens raccourcis Actions et Pages sont retirés tant qu’ils n’offrent pas une destination fonctionnelle; les actions sont ajoutées depuis le canevas et l’ancien menu Événements est renommé Historique conformément à sa fonction réelle.
+
+L’état d’une automatisation est présenté par une switch Activer/Désactiver (Active/Inactive), plutôt que par un bouton Démarrer/Arrêter. L’activation publie le brouillon et arme ses déclencheurs; la désactivation empêche les nouveaux événements de lancer le parcours.
+
+Une automatisation désactivée bloque également l’exécution réelle manuelle. Le bouton Tester reste accessible, puisqu’il valide le parcours sans produire d’effet Twitch ou OBS.
+
+Enregistrer une automatisation active republie immédiatement une nouvelle révision afin que la prochaine exécution utilise les options visibles dans le canevas. Pour une automatisation inactive, Enregistrer conserve seulement le brouillon.
+
+Une liaison qui crée une boucle n’est plus refusée automatiquement : l’interface demande une confirmation Oui/Non. Une boucle autorisée peut s’exécuter et le moteur impose une limite de sécurité de 1 000 étapes par exécution lorsqu’aucune sortie n’est atteinte.
+
+Les variables persistantes de type Nombre ou Texte sont gérées depuis l’onglet Variables. La carte Système « Modifier une variable » utilise un champ unique : une valeur simple fixe le nombre, +5/-2 l’ajuste, x2 le multiplie et /2 le divise; une variable Texte reçoit simplement le texte saisi. Les champs texte exécutables acceptent la syntaxe %nom_variable%, résolue avec la valeur courante juste avant l’effet externe.
+
+Une nouvelle automatisation commence sans événement automatique. Le bouton « + Événement » précède « + Action ». Les actions OBS comprennent aussi Enregistrement (démarrer/arrêter/pause/reprendre), Tampon replay (démarrer/arrêter/sauvegarder) et Caméra virtuelle (démarrer/arrêter), avec opérations intégrées aux cartes et captions FR/EN. Les neuf requêtes correspondantes sont vérifiées sur serveur WebSocket simulé ; les essais réels de ces sorties restent ouverts.
+
 ## 1. Vision et décisions retenues
 
 Créer une application indépendante pour automatiser Twitch et OBS, avec un éditeur visuel inspiré de Power Automate. L’utilisateur construit un parcours de cartes, configure ses actions et comprend le résultat sans programmer.
@@ -13,7 +48,7 @@ Décisions validées :
 
 - Windows et Linux sont pris en charge dès le premier prototype fonctionnel.
 - L’éditeur visuel est l’interface principale dès la première version graphique.
-- Les cartes sont reliées et disposées automatiquement ; le glisser-déposer est facultatif.
+- Les cartes sont positionnées sur le canevas et reliées explicitement ; aucun lien n’est ajouté automatiquement.
 - La bibliothèque classe les blocs par catégories : OBS, Twitch, Core, puis extensions progressives.
 - Les automatisations, brouillons, préférences et données durables sont enregistrés dans SQLite, dans `data` à côté du logiciel.
 - Les modifications sont sauvegardées en brouillon ; la publication applique une version validée.
@@ -155,7 +190,7 @@ Objectif : figer un premier périmètre réalisable.
 - [x] Vérifier les versions .NET/Avalonia et les contrats Twitch/OBS officiels.
 - [x] Définir le premier schéma des workflows, cartes, connexions, révisions et résultats.
 - [x] Définir le catalogue initial et le vocabulaire français.
-- [ ] Définir le stockage portable, le coffre de secrets et la règle d’instance unique. Les coffres Linux Secret Service/KWallet et Windows Credential Manager ainsi que la reconnexion automatique sont implémentés ; la règle d’instance unique reste à faire.
+- [x] Définir le stockage portable, le coffre de secrets et la règle d’instance unique. Le verrou du dossier de données est implémenté et testé.
 - [x] Consigner les premières décisions dans des documents courts avec leurs raisons.
 
 Critère de fin : un workflow d’exemple peut être décrit sans ambiguïté, de son événement source à ses effets et erreurs.
@@ -180,7 +215,7 @@ Objectif : démontrer la chaîne utile indépendamment de l’interface.
 - [x] Créer les premiers modules Domain, Contracts, Engine, Persistence et Runtime nécessaires.
 - [x] Initialiser SQLite, sa première migration et `data` à côté du logiciel.
 - [x] Implémenter l’événement synthétique, la première file série durable et le journal corrélé par étape.
-- [ ] Enregistrer durablement la notification et créer ses demandes avec unicité et marqueur de routage transactionnels.
+- [x] Enregistrer durablement la notification et créer ses demandes avec unicité et marqueur de routage transactionnels.
 - [x] Incrémenter un compteur durable puis demander un changement de scène OBS, en simulation par défaut ou via une connexion OBS 5.x réelle.
 - [x] Valider sur OBS Linux l’authentification WebSocket et la commande réelle `SetCurrentProgramScene` vers la scène `Merci`.
 - [x] Ajouter OAuth Twitch par Device Code Flow public et EventSub `channel.follow` v2 avec identité et permission vérifiées.
@@ -197,13 +232,13 @@ Mise à jour : la reprise automatique OBS et Twitch après redémarrage est dés
 
 Objectif : configurer et utiliser le prototype sans modifier de JSON.
 
-- [x] Implémenter l’interface Avalonia et l’API locale du Runtime.
+- [ ] Finaliser la séparation bureau/Runtime par API locale. L’interface Avalonia est implémentée ; le bureau appelle encore directement les services.
 - [x] Livrer l’assistant de connexion Twitch/OBS et les diagnostics. OBS et Twitch disposent de fenêtres de connexion et de reconnexion persistante.
 - [x] Livrer liste d’automatisations et éditeur avec placement automatique.
-- [x] Ajouter le catalogue initial, la recherche, les favoris et les paramètres typés.
-- [x] Sauvegarder brouillons et disposition ; la sauvegarde des actions choisies est opérationnelle ; annuler/rétablir reste à faire.
+- [ ] Compléter recherche et favoris. Le catalogue et les paramètres intégrés existent ; le menu d’ajout a remplacé la bibliothèque latérale.
+- [x] Sauvegarder brouillons et disposition ; annuler/rétablir couvre cartes, événements et liens.
 - [x] Valider et publier une révision, puis activer/désactiver l’automatisation.
-- [x] Montrer simulation, résultats par carte et historique.
+- [ ] Compléter la simulation et les résultats directement sur les cartes. La validation structurelle et l’historique par étape sont implémentés.
 - [ ] Définir la fermeture de fenêtre et l’arrêt explicite du moteur.
 
 Critère de fin : un utilisateur crée et teste Twitch → OBS depuis l’interface ; ses modifications réapparaissent après redémarrage. Fermer la fenêtre peut laisser le moteur actif selon le choix explicite présenté.
@@ -219,7 +254,7 @@ Objectif : rendre les comportements après panne compréhensibles et prévisible
 - [ ] Vérifier les crashs pendant admission, routage et exécution.
 - [ ] Garantir l’incrément atomique et la cohérence des marqueurs d’étapes locales.
 - [ ] Ajouter cooldowns transactionnels, pause, annulation, expiration et limites de capacité.
-- [ ] Présenter les demandes interrompues sans rejouer aveuglément les effets externes.
+- [x] Présenter les demandes interrompues sans rejouer aveuglément les effets externes.
 - [ ] Tester sauvegarde, restauration, migration et dossier non accessible en écriture.
 
 Critère de fin : les scénarios de panne ont des résultats reproductibles ; aucun effet externe incertain n’est présenté comme une réussite certaine.
@@ -285,7 +320,7 @@ Les essais réseau réels constituent une campagne explicite sur comptes et inst
 
 Une fonction est terminée lorsque son comportement est implémenté, expliqué dans l’interface, vérifié avec des cas utiles, persistant si nécessaire et validé sur les deux plateformes lorsqu’elle leur est commune. Les limitations sont visibles et consignées.
 
-Prochaine action : réaliser l’étape 0 puis la maquette de l’étape 1, centrée sur le parcours « connecter → créer → tester → publier → activer → comprendre le résultat ».
+Prochaines actions : restauration guidée des sauvegardes, validation des coupures Twitch/OBS et fermeture explicite du moteur. Poursuivre ensuite modèles, événements supplémentaires et validation utilisateur Windows/Linux.
 
 ## Note permanente — Localisation complète
 

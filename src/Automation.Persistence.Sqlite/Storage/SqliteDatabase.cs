@@ -4,7 +4,7 @@ namespace Automation.Persistence.Sqlite.Storage;
 
 public sealed class SqliteDatabase(AppDataPaths paths)
 {
-    private const int CurrentSchemaVersion = 4;
+    private const int CurrentSchemaVersion = 5;
 
     public SqliteConnection OpenConnection()
     {
@@ -41,6 +41,9 @@ public sealed class SqliteDatabase(AppDataPaths paths)
                 $"La base utilise le schéma {version}, mais cette version du logiciel prend en charge jusqu’au schéma {CurrentSchemaVersion}.");
         }
 
+        if (version > 0 && version < CurrentSchemaVersion)
+            SqliteBackups.Create(connection, paths.BackupsDirectory, $"beforeSchema{version}");
+
         if (version == 0)
         {
             await ApplyVersion1Async(connection, cancellationToken);
@@ -62,7 +65,27 @@ public sealed class SqliteDatabase(AppDataPaths paths)
         if (version == 3)
         {
             await ApplyVersion4Async(connection, cancellationToken);
+            version = 4;
         }
+
+        if (version == 4)
+        {
+            await ApplyVersion5Async(connection, cancellationToken);
+            version = 5;
+        }
+
+        await EnsureVariableMetadataColumnsAsync(connection, cancellationToken);
+    }
+
+    private static async Task EnsureVariableMetadataColumnsAsync(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        foreach (var (name, definition) in new[] { ("scope", "TEXT NOT NULL DEFAULT 'system'"), ("lifetime", "TEXT NOT NULL DEFAULT 'permanent'"), ("viewer_id", "TEXT NULL") })
+        {
+            await using var check = connection.CreateCommand(); check.CommandText = "SELECT COUNT(*) FROM pragma_table_info('persistent_variables') WHERE name = $name"; check.Parameters.AddWithValue("$name", name);
+            if (Convert.ToInt32(await check.ExecuteScalarAsync(cancellationToken)) != 0) continue;
+            await using var alter = connection.CreateCommand(); alter.CommandText = $"ALTER TABLE persistent_variables ADD COLUMN {name} {definition};"; await alter.ExecuteNonQueryAsync(cancellationToken);
+        }
+        await using var index = connection.CreateCommand(); index.CommandText = "CREATE INDEX IF NOT EXISTS ix_persistent_variables_scope_viewer ON persistent_variables(scope, viewer_id, name);"; await index.ExecuteNonQueryAsync(cancellationToken);
     }
 
     private static async Task ApplyVersion1Async(
@@ -192,6 +215,30 @@ public sealed class SqliteDatabase(AppDataPaths paths)
 
             PRAGMA user_version = 4;
             """;
+        await command.ExecuteNonQueryAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+    }
+
+    private static async Task ApplyVersion5Async(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.Transaction = (SqliteTransaction)transaction;
+        command.CommandText = """
+            ALTER TABLE persistent_variables ADD COLUMN value_type TEXT NOT NULL DEFAULT 'integer';
+            ALTER TABLE persistent_variables ADD COLUMN text_value TEXT NULL;
+            PRAGMA user_version = 5;
+            """;
+        await command.ExecuteNonQueryAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+    }
+
+    private static async Task ApplyVersion6Async(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.Transaction = (SqliteTransaction)transaction;
+        command.CommandText = "ALTER TABLE persistent_variables ADD COLUMN scope TEXT NOT NULL DEFAULT 'system'; ALTER TABLE persistent_variables ADD COLUMN lifetime TEXT NOT NULL DEFAULT 'permanent'; ALTER TABLE persistent_variables ADD COLUMN viewer_id TEXT NULL; CREATE INDEX IF NOT EXISTS ix_persistent_variables_scope_viewer ON persistent_variables(scope, viewer_id, name); PRAGMA user_version = 6;";
         await command.ExecuteNonQueryAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
     }

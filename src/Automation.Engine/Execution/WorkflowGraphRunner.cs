@@ -24,7 +24,11 @@ public sealed class WorkflowGraphRunner
             foreach (var edge in edges.Where(edge => edge.FromBlockId == id))
                 if (--incoming[edge.ToBlockId] == 0) ready.Enqueue(edge.ToBlockId);
         }
-        if (ordered.Count != blocks.Count) throw new InvalidOperationException("workflow.cycle");
+        if (ordered.Count != blocks.Count)
+        {
+            await RunLoopEnabledAsync(workflow, blocks, edges, execute, chooseOutput, cancellationToken);
+            return;
+        }
         foreach (var block in ordered)
         {
             if (!active.Contains(block.Id)) continue;
@@ -33,6 +37,32 @@ public sealed class WorkflowGraphRunner
             var output = chooseOutput is null ? null : await chooseOutput(block, cancellationToken);
             foreach (var edge in edges.Where(edge => edge.FromBlockId == block.Id && (output is null || edge.Output == output)))
                 active.Add(edge.ToBlockId);
+        }
+    }
+
+    private static async Task RunLoopEnabledAsync(
+        WorkflowDefinition workflow,
+        IReadOnlyDictionary<Guid, WorkflowBlock> blocks,
+        IReadOnlyCollection<WorkflowConnection> edges,
+        Func<WorkflowBlock, CancellationToken, Task> execute,
+        Func<WorkflowBlock, CancellationToken, Task<string?>>? chooseOutput,
+        CancellationToken cancellationToken)
+    {
+        const int maximumSteps = 1000;
+        var roots = workflow.Blocks.Where(block => edges.All(edge => edge.ToBlockId != block.Id)).Select(block => block.Id).ToArray();
+        if (roots.Length == 0) throw new InvalidOperationException("workflow.loop.no-entry");
+        var pending = new Queue<Guid>(roots);
+        var steps = 0;
+        while (pending.TryDequeue(out var id))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (++steps > maximumSteps)
+                throw new InvalidOperationException("workflow.loop.limit: 1000");
+            var block = blocks[id];
+            await execute(block, cancellationToken);
+            var output = chooseOutput is null ? null : await chooseOutput(block, cancellationToken);
+            foreach (var edge in edges.Where(edge => edge.FromBlockId == id && (output is null || edge.Output == output)))
+                pending.Enqueue(edge.ToBlockId);
         }
     }
 }

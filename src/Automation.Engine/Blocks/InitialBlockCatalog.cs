@@ -8,6 +8,10 @@ public sealed class InitialBlockCatalog : IBlockCatalog
     private static readonly IReadOnlyCollection<BlockDescriptor> Blocks =
     [
         new("manual.run", 1, BlockCategory.Core, BlockKind.Trigger, "Exécution manuelle", "Démarre avec le bouton Exécuter.", new HashSet<string>(StringComparer.Ordinal) { "next" }),
+        new("core.timer", 1, BlockCategory.Core, BlockKind.Trigger, "Minuteur", "Démarre le parcours à intervalle régulier.", new HashSet<string>(StringComparer.Ordinal) { "next" }),
+        new("obs.output.record", 1, BlockCategory.Obs, BlockKind.Action, "Enregistrement OBS", "Contrôle l’enregistrement.", new HashSet<string> { "next" }),
+        new("obs.output.replay", 1, BlockCategory.Obs, BlockKind.Action, "Tampon replay", "Contrôle le tampon replay.", new HashSet<string> { "next" }),
+        new("obs.output.virtual-camera", 1, BlockCategory.Obs, BlockKind.Action, "Caméra virtuelle", "Contrôle la caméra virtuelle.", new HashSet<string> { "next" }),
         new(
             "twitch.follow.received",
             1,
@@ -51,9 +55,11 @@ public sealed class InitialBlockCatalog : IBlockCatalog
         ,new("audio.play", 1, BlockCategory.Core, BlockKind.Action, "Jouer un son", "Lit un fichier audio local.", new HashSet<string>(StringComparer.Ordinal) { "next" })
         ,new("core.action", 1, BlockCategory.Core, BlockKind.Action, "Action", "Exécute une action générique.", new HashSet<string>(StringComparer.Ordinal) { "next" })
         ,new("variables.set-integer", 1, BlockCategory.Core, BlockKind.Action, "Modifier une variable", "Définit une variable entière persistante.", new HashSet<string>(StringComparer.Ordinal) { "next" })
+        ,new("variables.set-text", 1, BlockCategory.Core, BlockKind.Action, "Modifier une variable texte", "Définit une variable texte persistante.", new HashSet<string>(StringComparer.Ordinal) { "next" })
+        ,new("variables.number-expression", 1, BlockCategory.Core, BlockKind.Action, "Modifier une variable numérique", "Applique une valeur ou un calcul simple.", new HashSet<string>(StringComparer.Ordinal) { "next" })
     ];
 
-    private static readonly string[] AdditionalTriggers = ["channel.subscribe", "channel.subscription.message", "channel.subscription.gift", "channel.cheer", "channel.raid", "channel.channel_points_custom_reward_redemption.add", "stream.online", "stream.offline", "channel.update"];
+    private static readonly string[] AdditionalTriggers = ["channel.subscribe", "channel.subscription.message", "channel.subscription.gift", "channel.cheer", "channel.raid", "channel.channel_points_custom_reward_redemption.add", "stream.online", "stream.offline", "channel.update", "channel.chat.message"];
     public IReadOnlyCollection<BlockDescriptor> GetAll() => Blocks.Concat(AdditionalTriggers.Select(type => new BlockDescriptor($"twitch.{type}.received", 1, BlockCategory.Twitch, BlockKind.Trigger, type, type, new HashSet<string>(StringComparer.Ordinal) { "next" }))).ToArray();
 
     public BlockDescriptor? Find(string type, int version) =>

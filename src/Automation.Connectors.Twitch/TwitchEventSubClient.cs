@@ -99,8 +99,8 @@ public sealed class TwitchEventSubClient : IAsyncDisposable
         foreach (var trigger in TwitchTriggerCatalog.All.Where(item => item.EventType != "channel.follow" && (item.Scope.Length == 0 || identity.Scopes.Contains(item.Scope))))
         {
             try { await SubscribeAsync(clientId, token, trigger.EventType, trigger.Version, trigger.Condition(identity.UserId), cancellationToken); }
-            catch (HttpRequestException) { SubscriptionErrors.Add(trigger.EventType); }
-            catch (InvalidOperationException) { SubscriptionErrors.Add(trigger.EventType); }
+            catch (HttpRequestException exception) { SubscriptionErrors.Add($"{trigger.EventType}: {exception.Message}"); }
+            catch (InvalidOperationException exception) { SubscriptionErrors.Add($"{trigger.EventType}: {exception.Message}"); }
         }
     }
 

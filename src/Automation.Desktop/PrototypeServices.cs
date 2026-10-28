@@ -6,8 +6,10 @@ using Automation.Domain.Workflows;
 using Automation.Engine.Execution;
 using Automation.Engine.Blocks;
 using Automation.Engine.Workflows;
+using Automation.Engine.Variables;
 using Automation.Persistence.Sqlite.Storage;
 using Automation.Persistence.Sqlite.Stores;
+using System.Text.RegularExpressions;
 
 namespace Automation.Desktop;
 
@@ -15,10 +17,11 @@ internal static class PrototypeServices
 {
     internal static Guid CurrentWorkflowId { get; set; } = PrototypeWorkflowIds.WorkflowId;
     internal static string CurrentWorkflowName { get; set; } = "Mon Live Automatisation";
-    internal static string CurrentTriggerType { get; set; } = "manual.run";
-    internal static List<string> CurrentTriggerTypes { get; } = new() { "manual.run" };
+    internal static string CurrentTriggerType { get; set; } = "";
+    internal static List<string> CurrentTriggerTypes { get; } = new();
     internal static readonly Dictionary<string, bool> SourceVisibility = new(StringComparer.Ordinal);
     internal static readonly Dictionary<string, JsonObject> ActionOptions = new(StringComparer.Ordinal);
+    internal static readonly Dictionary<string, JsonObject> TriggerOptions = new(StringComparer.Ordinal);
 
     internal static async Task<IReadOnlyList<WorkflowDefinition>> GetDraftsAsync()
     {
@@ -26,9 +29,13 @@ internal static class PrototypeServices
         var drafts = await new SqliteWorkflowRepository(Database).GetAllDraftsAsync();
         foreach (var draft in drafts)
         {
-            var triggers = draft.Blocks.Where(block => block.Type == "manual.run" || TwitchTriggerCatalog.FindBlock(block.Type) is not null).ToArray();
+            var triggers = draft.Blocks.Where(block => IsTriggerType(block.Type)).ToArray();
             for (var index = 0; index < triggers.Length; index++)
-                triggers[index].Parameters["triggerKey"] = index == 0 ? "__trigger__" : $"__trigger__:{triggers[index].Type}";
+            {
+                var key = index == 0 ? "__trigger__" : $"__trigger__:{triggers[index].Type}";
+                triggers[index].Parameters["triggerKey"] = key;
+                TriggerOptions[TriggerOptionStorageKey(draft.Id, key)] = (JsonObject)triggers[index].Parameters.DeepClone();
+            }
         }
         foreach (var block in drafts.SelectMany(draft => draft.Blocks))
             if (block.Parameters["label"]?.GetValue<string>() is { } key)
@@ -61,6 +68,9 @@ internal static class PrototypeServices
                 ? diagnostic with { Message = "The workflow contains a loop. Remove a connection to avoid endless execution." }
                 : diagnostic).Concat(ExecutableWorkflowValidator.Validate(workflow, UiLanguageState.IsEnglish)).ToArray();
     }
+
+    internal static bool HasCycle(IReadOnlyCollection<string> actions, IReadOnlyCollection<(string From, string To)> links) =>
+        ValidateEditorDetails(actions, links).Any(diagnostic => diagnostic.Code == "workflow.cycle");
     private static readonly AppDataPaths Paths = new();
     private static readonly SqliteDatabase Database = new(Paths);
     private static bool initialized;
@@ -68,6 +78,137 @@ internal static class PrototypeServices
     private static readonly SemaphoreSlim ExecutionGate = new(1, 1);
     private static readonly System.Net.Http.HttpClient Http = new();
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, CancellationTokenSource> Running = new();
+    private static readonly Regex VariableToken = new("%([A-Za-z_][A-Za-z0-9_.-]{0,63})%", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+    private static readonly AsyncLocal<string?> CurrentViewerId = new();
+    private static readonly AsyncLocal<string?> CurrentViewerLogin = new();
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, DateTimeOffset> CommandCooldowns = new(StringComparer.OrdinalIgnoreCase);
+    private sealed record TimerSchedule(int Revision, double Seconds, DateTimeOffset NextRun);
+    private static readonly Dictionary<(Guid Workflow, Guid Trigger), TimerSchedule> TimerSchedules = new();
+    private static int processingTimers;
+
+    internal static bool IsTriggerType(string type) => type is "manual.run" or "core.timer" || TwitchTriggerCatalog.FindBlock(type) is not null;
+    internal static string TriggerOptionStorageKey(Guid workflowId, string canvasKey) => $"{workflowId:D}:{canvasKey}";
+    internal static JsonObject GetOrCreateTriggerOptions(string canvasKey, Func<JsonObject>? create = null)
+    {
+        var key = TriggerOptionStorageKey(CurrentWorkflowId, canvasKey);
+        if (!TriggerOptions.TryGetValue(key, out var options)) TriggerOptions[key] = options = create?.Invoke() ?? new JsonObject();
+        return options;
+    }
+
+    internal static async Task<IReadOnlyList<(string Id, string Title, int Cost, int Cooldown)>> GetTwitchRewardsAsync(CancellationToken token = default)
+    {
+        var identity = TwitchSessionState.Identity ?? throw new InvalidOperationException("Twitch disconnected");
+        var twitchToken = TwitchSessionState.Token ?? throw new InvalidOperationException("Twitch disconnected");
+        return await new TwitchChannelClient(Http).GetCustomRewardsAsync(identity, twitchToken, token);
+    }
+    internal static async Task<string> CreateTwitchRewardAsync(string title, int cost, CancellationToken token = default)
+    {
+        var identity = TwitchSessionState.Identity ?? throw new InvalidOperationException("Twitch disconnected");
+        var twitchToken = TwitchSessionState.Token ?? throw new InvalidOperationException("Twitch disconnected");
+        return await new TwitchChannelClient(Http).CreateCustomRewardAsync(identity, twitchToken, title, cost, token);
+    }
+    internal static async Task UpdateTwitchRewardAsync(string id, string title, int cost, int cooldown, CancellationToken token = default)
+    {
+        var identity = TwitchSessionState.Identity ?? throw new InvalidOperationException("Twitch disconnected");
+        var twitchToken = TwitchSessionState.Token ?? throw new InvalidOperationException("Twitch disconnected");
+        await new TwitchChannelClient(Http).UpdateCustomRewardAsync(identity, twitchToken, id, title, cost, cooldown, token);
+    }
+    internal static async Task DeleteTwitchRewardAsync(string id, CancellationToken token = default)
+    {
+        var identity = TwitchSessionState.Identity ?? throw new InvalidOperationException("Twitch disconnected");
+        var twitchToken = TwitchSessionState.Token ?? throw new InvalidOperationException("Twitch disconnected");
+        await new TwitchChannelClient(Http).DeleteCustomRewardAsync(identity, twitchToken, id, token);
+    }
+
+    internal static async Task ProcessTimersAsync(CancellationToken cancellationToken = default)
+    {
+        if (Interlocked.Exchange(ref processingTimers, 1) != 0) return;
+        try
+        {
+            await EnsureInitializedAsync(cancellationToken);
+            var repository = new SqliteWorkflowRepository(Database);
+            var workflows = await repository.GetEnabledPublishedAsync(cancellationToken);
+            var activeKeys = new HashSet<(Guid Workflow, Guid Trigger)>();
+            var now = DateTimeOffset.UtcNow;
+            var due = new List<(WorkflowDefinition Workflow, WorkflowBlock Trigger)>();
+            foreach (var workflow in workflows)
+            foreach (var trigger in workflow.Blocks.Where(block => block.Type == "core.timer"))
+            {
+                if (!double.TryParse(trigger.Parameters["seconds"]?.ToString(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var seconds)) continue;
+                seconds = Math.Clamp(seconds, 1, 86400);
+                var key = (workflow.Id, trigger.Id);
+                activeKeys.Add(key);
+                if (!TimerSchedules.TryGetValue(key, out var schedule) || schedule.Revision != workflow.Revision || Math.Abs(schedule.Seconds - seconds) > 0.001)
+                {
+                    TimerSchedules[key] = new TimerSchedule(workflow.Revision, seconds, now.AddSeconds(seconds));
+                    continue;
+                }
+                if (now < schedule.NextRun) continue;
+                TimerSchedules[key] = schedule with { NextRun = now.AddSeconds(seconds) };
+                due.Add((workflow, trigger));
+            }
+            foreach (var stale in TimerSchedules.Keys.Where(key => !activeKeys.Contains(key)).ToArray()) TimerSchedules.Remove(stale);
+            foreach (var (workflow, _) in due)
+            {
+                var envelope = new EventEnvelope(Guid.NewGuid(), "core", "timer", Guid.NewGuid().ToString("N"), "core.timer", 1, now,
+                    new JsonObject { ["workflowName"] = workflow.Name, ["interval"] = workflow.Blocks.First(block => block.Type == "core.timer").Parameters["seconds"]?.DeepClone() });
+                var request = new ExecutionRequest(Guid.NewGuid(), envelope.Id, workflow.Id, workflow.Revision, now);
+                await ExecutionGate.WaitAsync(cancellationToken);
+                try
+                {
+                    if (await new SqliteEventAdmissionStore(Database).TryAdmitAsync(envelope, [request], cancellationToken) == Automation.Contracts.Persistence.EventAdmissionResult.Admitted)
+                        await DrainQueueAsync(repository, [request.Id], cancellationToken, eventTrigger: "core.timer");
+                }
+                finally { ExecutionGate.Release(); }
+            }
+        }
+        finally { Volatile.Write(ref processingTimers, 0); }
+    }
+
+    internal static async Task<IReadOnlyList<Automation.Contracts.Persistence.PersistentVariable>> GetVariablesAsync(CancellationToken cancellationToken = default)
+    {
+        await EnsureInitializedAsync(cancellationToken);
+        return await new SqlitePersistentVariableStore(Database).ListAsync(cancellationToken);
+    }
+
+    internal static async Task SetVariableAsync(string name, long value, string scope = "system", string lifetime = "permanent", string? viewerId = null, CancellationToken cancellationToken = default)
+    {
+        await EnsureInitializedAsync(cancellationToken);
+        await new SqlitePersistentVariableStore(Database).SetIntegerAsync(name, value, scope, lifetime, viewerId ?? CurrentViewerId.Value, cancellationToken);
+    }
+
+    internal static async Task SetTextVariableAsync(string name, string value, string scope = "system", string lifetime = "permanent", string? viewerId = null, CancellationToken cancellationToken = default)
+    {
+        await EnsureInitializedAsync(cancellationToken);
+        await new SqlitePersistentVariableStore(Database).SetTextAsync(name, value, scope, lifetime, viewerId ?? CurrentViewerId.Value, cancellationToken);
+    }
+
+    internal static async Task DeleteVariableAsync(string name, CancellationToken cancellationToken = default)
+    {
+        await EnsureInitializedAsync(cancellationToken);
+        await new SqlitePersistentVariableStore(Database).DeleteAsync(name, cancellationToken);
+    }
+
+    internal static async Task<string> ResolveVariablesAsync(string text, CancellationToken cancellationToken = default)
+    {
+        await EnsureInitializedAsync(cancellationToken);
+        var store = new SqlitePersistentVariableStore(Database);
+        return await ReplaceVariableTokensAsync(text, name => store.GetValueAsync(name, "viewer", CurrentViewerId.Value, cancellationToken).ContinueWith(async viewer => await viewer ?? await store.GetValueAsync(name, cancellationToken), cancellationToken).Unwrap());
+    }
+
+    internal static async Task<string> ReplaceVariableTokensAsync(string text, Func<string, Task<string?>> lookup)
+    {
+        var matches = VariableToken.Matches(text);
+        if (matches.Count == 0) return text;
+        var result = text;
+        foreach (var name in matches.Select(match => match.Groups[1].Value).Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            var value = await lookup(name)
+                ?? throw new InvalidOperationException(UiLanguageState.IsEnglish ? $"Variable not found: {name}" : $"Variable introuvable : {name}");
+            result = Regex.Replace(result, $"%{Regex.Escape(name)}%", _ => value, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        }
+        return result;
+    }
 
     internal static async Task ProcessNotificationAsync(TwitchNotification notification, CancellationToken cancellationToken = default)
     {
@@ -75,20 +216,62 @@ internal static class PrototypeServices
         if (trigger is null) return;
         await EnsureInitializedAsync(cancellationToken);
         var payload = (JsonObject)notification.Data.DeepClone();
-        payload["userName"] = payload["user_name"]?.ToString() ?? payload["from_broadcaster_user_name"]?.ToString() ?? payload["broadcaster_user_name"]?.ToString() ?? trigger.English;
-        payload["userLogin"] = payload["user_login"]?.ToString() ?? payload["from_broadcaster_user_login"]?.ToString() ?? "";
-        payload["userId"] = payload["user_id"]?.ToString() ?? payload["from_broadcaster_user_id"]?.ToString() ?? "";
+        payload["userName"] = payload["user_name"]?.ToString() ?? payload["chatter_user_name"]?.ToString() ?? payload["from_broadcaster_user_name"]?.ToString() ?? payload["broadcaster_user_name"]?.ToString() ?? trigger.English;
+        payload["userLogin"] = payload["user_login"]?.ToString() ?? payload["chatter_user_login"]?.ToString() ?? payload["chatter_user_name"]?.ToString() ?? payload["from_broadcaster_user_login"]?.ToString() ?? "";
+        payload["userId"] = payload["user_id"]?.ToString() ?? payload["chatter_user_id"]?.ToString() ?? payload["from_broadcaster_user_id"]?.ToString() ?? "";
         var envelope = new EventEnvelope(Guid.NewGuid(), "twitch", "twitch-principal", notification.MessageId, notification.EventType, notification.Version, DateTimeOffset.UtcNow, payload);
         await ExecutionGate.WaitAsync(cancellationToken);
         try
         {
             var repository = new SqliteWorkflowRepository(Database);
-            var workflows = (await repository.GetEnabledPublishedAsync(cancellationToken)).Where(workflow => workflow.Blocks.Any(block => block.Type == trigger.BlockType)).ToArray();
+            var chatText = payload["message"]?.ToString();
+            if (payload["message"] is JsonObject messageObject) chatText = messageObject["text"]?.ToString();
+            chatText ??= payload["message_text"]?.ToString();
+            var commandText = chatText?.Split(' ', 2)[0];
+            var workflows = (await repository.GetEnabledPublishedAsync(cancellationToken)).Where(workflow => workflow.Blocks.Any(block =>
+                block.Type == trigger.BlockType && (block.Type switch
+                {
+                    "twitch.channel.chat.message.received" => CommandAllowed(workflow.Id, block, payload, commandText),
+                    "twitch.channel.channel_points_custom_reward_redemption.add.received" => string.IsNullOrWhiteSpace(block.Parameters["reward"]?.ToString()) || string.Equals(block.Parameters["reward"]?.ToString(), payload["reward"]?["title"]?.ToString(), StringComparison.OrdinalIgnoreCase),
+                    _ => true
+                }))).ToArray();
             var requests = workflows.Select(workflow => new ExecutionRequest(Guid.NewGuid(), envelope.Id, workflow.Id, workflow.Revision, DateTimeOffset.UtcNow)).ToArray();
             if (await new SqliteEventAdmissionStore(Database).TryAdmitAsync(envelope, requests, cancellationToken) == Automation.Contracts.Persistence.EventAdmissionResult.Admitted)
-                await DrainQueueAsync(repository, requests.Select(request => request.Id), cancellationToken, eventTrigger: trigger.BlockType);
+                CurrentViewerId.Value = payload["userId"]?.ToString();
+                CurrentViewerLogin.Value = payload["userLogin"]?.ToString();
+                try { await DrainQueueAsync(repository, requests.Select(request => request.Id), cancellationToken, eventTrigger: trigger.BlockType); }
+                finally { CurrentViewerId.Value = null; CurrentViewerLogin.Value = null; }
         }
         finally { ExecutionGate.Release(); }
+    }
+
+    private static bool CommandAllowed(Guid workflowId, WorkflowBlock block, JsonObject payload, string? commandText)
+    {
+        if (!string.Equals(block.Parameters["command"]?.ToString()?.Trim(), commandText, StringComparison.OrdinalIgnoreCase)) return false;
+        var badges = payload["badges"] as JsonArray;
+        bool HasBadge(string name) => badges?.Any(item => item is JsonObject badge && string.Equals(badge["set_id"]?.ToString(), name, StringComparison.OrdinalIgnoreCase)) == true;
+        var isModerator = HasBadge("moderator") || HasBadge("lead_moderator") || HasBadge("broadcaster") || payload["is_mod"]?.GetValue<bool>() == true || !string.IsNullOrWhiteSpace(payload["moderator_user_id"]?.ToString());
+        var isVip = HasBadge("vip") || isModerator;
+        var mode = block.Parameters["permission"]?.ToString() ?? "everyone";
+        var allowedUser = block.Parameters["allowedUser"]?.ToString()?.Trim();
+        if (mode == "viewer" && string.IsNullOrWhiteSpace(allowedUser)) return false;
+        if (!string.IsNullOrWhiteSpace(allowedUser))
+        {
+            var login = payload["chatter_user_login"]?.ToString() ?? payload["user_login"]?.ToString() ?? payload["userLogin"]?.ToString();
+            if (!string.Equals(login, allowedUser.TrimStart('@'), StringComparison.OrdinalIgnoreCase)) return false;
+        }
+        if (mode == "moderator" && !isModerator) return false;
+        if (mode == "vip" && !isVip) return false;
+        if (!double.TryParse(block.Parameters["cooldownSeconds"]?.ToString(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var seconds) || seconds <= 0) return true;
+        var cooldownScope = block.Parameters["cooldownScope"]?.ToString() ?? "global";
+        var viewerKey = payload["chatter_user_id"]?.ToString() ?? payload["user_id"]?.ToString() ?? "unknown";
+        var key = cooldownScope == "viewer"
+            ? $"{workflowId:D}:{block.Id:D}:{commandText}:{viewerKey}"
+            : $"{workflowId:D}:{block.Id:D}:{commandText}";
+        var now = DateTimeOffset.UtcNow;
+        if (CommandCooldowns.TryGetValue(key, out var until) && until > now) return false;
+        CommandCooldowns[key] = now.AddSeconds(seconds);
+        return true;
     }
 
     internal static async Task<FollowerProcessingResult> ProcessFollowAsync(
@@ -125,7 +308,10 @@ internal static class PrototypeServices
             ExecutionStatus? status = null;
             if (admission == Automation.Contracts.Persistence.EventAdmissionResult.Admitted)
             {
-                status = await DrainQueueAsync(repository, requests.Select(request => request.Id), cancellationToken);
+                CurrentViewerId.Value = follow.UserId;
+                CurrentViewerLogin.Value = follow.UserLogin;
+                try { status = await DrainQueueAsync(repository, requests.Select(request => request.Id), cancellationToken); }
+                finally { CurrentViewerId.Value = null; CurrentViewerLogin.Value = null; }
             }
             return new FollowerProcessingResult(admission, status, await new SqlitePersistentVariableStore(Database).GetIntegerAsync("followersTraites", cancellationToken) ?? 0);
         }
@@ -137,12 +323,15 @@ internal static class PrototypeServices
         var workflowId = CurrentWorkflowId;
         await EnsureInitializedAsync(token);
         var repository = new SqliteWorkflowRepository(Database);
+        if (!(await repository.GetEnabledPublishedAsync(token)).Any(candidate => candidate.Id == workflowId))
+            throw new InvalidOperationException(UiLanguageState.IsEnglish ? "Activate this automation before running it." : "Active cette automatisation avant de l’exécuter.");
         var workflow = await repository.GetPublishedAsync(workflowId, token)
-            ?? throw new InvalidOperationException(UiLanguageState.IsEnglish ? "Publish this workflow first using Start." : "Publie d’abord ce workflow avec Démarrer.");
+            ?? throw new InvalidOperationException(UiLanguageState.IsEnglish ? "Publish this workflow first." : "Publie d’abord cette automatisation.");
         var manualTriggers = workflow.Blocks.Where(block => block.Type == "manual.run").Select(block => block.Id).ToHashSet();
         if (!workflow.Connections.Any(edge => manualTriggers.Contains(edge.FromBlockId)))
             throw new InvalidOperationException(UiLanguageState.IsEnglish ? "Connect Manual run to an action, then save and publish the workflow." : "Relie Exécution manuelle à une action, puis enregistre et publie le workflow.");
-        EnsureValid(workflow);
+        var cyclesAllowed = workflow.Blocks.Any(block => block.Parameters["allowCycles"]?.GetValue<bool>() == true);
+        EnsureValid(workflow, cyclesAllowed);
         var errors = ExecutableWorkflowValidator.Validate(workflow, UiLanguageState.IsEnglish);
         if (errors.Count > 0) throw new InvalidOperationException(string.Join(" · ", errors.Select(error => error.Message)));
         var envelope = new EventEnvelope(Guid.NewGuid(), "manual", "local", Guid.NewGuid().ToString("N"), "manual.run", 1, DateTimeOffset.UtcNow,
@@ -164,8 +353,8 @@ internal static class PrototypeServices
         CancellationTokenSource? executionCancellation = null;
         var runner = new WorkflowExecutionRunner(new SqliteExecutionStore(Database), async (id, revision, ct) =>
         {
-            if (id != manualWorkflow && !(await repository.GetEnabledPublishedAsync(ct)).Any(workflow => workflow.Id == id))
-                throw new OperationCanceledException("Automation stopped before execution.");
+            if (!(await repository.GetEnabledPublishedAsync(ct)).Any(workflow => workflow.Id == id))
+                throw new OperationCanceledException(UiLanguageState.IsEnglish ? "Automation disabled before execution." : "Automatisation désactivée avant l’exécution.");
             runningId = id;
             executionCancellation = CancellationTokenSource.CreateLinkedTokenSource(ct);
             Running[id] = executionCancellation;
@@ -180,13 +369,15 @@ internal static class PrototypeServices
         {
             if (block.Type != "core.condition") return null;
             var name = block.Parameters["name"]!.GetValue<string>();
-            var actual = await new SqlitePersistentVariableStore(Database).GetIntegerAsync(name, executionCancellation?.Token ?? ct)
+            var actual = await new SqlitePersistentVariableStore(Database).GetIntegerAsync(name, block.Parameters["scope"]?.ToString() ?? "system", CurrentViewerId.Value, executionCancellation?.Token ?? ct)
                 ?? throw new InvalidOperationException($"Variable not found: {name}");
             var expected = long.Parse(block.Parameters["value"]!.ToString(), System.Globalization.CultureInfo.InvariantCulture);
             var result = block.Parameters["comparison"]?.ToString() switch
             {
                 "greater" => actual > expected,
+                "greaterOrEqual" => actual >= expected,
                 "less" => actual < expected,
+                "lessOrEqual" => actual <= expected,
                 _ => actual == expected
             };
             return result ? "yes" : "no";
@@ -216,6 +407,7 @@ internal static class PrototypeServices
         if (block.Type == "twitch.follow.received") return "Follower event received";
         if (TwitchTriggerCatalog.FindBlock(block.Type) is { } trigger) return "Event received: " + trigger.English;
         if (block.Type == "manual.run") return "Manual run";
+        if (block.Type == "core.timer") return "Timer elapsed";
         if (block.Parameters["label"] is null) throw new InvalidOperationException("Republish this legacy prototype workflow before running it.");
         string Required(string key) => block.Parameters[key]?.ToString() is { Length: > 0 } value ? value
             : throw new InvalidOperationException($"Missing parameter: {key}");
@@ -232,12 +424,21 @@ internal static class PrototypeServices
                 return $"OBS: {sources.Length} source(s) {(visible ? "shown" : "hidden")}";
             case "obs.scene.set-current":
                 if (obs?.IsConnected != true) throw new InvalidOperationException("OBS disconnected");
-                await obs.SetCurrentProgramSceneAsync("obs-principal", Required("scene"), token);
-                return $"OBS scene: {Required("scene")}";
+                var resolvedScene = await ResolveVariablesAsync(Required("scene"), token);
+                await obs.SetCurrentProgramSceneAsync("obs-principal", resolvedScene, token);
+                return $"OBS scene: {resolvedScene}";
             case "obs.replay.start":
                 if (obs?.IsConnected != true) throw new InvalidOperationException("OBS disconnected");
                 await obs.StartReplayBufferAsync(token);
                 return "OBS replay buffer started";
+            case "obs.output.record":
+            case "obs.output.replay":
+            case "obs.output.virtual-camera":
+                if (obs?.IsConnected != true) throw new InvalidOperationException("OBS is disconnected.");
+                var output = block.Type["obs.output.".Length..];
+                var operation = block.Parameters["operation"]?.ToString() ?? "start";
+                await obs.ControlOutputAsync(output, operation, token);
+                return $"OBS {output}: {operation}";
             case "obs.screenshot":
                 if (obs?.IsConnected != true) throw new InvalidOperationException("OBS disconnected");
                 var image = await obs.GetScreenshotAsync(Required("scene"), token);
@@ -249,21 +450,34 @@ internal static class PrototypeServices
             case "twitch.update-title":
                 var identity = TwitchSessionState.Identity ?? throw new InvalidOperationException("Twitch disconnected");
                 var credentials = TwitchSessionState.Token ?? throw new InvalidOperationException("Twitch disconnected");
-                await new TwitchChannelClient(Http).SetTitleAsync(identity, credentials, Required("title"), token);
+                await new TwitchChannelClient(Http).SetTitleAsync(identity, credentials, await ResolveVariablesAsync(Required("title"), token), token);
                 return "Twitch title updated";
             case "twitch.send-message":
             case "twitch.create-clip":
+            case "twitch.create-reward":
             case "twitch.get-user":
                 var twitchIdentity = TwitchSessionState.Identity ?? throw new InvalidOperationException("Twitch disconnected");
                 var twitchToken = TwitchSessionState.Token ?? throw new InvalidOperationException("Twitch disconnected");
                 var twitch = new TwitchChannelClient(Http);
                 if (block.Type == "twitch.send-message")
                 {
-                    await twitch.SendMessageAsync(twitchIdentity, twitchToken, Required("message"), token);
+                    await twitch.SendMessageAsync(twitchIdentity, twitchToken, await ResolveVariablesAsync(Required("message"), token), token);
                     return "Twitch message sent";
                 }
                 if (block.Type == "twitch.create-clip") return "Twitch clip: " + await twitch.CreateClipAsync(twitchIdentity, twitchToken, token);
-                return "Twitch user: " + await twitch.GetUserAsync(twitchIdentity, twitchToken, Required("login"), token);
+                if (block.Type == "twitch.create-reward") return "Twitch reward: " + await twitch.CreateCustomRewardAsync(twitchIdentity, twitchToken, await ResolveVariablesAsync(Required("title"), token), int.Parse(Required("cost"), System.Globalization.CultureInfo.InvariantCulture), token);
+                var requestedLogin = block.Parameters["login"]?.ToString()?.Trim();
+                var userResult = !string.IsNullOrWhiteSpace(CurrentViewerLogin.Value)
+                    ? CurrentViewerLogin.Value!
+                    : !string.IsNullOrWhiteSpace(requestedLogin)
+                        ? (await twitch.GetUserAsync(twitchIdentity, twitchToken, await ResolveVariablesAsync(requestedLogin, token), token)).Split(" · ID ", StringSplitOptions.None)[0]
+                        : throw new InvalidOperationException("Cette action doit être déclenchée par un viewer Twitch.");
+                if (!string.IsNullOrWhiteSpace(block.Parameters["outputVariable"]?.ToString()))
+                {
+                    var outputVariable = block.Parameters["outputVariable"]!.ToString();
+                    await new SqlitePersistentVariableStore(Database).SetTextAsync(outputVariable, userResult, "system", "temporary", CurrentViewerId.Value, token);
+                }
+                return "Twitch user: " + userResult;
             case "core.delay":
                 if (!double.TryParse(Required("seconds"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var seconds) || !double.IsFinite(seconds) || seconds < 0 || seconds > 3600)
                     throw new InvalidOperationException("Delay must be between 0 and 3600 seconds");
@@ -278,9 +492,26 @@ internal static class PrototypeServices
                 var name = Required("name");
                 var value = long.Parse(Required("value"), System.Globalization.CultureInfo.InvariantCulture);
                 var variables = new SqlitePersistentVariableStore(Database);
-                if (block.Type == "variables.increment") value = await variables.IncrementAsync(name, value, token);
-                else await variables.SetIntegerAsync(name, value, token);
+                var scope = block.Parameters["scope"]?.ToString() ?? "system";
+                var lifetime = block.Parameters["lifetime"]?.ToString() ?? "permanent";
+                if (block.Type == "variables.increment" && scope == "system") value = await variables.IncrementAsync(name, value, token);
+                else await variables.SetIntegerAsync(name, value, scope, lifetime, CurrentViewerId.Value, token);
                 return $"Variable {name}: {value}";
+            case "variables.set-text":
+                var textName = Required("name");
+                var textValue = block.Parameters["value"]?.ToString() ?? "";
+                await new SqlitePersistentVariableStore(Database).SetTextAsync(textName, textValue, block.Parameters["scope"]?.ToString() ?? "system", block.Parameters["lifetime"]?.ToString() ?? "permanent", CurrentViewerId.Value, token);
+                return $"Variable {textName}: {textValue}";
+            case "variables.number-expression":
+                var expressionName = Required("name");
+                var expression = Required("value");
+                var expressionStore = new SqlitePersistentVariableStore(Database);
+                var expressionScope = block.Parameters["scope"]?.ToString() ?? "system";
+                var currentValue = await expressionStore.GetIntegerAsync(expressionName, expressionScope, CurrentViewerId.Value, token) ?? 0;
+                if (!NumericVariableExpression.TryApply(expression, currentValue, out var expressionResult))
+                    throw new InvalidOperationException(UiLanguageState.IsEnglish ? "Invalid number expression." : "Expression numérique invalide.");
+                await expressionStore.SetIntegerAsync(expressionName, expressionResult, block.Parameters["scope"]?.ToString() ?? "system", block.Parameters["lifetime"]?.ToString() ?? "permanent", CurrentViewerId.Value, token);
+                return $"Variable {expressionName}: {expressionResult}";
             default: throw new NotSupportedException($"Action not implemented: {block.Type}");
         }
     }
@@ -342,15 +573,18 @@ internal static class PrototypeServices
             try { running.Cancel(); } catch (ObjectDisposedException) { }
     }
 
-    internal static async Task PublishPrototypeAsync(IReadOnlyCollection<string>? selectedActions = null, IReadOnlyCollection<(string From, string To)>? manualLinks = null, CancellationToken cancellationToken = default)
+    internal static async Task PublishPrototypeAsync(IReadOnlyCollection<string>? selectedActions = null, IReadOnlyCollection<(string From, string To)>? manualLinks = null, bool allowCycles = false, CancellationToken cancellationToken = default)
     {
         var workflow = CreatePrototypeWorkflow(selectedActions, manualLinks);
+        if (allowCycles)
+            foreach (var trigger in workflow.Blocks.Where(block => IsTriggerType(block.Type)))
+                trigger.Parameters["allowCycles"] = true;
         await EnsureInitializedAsync(cancellationToken);
         var repository = new SqliteWorkflowRepository(Database);
         var previous = await repository.GetPublishedAsync(workflow.Id, cancellationToken);
         var revision = (previous?.Revision ?? 0) + 1;
         workflow = workflow with { Enabled = true, Revision = revision };
-        EnsureValid(workflow);
+        EnsureValid(workflow, allowCycles);
         var executionErrors = ExecutableWorkflowValidator.Validate(workflow, UiLanguageState.IsEnglish);
         if (executionErrors.Count > 0) throw new InvalidOperationException(string.Join(" · ", executionErrors.Select(error => error.Message)));
         foreach (var trigger in workflow.Blocks.Select(block => TwitchTriggerCatalog.FindBlock(block.Type)).OfType<TwitchTrigger>())
@@ -359,12 +593,12 @@ internal static class PrototypeServices
                 throw new InvalidOperationException(UiLanguageState.IsEnglish ? "Connect Twitch before enabling this event." : "Connecte Twitch avant d’activer cet événement.");
             if (trigger.Scope.Length > 0 && TwitchSessionState.Identity?.Scopes.Contains(trigger.Scope) != true)
                 throw new InvalidOperationException(UiLanguageState.IsEnglish ? $"Reconnect Twitch to grant {trigger.Scope}." : $"Reconnecte Twitch pour autoriser {trigger.Scope}.");
-            if (TwitchSessionState.EventSubClient.SubscriptionErrors.Contains(trigger.EventType))
-                throw new InvalidOperationException(UiLanguageState.IsEnglish ? $"Twitch refused this event: {trigger.English}." : $"Twitch a refusé cet événement : {trigger.French}.");
+            if (TwitchSessionState.EventSubClient.SubscriptionErrors.Any(error => error.StartsWith(trigger.EventType + ":", StringComparison.Ordinal)))
+                throw new InvalidOperationException(UiLanguageState.IsEnglish ? $"Twitch refused this event: {trigger.English}. Reconnect Twitch and check its permissions." : $"Twitch a refusé cet événement : {trigger.French}. Reconnecte Twitch et vérifie ses permissions.");
         }
         if (workflow.Blocks.Any(block => block.Type == "twitch.update-title") && TwitchSessionState.Identity?.Scopes.Contains("channel:manage:broadcast") != true)
             throw new InvalidOperationException(UiLanguageState.IsEnglish ? "Reconnect Twitch to grant permission to edit the title." : "Reconnecte Twitch pour autoriser la modification du titre.");
-        foreach (var (type, scope) in new[] { ("twitch.send-message", "user:write:chat"), ("twitch.create-clip", "clips:edit") })
+        foreach (var (type, scope) in new[] { ("twitch.send-message", "user:write:chat"), ("twitch.create-clip", "clips:edit"), ("twitch.create-reward", "channel:manage:redemptions"), ("twitch.channel.chat.message.received", "user:read:chat") })
             if (workflow.Blocks.Any(block => block.Type == type) && TwitchSessionState.Identity?.Scopes.Contains(scope) != true)
                 throw new InvalidOperationException(UiLanguageState.IsEnglish ? $"Reconnect Twitch to grant {scope}." : $"Reconnecte Twitch pour autoriser {scope}.");
         await ValidateConnectionsAsync(workflow, cancellationToken);
@@ -382,7 +616,7 @@ internal static class PrototypeServices
             var scenes = await obs.GetSceneNamesAsync(token);
             foreach (var block in obsBlocks)
             {
-                if (block.Type == "obs.replay.start") continue;
+                if (block.Type == "obs.replay.start" || block.Type.StartsWith("obs.output.", StringComparison.Ordinal)) continue;
                 var scene = block.Parameters["scene"]!.ToString();
                 if (!scenes.Contains(scene)) throw new InvalidOperationException(Text($"Scène OBS introuvable : {scene}", $"OBS scene not found: {scene}"));
                 if (block.Type == "obs.set-source-visible")
@@ -402,9 +636,15 @@ internal static class PrototypeServices
 
     private static WorkflowDefinition CreatePrototypeWorkflow(IReadOnlyCollection<string>? selectedActions, IReadOnlyCollection<(string From, string To)>? manualLinks) 
     {
-        var triggerTypes = CurrentTriggerTypes.Count == 0 ? new[] { CurrentTriggerType } : CurrentTriggerTypes.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-        var blocks = triggerTypes.Select((type, index) => new WorkflowBlock(
-            index == 0 ? PrototypeWorkflowIds.TriggerBlockId : Guid.NewGuid(), type, 1, new JsonObject())).ToList();
+        var triggerTypes = CurrentTriggerTypes.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        var blocks = triggerTypes.Select((type, index) =>
+        {
+            var key = index == 0 ? "__trigger__" : $"__trigger__:{type}";
+            var storageKey = TriggerOptionStorageKey(CurrentWorkflowId, key);
+            var parameters = TriggerOptions.TryGetValue(storageKey, out var options) ? (JsonObject)options.DeepClone() : new JsonObject();
+            if (type == "core.timer" && parameters["seconds"] is null) parameters["seconds"] = "60";
+            return new WorkflowBlock(index == 0 ? PrototypeWorkflowIds.TriggerBlockId : Guid.NewGuid(), type, 1, parameters);
+        }).ToList();
         var connections = new List<WorkflowConnection>
         {
         };
@@ -425,7 +665,9 @@ internal static class PrototypeServices
             if (ActionTypeFor(label) == "obs.set-source-visible")
                 parameters["visible"] = SourceVisibility.GetValueOrDefault(label, true);
             var type = ActionTypeFor(label);
-            if (type == "variables.set-integer" && parameters["operation"]?.ToString() == "increment") type = "variables.increment";
+            if (type == "variables.set-integer")
+                type = parameters["valueType"]?.ToString() == "text" ? "variables.set-text"
+                    : "variables.number-expression";
             blocks.Add(new WorkflowBlock(id, type, 1, parameters));
         }
 
@@ -456,9 +698,13 @@ internal static class PrototypeServices
 
     internal static string ActionTypeFor(string label) => label.ToLowerInvariant() switch
     {
+        var value when value.Contains("enregistrement obs") || value.Contains("obs recording") => "obs.output.record",
+        var value when value.Contains("tampon replay") || value.Contains("replay buffer") => "obs.output.replay",
+        var value when value.Contains("caméra virtuelle") || value.Contains("virtual camera") => "obs.output.virtual-camera",
         var value when value.Contains("clip") => "twitch.create-clip",
         var value when value.Contains("titre") || value.Contains("title") => "twitch.update-title",
         var value when value.Contains("message") => "twitch.send-message",
+        var value when value.Contains("récompense") || value.Contains("reward") => "twitch.create-reward",
         var value when value.Contains("utilisateur") || value.Contains("user") => "twitch.get-user",
         var value when value.Contains("capture") || value.Contains("screenshot") => "obs.screenshot",
         var value when value.Contains("source") => "obs.set-source-visible",
@@ -471,12 +717,13 @@ internal static class PrototypeServices
         _ => "core.action"
     };
 
-    private static void EnsureValid(WorkflowDefinition workflow)
+    private static void EnsureValid(WorkflowDefinition workflow, bool allowCycles = false)
     {
         var result = new WorkflowValidator(new InitialBlockCatalog()).Validate(workflow);
-        if (!result.IsValid)
+        var blocking = result.Diagnostics.Where(diagnostic => !allowCycles || diagnostic.Code != "workflow.cycle").ToArray();
+        if (blocking.Length > 0)
         {
-            throw new InvalidOperationException(string.Join(" ", result.Diagnostics.Select(diagnostic => diagnostic.Message)));
+            throw new InvalidOperationException(string.Join(" ", blocking.Select(diagnostic => diagnostic.Message)));
         }
     }
 
@@ -493,6 +740,7 @@ internal static class PrototypeServices
             if (!initialized)
             {
                 await Database.InitializeAsync(cancellationToken);
+                await new SqlitePersistentVariableStore(Database).DeleteTemporaryAsync(cancellationToken);
                 await new SqliteExecutionStore(Database).RecoverAbandonedAsync(cancellationToken);
                 initialized = true;
             }

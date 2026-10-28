@@ -18,3 +18,15 @@ dotnet run --project src/Automation.Desktop
 ```
 
 The Windows build uses the same local data model and can be published self-contained with the .NET SDK.
+
+## Backups and offline restore
+
+Settings provides **Create backup**. Database snapshots are written to `data/backups` with an integrity check. An existing database is also backed up before a schema migration. Snapshots include workflows, settings, variables and history; system credentials and media files are not included.
+
+To restore, close CuezyBot and run the desktop executable with:
+
+```bash
+dotnet run --project src/Automation.Desktop --no-build -- --restore-backup "/absolute/path/to/backup.db" --confirm-restore
+```
+
+For a published build, pass the same arguments to its executable. The destination is the `data` folder beside that executable. The command verifies a complete schema-v4 backup, refuses an active data directory, saves a safety copy of existing data, and restores the snapshot. Restored automations are disabled and pending/running requests expire. Start CuezyBot normally, review the workflows and connections, then enable the desired automations. Restoring from the graphical interface is not yet implemented.

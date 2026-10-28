@@ -12,7 +12,7 @@
     <Style Selector="Button.primary:pointerover"><Setter Property="Background" Value="#A44DFF" /></Style>
     <Style Selector="ComboBox"><Setter Property="FontFamily" Value="Inter" /><Setter Property="Background" Value="#171B34" /><Setter Property="Foreground" Value="#F4F3FF" /><Setter Property="BorderBrush" Value="#3A4264" /><Setter Property="BorderThickness" Value="1" /></Style>
   </Window.Styles>
-  <StackPanel Margin="28" Spacing="18">
+  <ScrollViewer><StackPanel Margin="28" Spacing="18">
     <TextBlock x:Name="SettingsTitle" Text="Paramètres" FontSize="24" FontWeight="SemiBold" />
     <TextBlock x:Name="SettingsDescription" Text="Personnalise le comportement de CuezyBot." Classes="muted" />
     <Border Background="#151A30" BorderBrush="#303858" BorderThickness="1" CornerRadius="10" Padding="16">
@@ -28,13 +28,39 @@
       </Grid>
     </Border>
     <TextBlock x:Name="IntegrationsTitle" Text="Intégrations" FontSize="17" FontWeight="SemiBold" Margin="0,8,0,0" />
-    <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
-      <Border Grid.Column="0" Background="#151A30" BorderBrush="#303858" BorderThickness="1" CornerRadius="10" Padding="13">
-        <StackPanel Spacing="9"><TextBlock Text="OBS Studio" FontWeight="SemiBold" /><TextBlock x:Name="ObsStatus" Text="Non connecté" Classes="muted" FontSize="11" TextWrapping="Wrap" /><Button x:Name="ObsButton" Classes="primary" Content="Configurer OBS" Click="OnObsClick" /></StackPanel>
+    <StackPanel Spacing="12">
+      <Border Background="#151A30" BorderBrush="#303858" BorderThickness="1" CornerRadius="10" Padding="16">
+        <StackPanel Spacing="9">
+          <TextBlock Text="OBS Studio" FontWeight="SemiBold" FontSize="15" />
+          <TextBlock x:Name="ObsStatus" Text="Non connecté" Classes="muted" FontSize="11" TextWrapping="Wrap" />
+          <CheckBox x:Name="ObsAutoReconnectCheck" Content="Reconnexion automatique" IsCheckedChanged="OnAutoReconnectChanged" />
+          <TextBlock x:Name="ObsAutoReconnectDescription" Text="Réessaie toutes les 15 secondes après une coupure." Classes="muted" FontSize="11" TextWrapping="Wrap" />
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <Button x:Name="ObsButton" Classes="primary" Content="Reconnecter" Click="OnObsClick" />
+            <Button x:Name="ObsConfigureButton" Content="Configurer" Click="OnObsConfigureClick" />
+          </StackPanel>
+        </StackPanel>
       </Border>
-      <Border Grid.Column="1" Background="#151A30" BorderBrush="#6336A4" BorderThickness="1" CornerRadius="10" Padding="13">
-        <StackPanel Spacing="9"><TextBlock Text="Twitch" FontWeight="SemiBold" /><TextBlock x:Name="TwitchStatus" Text="Non connecté" Classes="muted" FontSize="11" TextWrapping="Wrap" /><Button x:Name="TwitchButton" Classes="primary" Content="Connecter Twitch" Click="OnTwitchClick" /></StackPanel>
+      <Border Background="#151A30" BorderBrush="#6336A4" BorderThickness="1" CornerRadius="10" Padding="16">
+        <StackPanel Spacing="9">
+          <TextBlock Text="Twitch" FontWeight="SemiBold" FontSize="15" />
+          <TextBlock x:Name="TwitchStatus" Text="Non connecté" Classes="muted" FontSize="11" TextWrapping="Wrap" />
+          <CheckBox x:Name="TwitchAutoReconnectCheck" Content="Reconnexion automatique" IsCheckedChanged="OnAutoReconnectChanged" />
+          <TextBlock x:Name="TwitchAutoReconnectDescription" Text="Réessaie toutes les 15 secondes après une coupure." Classes="muted" FontSize="11" TextWrapping="Wrap" />
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <Button x:Name="TwitchButton" Classes="primary" Content="Reconnecter" Click="OnTwitchClick" />
+            <Button x:Name="TwitchAuthorizeButton" Content="Renouveler l’autorisation" Click="OnTwitchAuthorizeClick" />
+          </StackPanel>
+        </StackPanel>
       </Border>
-    </Grid>
-  </StackPanel>
+    </StackPanel>
+    <Border Background="#151A30" BorderBrush="#303858" BorderThickness="1" CornerRadius="10" Padding="13">
+      <StackPanel Spacing="9">
+        <TextBlock x:Name="BackupsTitle" Text="Sauvegardes" FontWeight="SemiBold" />
+        <TextBlock x:Name="BackupsDescription" Text="Sauvegarde les automatisations, réglages et historiques dans data/backups." Classes="muted" FontSize="11" TextWrapping="Wrap" />
+        <Button x:Name="BackupButton" Content="Créer une sauvegarde" Click="OnBackupClick" />
+        <TextBlock x:Name="BackupStatus" Classes="muted" FontSize="11" TextWrapping="Wrap" />
+      </StackPanel>
+    </Border>
+  </StackPanel></ScrollViewer>
 </Window>

@@ -29,9 +29,17 @@
       <Setter Property="Background" Value="#168A5D" />
       <Setter Property="Foreground" Value="White" />
     </Style>
+    <Style Selector="Button.systemAdd">
+      <Setter Property="Background" Value="#245A91" />
+      <Setter Property="Foreground" Value="White" />
+    </Style>
     <Style Selector="Button.surface">
       <Setter Property="Background" Value="#171B34" />
       <Setter Property="Foreground" Value="#E8E7F5" />
+    </Style>
+    <Style Selector="ToggleSwitch.activation">
+      <Setter Property="Foreground" Value="#E8E7F5" />
+      <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
     <Style Selector="Button.nav">
       <Setter Property="HorizontalContentAlignment" Value="Left" />
@@ -129,10 +137,9 @@
         <StackPanel Spacing="4">
           <Button Classes="nav" Content="⌂   Accueil" />
           <Button Classes="nav active" Content="⌘   Workflows" />
-          <Button Classes="nav" Content="⚡   Événements" Click="OnHistoryClick" />
-          <Button Classes="nav" Content="◇   Actions" />
-          <Button Classes="nav" Content="𝑥   Variables" />
-          <Button Classes="nav" Content="▣   Pages" />
+          <Button x:Name="HistoryButton" Classes="nav" Content="◷   Historique" Click="OnHistoryClick" />
+          <Button x:Name="VariablesButton" Classes="nav" Content="𝑥   Variables" Click="OnVariablesClick" />
+          <Button x:Name="RewardsButton" Classes="nav" Content="◎   Récompenses" Click="OnRewardsClick" />
         </StackPanel>
 
         <Border x:Name="CreatorCard" Grid.Row="1" Padding="13" CornerRadius="12" BorderBrush="#39466F" BorderThickness="1" IsVisible="False">
@@ -189,14 +196,18 @@
         <Border x:Name="WorkflowToolbar" Canvas.Right="18" Canvas.Top="18" Background="#11162B" BorderBrush="#2C3353" BorderThickness="1" CornerRadius="10" Padding="6,5">
           <StackPanel Orientation="Horizontal" Spacing="5">
             <TextBlock x:Name="TestStatus" Text="Brouillon enregistré" Classes="muted" FontSize="11" VerticalAlignment="Center" Margin="3,0,4,0" MaxWidth="300" TextWrapping="Wrap" />
-            <Button x:Name="AddCanvasItemButton" Classes="primary" Content="＋  Action" Click="OnAddCanvasItemClick" Padding="9,7" ToolTip.Tip="Ajouter une action au canevas" />
             <Button x:Name="AddCanvasEventButton" Classes="eventAdd" Content="＋  Événement" Click="OnAddCanvasEventClick" Padding="9,7" ToolTip.Tip="Ajouter un événement au canevas" />
-            <Button Classes="surface" Content="▷  Tester" Click="OnTestClick" Padding="9,7" />
-            <Button x:Name="RunOnceButton" Classes="surface" Content="Exécuter" Click="OnRunOnceClick" Padding="9,7" ToolTip.Tip="Exécuter la version publiée avec des effets réels" />
+            <Button x:Name="AddCanvasItemButton" Classes="primary" Content="＋  Action" Click="OnAddCanvasItemClick" Padding="9,7" ToolTip.Tip="Ajouter une action au canevas" />
+            <Button x:Name="AddCanvasSystemButton" Classes="systemAdd" Content="＋  Système" Click="OnAddCanvasSystemClick" Padding="9,7" ToolTip.Tip="Ajouter une fonction interne au canevas" />
+            <Button Classes="surface" Content="▷  Tester" Click="OnTestClick" Padding="9,7" IsVisible="False" />
+            <Button x:Name="RunOnceButton" Classes="surface" Content="Exécuter" Click="OnRunOnceClick" Padding="9,7" ToolTip.Tip="Exécuter la version publiée avec des effets réels" IsVisible="False" />
             <Button x:Name="UndoButton" Classes="surface" Content="↶" ToolTip.Tip="Annuler" Click="OnUndoClick" Padding="8,7" IsEnabled="False" />
             <Button x:Name="RedoButton" Classes="surface" Content="↷" ToolTip.Tip="Rétablir" Click="OnRedoClick" Padding="8,7" IsEnabled="False" />
             <Button x:Name="SaveWorkflowButton" Classes="surface" Content="Enregistrer" Click="OnSaveWorkflowClick" Padding="9,7" />
-            <Button x:Name="StartWorkflowButton" Classes="primary" Content="▶  Démarrer" Click="OnStartWorkflowClick" Padding="9,7" />
+            <ToggleSwitch x:Name="StartWorkflowButton" Classes="activation" IsChecked="False"
+                          OnContent="Activée" OffContent="Désactivée"
+                          IsCheckedChanged="OnWorkflowActivationChanged"
+                          ToolTip.Tip="Active ou désactive les déclencheurs automatiques" />
           </StackPanel>
         </Border>
 

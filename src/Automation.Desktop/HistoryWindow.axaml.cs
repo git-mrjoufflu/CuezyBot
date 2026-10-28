@@ -35,7 +35,7 @@ public sealed partial class HistoryWindow : Window
             var database = new SqliteDatabase(new AppDataPaths());
             await database.InitializeAsync();
             var entries = await new SqliteExecutionHistoryReader(database).GetRecentAsync(50);
-            var rows = entries.Select(ToRow).ToArray();
+            var rows = entries.Reverse().Select(ToRow).ToArray();
             HistoryItems.ItemsSource = rows;
             ApplyStaticLanguage();
             HistoryStatus.Text = rows.Length == 0

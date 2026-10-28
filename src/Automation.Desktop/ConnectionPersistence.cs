@@ -21,6 +21,19 @@ internal static class ConnectionPersistence
     private static readonly ISecretStore Secrets = PlatformSecretStore.Create();
     private static bool initialized;
     private static readonly SemaphoreSlim InitializationGate = new(1, 1);
+    private static readonly SemaphoreSlim ReconnectGate = new(1, 1);
+
+    internal static async Task<bool> GetAutoReconnectAsync(bool twitch)
+    {
+        await EnsureInitializedAsync(default);
+        return await Settings.GetAsync(twitch ? "twitch.autoReconnect" : "obs.autoReconnect") != "false";
+    }
+
+    internal static async Task SetAutoReconnectAsync(bool twitch, bool enabled)
+    {
+        await EnsureInitializedAsync(default);
+        await Settings.SetAsync(twitch ? "twitch.autoReconnect" : "obs.autoReconnect", enabled ? "true" : "false");
+    }
 
     internal static async Task SaveLanguageAsync(string language, CancellationToken cancellationToken = default)
     {
@@ -87,6 +100,23 @@ internal static class ConnectionPersistence
         return new ConnectionRestoreResult(obsConnected, twitchConnected, errors);
     }
 
+    internal static async Task<ConnectionRestoreResult> ReconnectAsync(bool twitch, CancellationToken cancellationToken = default)
+    {
+        await ReconnectGate.WaitAsync(cancellationToken);
+        var errors = new List<string>();
+        var connected = false;
+        try
+        {
+            await EnsureInitializedAsync(cancellationToken);
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeout.CancelAfter(TimeSpan.FromSeconds(30));
+            connected = twitch ? await RestoreTwitchAsync(errors, timeout.Token) : await RestoreObsAsync(errors, timeout.Token);
+        }
+        catch (Exception exception) { errors.Add(exception.Message); }
+        finally { ReconnectGate.Release(); }
+        return new ConnectionRestoreResult(!twitch && connected, twitch && connected, errors);
+    }
+
     private static async Task<bool> RestoreObsAsync(
         ICollection<string> errors,
         CancellationToken cancellationToken)
@@ -99,15 +129,18 @@ internal static class ConnectionPersistence
             return false;
         }
 
+        var client = new ObsWebSocketClient();
         try
         {
-            var client = new ObsWebSocketClient();
             await client.ConnectAsync(new Uri($"ws://{host}:{port}"), password, cancellationToken);
+            var previous = ObsSessionState.Client;
             ObsSessionState.Client = client;
+            if (previous is not null) await previous.DisposeAsync();
             return true;
         }
         catch (Exception exception)
         {
+            await client.DisposeAsync();
             errors.Add($"OBS : {exception.Message}");
             return false;
         }

@@ -25,7 +25,8 @@ public sealed class TwitchTriggerRoutingTests
             Assert.Equal(100, parsed.Data["bits"]!.GetValue<int>());
             Assert.NotNull(new InitialBlockCatalog().Find(trigger.BlockType, 1));
             var start = Guid.NewGuid(); var action = Guid.NewGuid();
-            var workflow = new WorkflowDefinition(Guid.NewGuid(), 1, "Test", false, [new(start, trigger.BlockType, 1, new JsonObject()), new(action, "core.delay", 1, new JsonObject { ["seconds"] = 0 })], [new(start, "next", action)]);
+            var parameters = trigger.EventType == "channel.chat.message" ? new JsonObject { ["command"] = "!test" } : new JsonObject();
+            var workflow = new WorkflowDefinition(Guid.NewGuid(), 1, "Test", false, [new(start, trigger.BlockType, 1, parameters), new(action, "core.delay", 1, new JsonObject { ["seconds"] = 0 })], [new(start, "next", action)]);
             Assert.Empty(ExecutableWorkflowValidator.Validate(workflow, true));
             Assert.True(new WorkflowValidator(new InitialBlockCatalog()).Validate(workflow).IsValid);
         }
@@ -59,6 +60,21 @@ public sealed class TwitchTriggerRoutingTests
         await new WorkflowGraphRunner().RunAsync(WorkflowEventRouter.Select(workflow, "manual.run"), (block, _) => { executed.Add(block.Id); return Task.CompletedTask; }, TestContext.Current.CancellationToken);
         Assert.Equal(new[] { manual, manualAction }, executed);
         Assert.Empty(WorkflowEventRouter.Select(workflow with { Blocks = workflow.Blocks.Where(block => block.Id != manual).ToArray(), Connections = workflow.Connections.Where(edge => edge.FromBlockId != manual).ToArray() }, "manual.run").Blocks);
+    }
+
+    [Fact]
+    public async Task TimerRunsOnlyItsConnectedBranch()
+    {
+        var timer = new WorkflowBlock(Guid.NewGuid(), "core.timer", 1, new JsonObject { ["seconds"] = "5" });
+        var manual = new WorkflowBlock(Guid.NewGuid(), "manual.run", 1, new JsonObject());
+        var timerAction = new WorkflowBlock(Guid.NewGuid(), "core.delay", 1, new JsonObject { ["seconds"] = "0" });
+        var manualAction = new WorkflowBlock(Guid.NewGuid(), "core.delay", 1, new JsonObject { ["seconds"] = "0" });
+        var workflow = new WorkflowDefinition(Guid.NewGuid(), 1, "Timer", true, [timer, manual, timerAction, manualAction],
+            [new(timer.Id, "next", timerAction.Id), new(manual.Id, "next", manualAction.Id)]);
+        var executed = new List<Guid>();
+        await new WorkflowGraphRunner().RunAsync(WorkflowEventRouter.Select(workflow, "core.timer"),
+            (block, _) => { executed.Add(block.Id); return Task.CompletedTask; }, TestContext.Current.CancellationToken);
+        Assert.Equal(new[] { timer.Id, timerAction.Id }, executed);
     }
 
     [Fact]

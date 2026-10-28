@@ -3,12 +3,15 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Avalonia.Controls;
 using Automation.Persistence.Sqlite.Storage;
+using Avalonia.Threading;
 
 namespace Automation.Desktop;
 
 public sealed partial class App : global::Avalonia.Application
 {
     private RuntimeDataLease? runtimeLease;
+    private DispatcherTimer? reconnectTimer;
+    private DispatcherTimer? automationTimer;
     public override void Initialize() => AvaloniaXamlLoader.Load(this);
 
     public override void OnFrameworkInitializationCompleted()
@@ -37,6 +40,23 @@ public sealed partial class App : global::Avalonia.Application
             desktop.MainWindow = mainWindow;
             _ = RestoreLanguageAsync(mainWindow);
             _ = RestoreConnectionsAsync(mainWindow);
+            reconnectTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(15) };
+            reconnectTimer.Tick += async (_, _) =>
+            {
+                try { await AutoReconnect.RetryAsync(); }
+                catch { /* A later tick retries without opening an authentication dialog. */ }
+                mainWindow.UpdateIntegrationCount(ObsSessionState.Client?.IsConnected == true, TwitchSessionState.EventSubClient?.IsConnected == true);
+            };
+            reconnectTimer.Start();
+            automationTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+            automationTimer.Tick += async (_, _) =>
+            {
+                try { await PrototypeServices.ProcessTimersAsync(); }
+                catch { /* A faulty workflow is recorded by the execution engine; the scheduler keeps running. */ }
+            };
+            automationTimer.Start();
+            _ = PrototypeServices.ProcessTimersAsync();
+            desktop.Exit += (_, _) => { reconnectTimer.Stop(); automationTimer.Stop(); };
         }
 
         base.OnFrameworkInitializationCompleted();
@@ -62,13 +82,9 @@ public sealed partial class App : global::Avalonia.Application
     {
         try
         {
-            var result = await ConnectionPersistence.RestoreAsync();
-            mainWindow.UpdateIntegrationCount(result.ObsConnected, result.TwitchConnected);
-
-            if (result.Errors.Count > 0)
-            {
-                mainWindow.SetConnectionStatus($"Reconnexion incomplète : {string.Join(" · ", result.Errors)}");
-            }
+            await AutoReconnect.LoadAsync();
+            await AutoReconnect.RetryAsync();
+            mainWindow.UpdateIntegrationCount(ObsSessionState.Client?.IsConnected == true, TwitchSessionState.EventSubClient?.IsConnected == true);
         }
         catch (Exception exception)
         {

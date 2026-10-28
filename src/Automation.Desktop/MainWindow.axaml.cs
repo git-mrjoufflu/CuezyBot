@@ -6,6 +6,7 @@ using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.VisualTree;
 using Avalonia.Media.Imaging;
+using Avalonia.Platform.Storage;
 using System.Net.Http;
 using Avalonia.Threading;
 using System.IO;
@@ -22,7 +23,8 @@ public sealed partial class MainWindow : Window
     private readonly Stack<CanvasSnapshot> _redoActions = new();
     private CanvasSnapshot? _dragStartSnapshot;
     private sealed record CanvasSnapshot(string[] Actions, Dictionary<string, Point> Positions,
-        (string From, string To)[] Links, Dictionary<string, System.Text.Json.Nodes.JsonObject> Options, Dictionary<string, bool> Visibility, string[] Triggers);
+        (string From, string To)[] Links, Dictionary<string, System.Text.Json.Nodes.JsonObject> Options,
+        Dictionary<string, System.Text.Json.Nodes.JsonObject> TriggerOptions, Dictionary<string, bool> Visibility, string[] Triggers);
     private Border? _draggedNode;
     private Border? _selectedNode;
     private readonly List<Border> _dynamicNodes = new();
@@ -30,6 +32,8 @@ public sealed partial class MainWindow : Window
     private readonly List<Border> _additionalTriggerNodes = new();
     private readonly Dictionary<Border, Func<Task>> _obsCardRefresh = new();
     private readonly List<Avalonia.Controls.Shapes.Path> _dynamicLinks = new();
+    private readonly List<Border> _dynamicLinkLabels = new();
+    private readonly Dictionary<Border, (Border From, Border To)> _linkLabelMap = new();
     private readonly List<(Border From, Border To)> _manualLinks = new();
     private readonly Dictionary<Avalonia.Controls.Shapes.Path, (Border From, Border To)> _linkMap = new();
     private readonly List<string> _workflowNames = new() { "Mon Live Automatisation" };
@@ -40,6 +44,7 @@ public sealed partial class MainWindow : Window
     private bool _switchingWorkflow;
     private readonly Dictionary<string, Guid> _workflowIds = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<Guid> _enabledWorkflowIds = new();
+    private readonly HashSet<Guid> _cycleApprovals = new();
     private readonly Dictionary<Guid, string> _workflowTriggerKinds = new();
     private readonly Dictionary<Guid, string[]> _workflowTriggers = new();
     private Point _dragPointerStart;
@@ -48,6 +53,7 @@ public sealed partial class MainWindow : Window
     private double _canvasZoom = 1;
     private Point _canvasOffset;
     private Point? _panStart;
+    private bool _switchingActivation;
     private Point _panOffset;
 
     public MainWindow() : this(true) { }
@@ -56,6 +62,9 @@ public sealed partial class MainWindow : Window
     {
         InitializeComponent();
         var viewport = (Grid)WorkflowCanvas.Parent!;
+        viewport.Background = WorkflowCanvas.Background;
+        WorkflowCanvas.Background = Brushes.Transparent;
+        WorkflowCanvas.RenderTransformOrigin = new RelativePoint(0, 0, RelativeUnit.Relative);
         WorkflowCanvas.Children.Remove(WorkflowToolbar);
         WorkflowCanvas.Children.Remove(CanvasControls);
         viewport.Children.Add(WorkflowToolbar);
@@ -73,8 +82,10 @@ public sealed partial class MainWindow : Window
         viewport.PointerMoved += OnCanvasPanMoved;
         viewport.PointerReleased += OnCanvasPanReleased;
         _workflowIds[_activeWorkflowName] = PrototypeServices.CurrentWorkflowId;
+        _switchingWorkflow = true;
         WorkflowTriggerSelector.ItemsSource = new[] { "Manuel", "Nouveau follower" };
         WorkflowTriggerSelector.SelectedIndex = 0;
+        _switchingWorkflow = false;
         WorkflowSelector.ItemsSource = _workflowNames.ToArray();
         foreach (var node in new[] { EventNode, ConditionNode, ObsAlertNode })
         {
@@ -111,7 +122,7 @@ public sealed partial class MainWindow : Window
                     if (_workflowIds.ContainsKey(name)) name += $" ({draft.Id.ToString()[..8]})";
                     _workflowNames.Add(name);
                     _workflowIds[name] = draft.Id;
-                    _workflowTriggers[draft.Id] = draft.Blocks.Where(block => block.Type == "manual.run" || TwitchTriggerCatalog.FindBlock(block.Type) is not null).Select(block => block.Type).Distinct().ToArray();
+                    _workflowTriggers[draft.Id] = draft.Blocks.Where(block => PrototypeServices.IsTriggerType(block.Type)).Select(block => block.Type).Distinct().ToArray();
                     _workflowTriggerKinds[draft.Id] = _workflowTriggers[draft.Id].FirstOrDefault() ?? "manual.run";
                     _workflowActions[name] = draft.Blocks.Select(block => block.Parameters["label"]?.GetValue<string>()).OfType<string>().ToList();
                     var labels = draft.Blocks.Where(block => block.Parameters["label"] is not null || block.Parameters["triggerKey"] is not null).ToDictionary(block => block.Id, block => (block.Parameters["label"] ?? block.Parameters["triggerKey"])!.GetValue<string>());
@@ -148,7 +159,7 @@ public sealed partial class MainWindow : Window
                 UpdateDynamicLinks();
                 TestStatus.Text = _english ? "Draft restored" : "Brouillon restauré";
                 var savedPositions = await ConnectionPersistence.GetWorkflowPositionsAsync(_activeWorkflowName);
-                foreach (var node in _dynamicNodes)
+                foreach (var node in CanvasNodes())
                     if (node.Tag is string label && savedPositions.TryGetValue(label, out var position)) { Canvas.SetLeft(node, position.X); Canvas.SetTop(node, position.Y); }
                 UpdateDynamicLinks();
             }
@@ -158,7 +169,7 @@ public sealed partial class MainWindow : Window
                 TestStatus.Text = _english
                     ? $"Automation active · revision {publishedRevision}"
                     : $"Automatisation active · révision {publishedRevision}";
-                StartWorkflowButton.Content = _english ? "■  Stop" : "■  Arrêter";
+                SetActivationSwitch(_enabledWorkflowIds.Contains(PrototypeServices.CurrentWorkflowId));
             }
         }
         catch
@@ -183,14 +194,14 @@ public sealed partial class MainWindow : Window
         _workflowActions[_activeWorkflowName] = _selectedActions.ToList();
         _workflowTriggers[PrototypeServices.CurrentWorkflowId] = PrototypeServices.CurrentTriggerTypes.ToArray();
         _workflowLinks[_activeWorkflowName] = GetManualLinkLabels().ToList();
-        _workflowPositions[_activeWorkflowName] = _dynamicNodes.Where(node => node.Tag is string).ToDictionary(node => (string)node.Tag!, node => new Point(Canvas.GetLeft(node), Canvas.GetTop(node)));
+        _workflowPositions[_activeWorkflowName] = CaptureNodePositions();
         _workflowNames.Add(name);
         _workflowIds[name] = Guid.NewGuid();
         PrototypeServices.CurrentWorkflowId = _workflowIds[name];
         PrototypeServices.CurrentWorkflowName = name;
-        PrototypeServices.CurrentTriggerType = "manual.run";
-        PrototypeServices.CurrentTriggerTypes.Clear(); PrototypeServices.CurrentTriggerTypes.Add("manual.run");
-        _workflowTriggerKinds[_workflowIds[name]] = "manual.run";
+        PrototypeServices.CurrentTriggerType = "";
+        PrototypeServices.CurrentTriggerTypes.Clear();
+        _workflowTriggerKinds[_workflowIds[name]] = "";
         WorkflowTriggerSelector.SelectedIndex = 0;
         _workflowActions[name] = new List<string>();
         _workflowPositions[name] = new Dictionary<string, Point>();
@@ -198,7 +209,7 @@ public sealed partial class MainWindow : Window
         WorkflowSelector.SelectedIndex = _workflowNames.Count - 1;
         _activeWorkflowName = name;
         ClearWorkflowCanvas();
-        StartWorkflowButton.Content = _english ? "▶  Start" : "▶  Démarrer";
+        SetActivationSwitch(false);
         _switchingWorkflow = false;
         TestStatus.Text = _english ? "New automation created" : "Nouvelle automatisation créée";
     }
@@ -214,10 +225,10 @@ public sealed partial class MainWindow : Window
                 _workflowTriggers[PrototypeServices.CurrentWorkflowId] = PrototypeServices.CurrentTriggerTypes.ToArray();
                 PrototypeServices.CurrentWorkflowId = _workflowIds[name];
                 PrototypeServices.CurrentTriggerTypes.Clear();
-                PrototypeServices.CurrentTriggerTypes.AddRange(_workflowTriggers.GetValueOrDefault(_workflowIds[name], new[] { "manual.run" }));
-                PrototypeServices.CurrentTriggerType = PrototypeServices.CurrentTriggerTypes[0];
+                PrototypeServices.CurrentTriggerTypes.AddRange(_workflowTriggers.GetValueOrDefault(_workflowIds[name], Array.Empty<string>()));
+                PrototypeServices.CurrentTriggerType = PrototypeServices.CurrentTriggerTypes.FirstOrDefault() ?? "";
                 _workflowLinks[_activeWorkflowName] = GetManualLinkLabels().ToList();
-                _workflowPositions[_activeWorkflowName] = _dynamicNodes.Where(node => node.Tag is string).ToDictionary(node => (string)node.Tag!, node => new Point(Canvas.GetLeft(node), Canvas.GetTop(node)));
+                _workflowPositions[_activeWorkflowName] = CaptureNodePositions();
                 ClearWorkflowCanvas();
                 foreach (var action in _workflowActions.TryGetValue(name, out var actions) ? actions : [])
                 {
@@ -225,7 +236,7 @@ public sealed partial class MainWindow : Window
                     AddActionNode(action);
                 }
                 if (_workflowPositions.TryGetValue(name, out var positions))
-                    foreach (var node in _dynamicNodes)
+                    foreach (var node in CanvasNodes())
                         if (node.Tag is string label && positions.TryGetValue(label, out var position)) { Canvas.SetLeft(node, position.X); Canvas.SetTop(node, position.Y); }
                 if (_workflowLinks.TryGetValue(name, out var savedLinks))
                     foreach (var (from, to) in savedLinks)
@@ -245,8 +256,7 @@ public sealed partial class MainWindow : Window
                 _switchingWorkflow = true;
                 WorkflowTriggerSelector.SelectedIndex = PrototypeServices.CurrentTriggerType == "manual.run" ? 0 : 1;
                 _switchingWorkflow = switching;
-                StartWorkflowButton.Content = _enabledWorkflowIds.Contains(PrototypeServices.CurrentWorkflowId)
-                    ? (_english ? "■  Stop" : "■  Arrêter") : (_english ? "▶  Start" : "▶  Démarrer");
+                SetActivationSwitch(_enabledWorkflowIds.Contains(PrototypeServices.CurrentWorkflowId));
             }
             TestStatus.Text = _english ? $"Editing: {name}" : $"Édition : {name}";
         }
@@ -264,25 +274,46 @@ public sealed partial class MainWindow : Window
 
     private async void OnAddCanvasEventClick(object? sender, RoutedEventArgs eventArgs)
     {
-        var dialog = new Window { Title = _english ? "Add event" : "Ajouter un événement", Width = 420, Height = 500, CanResize = false, WindowStartupLocation = WindowStartupLocation.CenterOwner };
-        var manual = new Button { Content = _english ? "▶  Manual run" : "▶  Exécution manuelle", HorizontalContentAlignment = Avalonia.Layout.HorizontalAlignment.Left };
+        var dialog = new Window { Title = _english ? "Add event" : "Ajouter un événement", Width = 460, Height = 560, CanResize = false, WindowStartupLocation = WindowStartupLocation.CenterOwner, Background = new SolidColorBrush(Color.Parse("#0B1024")) };
+        var eventButtonStyle = new SolidColorBrush(Color.Parse("#151A32"));
+        var eventBorderStyle = new SolidColorBrush(Color.Parse("#33406A"));
+        var manual = new Button { Content = _english ? "▶  Manual run" : "▶  Exécution manuelle", HorizontalContentAlignment = Avalonia.Layout.HorizontalAlignment.Left, HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch, Background = eventButtonStyle, Foreground = Brushes.White, BorderBrush = eventBorderStyle, Padding = new Thickness(12, 9) };
         manual.Click += (_, _) => dialog.Close("manual.run");
-        var choices = new StackPanel { Margin = new Thickness(18), Spacing = 10, Children = { new TextBlock { Text = _english ? "Choose an event to add to this canvas" : "Choisis un événement à ajouter à ce canevas", TextWrapping = TextWrapping.Wrap }, manual } };
+        var timer = new Button { Content = _english ? "◷  Timer" : "◷  Minuteur", HorizontalContentAlignment = Avalonia.Layout.HorizontalAlignment.Left, HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch, Background = eventButtonStyle, Foreground = Brushes.White, BorderBrush = eventBorderStyle, Padding = new Thickness(12, 9) };
+        timer.Click += (_, _) => dialog.Close("core.timer");
+        var systemItems = new StackPanel { Spacing = 6, Children = { manual, timer } };
+        var twitchItems = new StackPanel { Spacing = 6 };
+        var choices = new StackPanel { Margin = new Thickness(18), Spacing = 8, Children =
+        {
+            new TextBlock { Text = _english ? "Choose an event to add to this canvas" : "Choisis un événement à ajouter à ce canevas", TextWrapping = TextWrapping.Wrap },
+            new Expander { Header = CategoryHeader("⚡", _english ? "EVENTS / SYSTEM" : "ÉVÉNEMENTS / SYSTÈME", "#159B70", "#62E6AE"), Content = systemItems, IsExpanded = true, HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch, HorizontalContentAlignment = Avalonia.Layout.HorizontalAlignment.Stretch, Background = Brushes.Transparent, BorderBrush = Brushes.Transparent, BorderThickness = new Thickness(0) },
+            new Expander { Header = CategoryHeader("T", "TWITCH", "#9146FF", "#F0D8FF", true), Content = twitchItems, IsExpanded = true, HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch, HorizontalContentAlignment = Avalonia.Layout.HorizontalAlignment.Stretch, Background = Brushes.Transparent, BorderBrush = Brushes.Transparent, BorderThickness = new Thickness(0) }
+        } };
         foreach (var item in TwitchTriggerCatalog.All)
         {
-            var button = new Button { Content = _english ? item.English : item.French, HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch };
+            var button = new Button { Content = "⚡  " + (_english ? item.English : item.French), HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch, Background = Brushes.Transparent, Foreground = new SolidColorBrush(Color.Parse("#E8E9F4")), BorderBrush = Brushes.Transparent, BorderThickness = new Thickness(0), Padding = new Thickness(10, 8), HorizontalContentAlignment = Avalonia.Layout.HorizontalAlignment.Left };
             button.Click += (_, _) => dialog.Close(item.BlockType);
-            choices.Children.Add(button);
+            twitchItems.Children.Add(button);
         }
         dialog.Content = new ScrollViewer { Content = choices };
         var trigger = await dialog.ShowDialog<string?>(this);
-        if (trigger is null || (trigger != "manual.run" && TwitchTriggerCatalog.FindBlock(trigger) is null)) return;
+        if (trigger is null || !PrototypeServices.IsTriggerType(trigger)) return;
         AddCanvasEvent(trigger);
+    }
+
+    private async void OnVariablesClick(object? sender, RoutedEventArgs eventArgs)
+    {
+        await new VariablesWindow(_english).ShowDialog(this);
+    }
+
+    private async void OnRewardsClick(object? sender, RoutedEventArgs eventArgs)
+    {
+        await new RewardsWindow(_english).ShowDialog(this);
     }
 
     internal void AddCanvasEvent(string trigger)
     {
-        if (trigger != "manual.run" && TwitchTriggerCatalog.FindBlock(trigger) is null) throw new ArgumentException("Unknown trigger", nameof(trigger));
+        if (!PrototypeServices.IsTriggerType(trigger)) throw new ArgumentException("Unknown trigger", nameof(trigger));
         if (PrototypeServices.CurrentTriggerTypes.Contains(trigger))
         {
             TestStatus.Text = _english ? "This event is already on the canvas" : "Cet événement est déjà dans le canevas";
@@ -290,23 +321,34 @@ public sealed partial class MainWindow : Window
         }
         RememberCanvas();
         PrototypeServices.CurrentTriggerTypes.Add(trigger);
-        AddAdditionalTriggerNode(trigger);
+        if (PrototypeServices.CurrentTriggerTypes.Count == 1)
+        {
+            PrototypeServices.CurrentTriggerType = trigger;
+            _workflowTriggerKinds[PrototypeServices.CurrentWorkflowId] = trigger;
+            AddTriggerNode();
+        }
+        else AddAdditionalTriggerNode(trigger);
         UpdateHistoryButtons();
         TestStatus.Text = _english ? "Event added — connect it to an action" : "Événement ajouté — relie-le à une action";
     }
 
     private async void OnAddCanvasItemClick(object? sender, RoutedEventArgs eventArgs)
     {
-        var dialog = new Window { Title = _english ? "Add to canvas" : "Ajouter au canevas", Width = 420, Height = 520, CanResize = false, WindowStartupLocation = WindowStartupLocation.CenterOwner };
+        var dialog = new Window { Title = _english ? "Add an action" : "Ajouter une action", Width = 560, Height = 700, CanResize = false, WindowStartupLocation = WindowStartupLocation.CenterOwner, Background = new SolidColorBrush(Color.Parse("#0B1024")) };
         var stack = new StackPanel { Margin = new Thickness(18), Spacing = 7 };
         foreach (var group in new[] {
-            ("Twitch", new[] { ("Envoyer un message", "Send a message"), ("Créer un clip", "Create a clip"), ("Modifier un titre", "Edit title"), ("Gérer les points de chaîne", "Manage channel points"), ("Récupérer un utilisateur", "Get a user") }),
-            ("OBS Studio", new[] { ("Changer de scène", "Change scene"), ("Visibilité d’une source", "Source visibility"), ("Démarrer un replay", "Start replay"), ("Prendre une capture", "Take a screenshot") }),
-            ("CORE", new[] { ("Ajouter une condition", "Add a condition"), ("Attendre", "Wait"), ("Modifier une variable", "Edit a variable"), ("Jouer un son", "Play a sound") }) })
+            ("Twitch", new[] { ("Envoyer un message", "Send a message"), ("Créer un clip", "Create a clip"), ("Modifier un titre", "Edit title"), ("Récupérer un utilisateur", "Get a user") }),
+            ("OBS Studio · Scènes", new[] { ("Changer de scène", "Change scene"), ("Récupérer la scène actuelle", "Get current scene"), ("Récupérer le statut OBS", "Get OBS status") }),
+            ("OBS Studio · Sources", new[] { ("Masquer une source", "Hide source"), ("Afficher une source", "Show source"), ("Pivoter une source", "Rotate source"), ("Définir l’URL d’une source navigateur", "Set browser source URL"), ("Définir la couleur d’une source", "Set source color"), ("Définir un texte GDI", "Set GDI text"), ("Définir le fichier image d’une source", "Set image source file"), ("Définir le fichier média d’une source", "Set media source file"), ("Définir l’état média", "Set media state"), ("Définir la piste audio média", "Set media audio track"), ("Définir l’état d’un filtre", "Set source filter state"), ("Définir le mute d’une source", "Set source mute state"), ("Visibilité d’une source", "Source visibility") }),
+            ("OBS Studio · Replay / Sorties", new[] { ("Tampon replay", "Replay buffer"), ("Enregistrement OBS", "OBS recording"), ("Caméra virtuelle", "Virtual camera"), ("Prendre une capture", "Take a screenshot") }) })
         {
-            stack.Children.Add(new TextBlock { Text = group.Item1, FontWeight = FontWeight.Bold, Margin = new Thickness(0, 10, 0, 0) });
+            var groupItems = new StackPanel { Spacing = 6 };
             foreach (var item in group.Item2)
-            { var button = new Button { Content = _english ? item.Item2 : item.Item1, HorizontalContentAlignment = Avalonia.Layout.HorizontalAlignment.Left }; button.Click += (_, _) => dialog.Close($"action:{item.Item1}"); stack.Children.Add(button); }
+            { var button = new Button { Content = ActionIcon(item.Item1) + "  " + (_english ? item.Item2 : item.Item1), HorizontalContentAlignment = Avalonia.Layout.HorizontalAlignment.Left, HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch, Background = Brushes.Transparent, Foreground = new SolidColorBrush(Color.Parse("#E8E9F4")), BorderBrush = Brushes.Transparent, BorderThickness = new Thickness(0), Padding = new Thickness(10, 8) }; button.Click += (_, _) => dialog.Close($"action:{item.Item1}"); groupItems.Children.Add(button); }
+            var isTwitch = group.Item1.StartsWith("Twitch", StringComparison.Ordinal);
+            var isObs = group.Item1.StartsWith("OBS", StringComparison.Ordinal);
+            var header = CategoryHeader(isTwitch ? "T" : isObs ? "OBS" : "▶", group.Item1, isTwitch ? "#9146FF" : isObs ? "#343A4D" : "#2563A5", isTwitch ? "#F0D8FF" : "#DCE8FF", isTwitch, isObs);
+            stack.Children.Add(new Expander { Header = header, Content = groupItems, IsExpanded = true, HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch, HorizontalContentAlignment = Avalonia.Layout.HorizontalAlignment.Stretch, Background = new SolidColorBrush(Color.Parse("#0F1530")), BorderBrush = new SolidColorBrush(Color.Parse("#33406A")), BorderThickness = new Thickness(1), Padding = new Thickness(6), CornerRadius = new CornerRadius(10), Margin = new Thickness(0, 6, 0, 0) });
         }
         dialog.Content = new ScrollViewer { Content = stack };
         var result = await dialog.ShowDialog<string?>(this);
@@ -322,6 +364,64 @@ public sealed partial class MainWindow : Window
             PrototypeServices.CurrentTriggerTypes.Add(result); AddAdditionalTriggerNode(result);
             TestStatus.Text = _english ? "Event added — connect it in the canvas" : "Événement ajouté — relie-le dans le canevas";
         }
+    }
+
+    private static StackPanel CategoryHeader(string badgeText, string label, string badgeColor, string textColor, bool round = false, bool compact = false)
+    {
+        var badge = new Border
+        {
+            Width = compact ? 32 : 26,
+            Height = 26,
+            CornerRadius = new CornerRadius(round || compact ? 13 : 7),
+            Background = new SolidColorBrush(Color.Parse(badgeColor)),
+            Child = new TextBlock { Text = badgeText, HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center, FontSize = compact ? 9 : 14, FontWeight = FontWeight.Bold, Foreground = Brushes.White }
+        };
+        return new StackPanel
+        {
+            Orientation = Avalonia.Layout.Orientation.Horizontal,
+            Spacing = 9,
+            Margin = new Thickness(8, 8, 8, 4),
+            Children = { badge, new TextBlock { Text = label, FontWeight = FontWeight.Bold, FontSize = 14, Foreground = new SolidColorBrush(Color.Parse(textColor)), VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center } }
+        };
+    }
+
+    private static string ActionIcon(string label)
+    {
+        var value = label.ToLowerInvariant();
+        if (value.Contains("message")) return "💬";
+        if (value.Contains("clip")) return "✂";
+        if (value.Contains("titre") || value.Contains("title")) return "✏";
+        if (value.Contains("scène") || value.Contains("scene")) return "🎬";
+        if (value.Contains("source")) return "▣";
+        if (value.Contains("replay")) return "↻";
+        if (value.Contains("capture") || value.Contains("screenshot")) return "📷";
+        if (value.Contains("son") || value.Contains("sound")) return "♫";
+        if (value.Contains("variable")) return "ƒ";
+        return "▶";
+    }
+
+    private async void OnAddCanvasSystemClick(object? sender, RoutedEventArgs eventArgs)
+    {
+        var dialog = new Window { Title = _english ? "Add a system function" : "Ajouter une fonction système", Width = 420, Height = 410, CanResize = false, WindowStartupLocation = WindowStartupLocation.CenterOwner };
+        var stack = new StackPanel { Margin = new Thickness(18), Spacing = 7 };
+        stack.Children.Add(new TextBlock
+        {
+            Text = _english ? "SYSTEM" : "SYSTÈME",
+            FontWeight = FontWeight.Bold,
+            Foreground = new SolidColorBrush(Color.Parse("#7DBEFF")),
+            Margin = new Thickness(0, 4, 0, 6)
+        });
+        foreach (var item in new[] { ("Ajouter une condition", "Add a condition"), ("Attendre", "Wait"), ("Modifier une variable", "Edit a variable"), ("Jouer un son", "Play a sound") })
+        {
+            var button = new Button { Content = _english ? item.Item2 : item.Item1, HorizontalContentAlignment = Avalonia.Layout.HorizontalAlignment.Left };
+            button.Click += (_, _) => dialog.Close(item.Item1);
+            stack.Children.Add(button);
+        }
+        dialog.Content = stack;
+        var result = await dialog.ShowDialog<string?>(this);
+        if (result is null) return;
+        AddCanvasAction(result);
+        TestStatus.Text = _english ? "System function added — connect it in the canvas" : "Fonction système ajoutée — relie-la dans le canevas";
     }
 
     internal void AddCanvasAction(string label)
@@ -378,7 +478,7 @@ public sealed partial class MainWindow : Window
             _switchingWorkflow = true;
             _workflowActions[current] = _selectedActions.ToList();
             _workflowLinks[current] = GetManualLinkLabels().ToList();
-            _workflowPositions[current] = _dynamicNodes.Where(node => node.Tag is string).ToDictionary(node => (string)node.Tag!, node => new Point(Canvas.GetLeft(node), Canvas.GetTop(node)));
+            _workflowPositions[current] = CaptureNodePositions();
             _workflowNames[WorkflowSelector.SelectedIndex] = result;
             var oldName = current;
             if (_workflowActions.TryGetValue(oldName, out var actions))
@@ -408,17 +508,50 @@ public sealed partial class MainWindow : Window
             return;
         }
         var currentWorkflowName = _workflowNames[WorkflowSelector.SelectedIndex];
+        // Snapshot the current canvas before removing it, then switch state explicitly.
+        _workflowActions[currentWorkflowName] = _selectedActions.ToList();
+        _workflowLinks[currentWorkflowName] = GetManualLinkLabels().ToList();
+        _workflowPositions[currentWorkflowName] = CaptureNodePositions();
         if (_workflowIds.TryGetValue(currentWorkflowName, out var deletedId))
             await PrototypeServices.DeleteWorkflowAsync(deletedId);
         _workflowNames.Remove(currentWorkflowName);
         _workflowActions.Remove(currentWorkflowName);
         _workflowLinks.Remove(currentWorkflowName);
         _workflowPositions.Remove(currentWorkflowName);
+        if (deletedId != Guid.Empty)
+        {
+            _workflowTriggers.Remove(deletedId);
+            _workflowTriggerKinds.Remove(deletedId);
+            _enabledWorkflowIds.Remove(deletedId);
+        }
         _workflowIds.Remove(currentWorkflowName);
+        var targetName = _workflowNames[0];
+        _activeWorkflowName = targetName;
+        PrototypeServices.CurrentWorkflowId = _workflowIds[targetName];
+        PrototypeServices.CurrentWorkflowName = targetName;
+        PrototypeServices.CurrentTriggerTypes.Clear();
+        PrototypeServices.CurrentTriggerTypes.AddRange(_workflowTriggers.GetValueOrDefault(PrototypeServices.CurrentWorkflowId, Array.Empty<string>()));
+        PrototypeServices.CurrentTriggerType = PrototypeServices.CurrentTriggerTypes.FirstOrDefault() ?? "";
         ClearWorkflowCanvas();
-        _activeWorkflowName = _workflowNames[0];
+        foreach (var action in _workflowActions.GetValueOrDefault(targetName, []))
+        {
+            _selectedActions.Add(action);
+            AddActionNode(action);
+        }
+        if (_workflowPositions.TryGetValue(targetName, out var targetPositions))
+            foreach (var node in CanvasNodes())
+                if (node.Tag is string label && targetPositions.TryGetValue(label, out var position)) { Canvas.SetLeft(node, position.X); Canvas.SetTop(node, position.Y); }
+        foreach (var (from, to) in _workflowLinks.GetValueOrDefault(targetName, []))
+        {
+            var source = FindCanvasNode(from); var target = FindCanvasNode(to);
+            if (source is not null && target is not null) _manualLinks.Add((source, target));
+        }
+        UpdateDynamicLinks();
         WorkflowSelector.ItemsSource = _workflowNames.ToArray();
+        _switchingWorkflow = true;
         WorkflowSelector.SelectedIndex = 0;
+        _switchingWorkflow = false;
+        SetActivationSwitch(_enabledWorkflowIds.Contains(PrototypeServices.CurrentWorkflowId));
         TestStatus.Text = _english ? "Automation deleted" : "Automatisation supprimée";
     }
 
@@ -429,7 +562,10 @@ public sealed partial class MainWindow : Window
         _manualLinks.Clear();
         _dynamicNodes.Clear();
         foreach (var link in _dynamicLinks) WorkflowCanvas.Children.Remove(link);
+        foreach (var label in _dynamicLinkLabels) WorkflowCanvas.Children.Remove(label);
         _dynamicLinks.Clear();
+        _dynamicLinkLabels.Clear();
+        _linkLabelMap.Clear();
         foreach (var node in WorkflowCanvas.Children.OfType<Border>().Where(border => border.Classes.Contains("dynamicAction")).ToArray())
             WorkflowCanvas.Children.Remove(node);
         _addedActionCount = 0;
@@ -473,20 +609,19 @@ public sealed partial class MainWindow : Window
     private void OnZoomOutClick(object? sender, RoutedEventArgs args) => SetCanvasZoom(_canvasZoom - 0.1);
     private void OnCanvasWheel(object? sender, PointerWheelEventArgs args)
     {
-        if ((args.KeyModifiers & KeyModifiers.Control) == 0) return;
         SetCanvasZoom(_canvasZoom + Math.Sign(args.Delta.Y) * 0.1, args.GetPosition((Visual)WorkflowCanvas.Parent!));
         args.Handled = true;
     }
 
     private void OnCenterCanvasClick(object? sender, RoutedEventArgs args)
     {
-        if (_dynamicNodes.Count == 0) { _canvasZoom = 1; _canvasOffset = default; ApplyCanvasTransform(); return; }
-        var left = _dynamicNodes.Min(Canvas.GetLeft);
-        var top = _dynamicNodes.Min(Canvas.GetTop);
-        var right = _dynamicNodes.Max(node => Canvas.GetLeft(node) + node.Width);
-        var bottom = _dynamicNodes.Max(node => Canvas.GetTop(node) + node.Height);
+        var nodes = _dynamicNodes.Concat(_additionalTriggerNodes).Concat(_triggerNode is null ? Array.Empty<Border>() : new[] { _triggerNode }).Where(node => node.IsVisible).ToArray();
+        if (nodes.Length == 0) { _canvasOffset = default; ApplyCanvasTransform(); return; }
+        var left = nodes.Min(Canvas.GetLeft);
+        var top = nodes.Min(Canvas.GetTop);
+        var right = nodes.Max(node => Canvas.GetLeft(node) + NodeWidth(node));
+        var bottom = nodes.Max(node => Canvas.GetTop(node) + NodeHeight(node));
         var viewport = (Grid)WorkflowCanvas.Parent!;
-        _canvasZoom = Math.Clamp(Math.Min((viewport.Bounds.Width - 80) / (right - left), (viewport.Bounds.Height - 150) / (bottom - top)), 0.35, 1);
         _canvasOffset = new Point((viewport.Bounds.Width - (right + left) * _canvasZoom) / 2,
             (viewport.Bounds.Height - (bottom + top) * _canvasZoom) / 2 + 20);
         ApplyCanvasTransform();
@@ -494,10 +629,12 @@ public sealed partial class MainWindow : Window
 
     private void OnCanvasPanPressed(object? sender, PointerPressedEventArgs args)
     {
-        if (!args.GetCurrentPoint(WorkflowCanvas).Properties.IsMiddleButtonPressed) return;
+        var point = args.GetCurrentPoint((Visual)WorkflowCanvas.Parent!);
+        var background = ReferenceEquals(args.Source, WorkflowCanvas) || ReferenceEquals(args.Source, WorkflowCanvas.Parent);
+        if (!point.Properties.IsMiddleButtonPressed && !(point.Properties.IsLeftButtonPressed && background)) return;
         _panStart = args.GetPosition((Visual)WorkflowCanvas.Parent!);
         _panOffset = _canvasOffset;
-        args.Pointer.Capture(WorkflowCanvas);
+        args.Pointer.Capture((Grid)WorkflowCanvas.Parent!);
         args.Handled = true;
     }
     private void OnCanvasPanMoved(object? sender, PointerEventArgs args)
@@ -534,22 +671,55 @@ public sealed partial class MainWindow : Window
     private async void OnSaveWorkflowClick(object? sender, RoutedEventArgs eventArgs)
     {
         var name = _activeWorkflowName;
-        var positions = _dynamicNodes.Where(node => node.Tag is string).ToDictionary(node => (string)node.Tag!, node => new Point(Canvas.GetLeft(node), Canvas.GetTop(node)));
+        var positions = CaptureNodePositions();
+        var draftSaved = false;
         try
         {
             await PrototypeServices.SavePrototypeDraftAsync(_selectedActions, GetManualLinkLabels());
             await ConnectionPersistence.SaveWorkflowPositionsAsync(name, positions);
-            TestStatus.Text = _english ? "Draft saved" : "Brouillon enregistré";
+            draftSaved = true;
+            if (_enabledWorkflowIds.Contains(PrototypeServices.CurrentWorkflowId))
+            {
+                var allowCycles = await EnsureCyclesApprovedAsync();
+                if (allowCycles is null)
+                {
+                    TestStatus.Text = _english ? "Draft saved — active version unchanged because the loop was declined" : "Brouillon enregistré — version active inchangée, car la boucle a été refusée";
+                    return;
+                }
+                try
+                {
+                    await PrototypeServices.PublishPrototypeAsync(_selectedActions, GetManualLinkLabels(), allowCycles.Value);
+                }
+                catch (InvalidOperationException exception) when (exception.Message.Contains("Commande de chat", StringComparison.OrdinalIgnoreCase) || exception.Message.Contains("Chat command", StringComparison.OrdinalIgnoreCase))
+                {
+                    await ConnectionPersistence.ReconnectAsync(true);
+                    await PrototypeServices.PublishPrototypeAsync(_selectedActions, GetManualLinkLabels(), allowCycles.Value);
+                }
+                await PrototypeServices.ProcessTimersAsync();
+                TestStatus.Text = _english ? "Saved — active version updated" : "Enregistrée — version active mise à jour";
+            }
+            else
+            {
+                TestStatus.Text = _english ? "Draft saved" : "Brouillon enregistré";
+            }
         }
         catch (Exception exception)
         {
-            TestStatus.Text = _english ? $"Save failed: {exception.Message}" : $"Échec de sauvegarde : {exception.Message}";
+            TestStatus.Text = draftSaved
+                ? (_english
+                    ? $"Draft saved, but the active version could not be updated: {exception.Message}"
+                    : $"Brouillon enregistré, mais la version active n’a pas pu être mise à jour : {exception.Message}")
+                : (_english ? $"Save failed: {exception.Message}" : $"Échec de sauvegarde : {exception.Message}");
         }
     }
 
     private async void OnRunOnceClick(object? sender, RoutedEventArgs eventArgs)
     {
-        if (!RunOnceButton.IsEnabled) return;
+        if (!RunOnceButton.IsEnabled)
+        {
+            TestStatus.Text = _english ? "Activate this automation before running it." : "Active cette automatisation avant de l’exécuter.";
+            return;
+        }
         RunOnceButton.IsEnabled = false;
         TestStatus.Text = _english ? "Running published workflow…" : "Exécution du workflow publié…";
         try
@@ -562,28 +732,47 @@ public sealed partial class MainWindow : Window
                     : (_english ? "Run failed or cancelled — open History" : "Exécution échouée ou annulée — ouvre l’historique");
         }
         catch (Exception exception) { TestStatus.Text = exception.Message; }
-        finally { RunOnceButton.IsEnabled = true; }
+        finally { RunOnceButton.IsEnabled = _enabledWorkflowIds.Contains(PrototypeServices.CurrentWorkflowId); }
     }
 
-    private async void OnStartWorkflowClick(object? sender, RoutedEventArgs eventArgs)
+    private async void OnWorkflowActivationChanged(object? sender, RoutedEventArgs eventArgs)
     {
+        if (_switchingActivation) return;
         var workflowId = PrototypeServices.CurrentWorkflowId;
-        var stopping = _enabledWorkflowIds.Contains(workflowId);
-        if (!stopping)
+        var activate = StartWorkflowButton.IsChecked == true;
+        if (activate)
         {
             try
             {
                 if (!await PrototypeServices.HasPrototypeDraftAsync())
                 {
-                    TestStatus.Text = _english ? "Save the draft before starting." : "Enregistre le brouillon avant de démarrer.";
+                    TestStatus.Text = _english ? "Save the draft before activating." : "Enregistre le brouillon avant de l’activer.";
+                    SetActivationSwitch(false);
                     return;
                 }
-                await PrototypeServices.PublishPrototypeAsync(_selectedActions, GetManualLinkLabels());
+                var allowCycles = await EnsureCyclesApprovedAsync();
+                if (allowCycles is null)
+                {
+                    TestStatus.Text = _english ? "Activation cancelled — loop declined" : "Activation annulée — boucle refusée";
+                    SetActivationSwitch(false);
+                    return;
+                }
+                try
+                {
+                    await PrototypeServices.PublishPrototypeAsync(_selectedActions, GetManualLinkLabels(), allowCycles.Value);
+                }
+                catch (InvalidOperationException exception) when (exception.Message.Contains("Commande de chat", StringComparison.OrdinalIgnoreCase) || exception.Message.Contains("Chat command", StringComparison.OrdinalIgnoreCase))
+                {
+                    await ConnectionPersistence.ReconnectAsync(true);
+                    await PrototypeServices.PublishPrototypeAsync(_selectedActions, GetManualLinkLabels(), allowCycles.Value);
+                }
+                await PrototypeServices.ProcessTimersAsync();
                 _enabledWorkflowIds.Add(workflowId);
             }
             catch (Exception exception)
             {
                 TestStatus.Text = _english ? $"Publish failed: {exception.Message}" : $"Échec de publication : {exception.Message}";
+                SetActivationSwitch(false);
                 return;
             }
         }
@@ -593,14 +782,62 @@ public sealed partial class MainWindow : Window
             _enabledWorkflowIds.Remove(workflowId);
         }
         if (PrototypeServices.CurrentWorkflowId != workflowId) return;
-        TestStatus.Text = stopping
-            ? (_english ? "Automation stopped" : "Automatisation arrêtée")
+        SetActivationSwitch(activate);
+        TestStatus.Text = !activate
+            ? (_english ? "Automation disabled" : "Automatisation désactivée")
             : PrototypeServices.CurrentTriggerType == "manual.run"
                 ? (_english ? "Published — click Run once to execute" : "Version publiée — clique Exécuter pour la lancer")
                 : (_english ? "Enabled — waiting for a new follower" : "Activée — en attente d’un nouveau follower");
-        StartWorkflowButton.Content = stopping
-            ? (_english ? "▶  Start" : "▶  Démarrer")
-            : (_english ? "■  Stop" : "■  Arrêter");
+    }
+
+    private void SetActivationSwitch(bool active)
+    {
+        _switchingActivation = true;
+        StartWorkflowButton.IsChecked = active;
+        RunOnceButton.IsEnabled = active;
+        ToolTip.SetTip(RunOnceButton, _english
+            ? (active ? "Run the active published manual branch with real effects" : "Activate this automation to run real actions")
+            : (active ? "Exécuter la branche manuelle publiée avec des effets réels" : "Active cette automatisation pour exécuter des actions réelles"));
+        _switchingActivation = false;
+    }
+
+    private async Task<bool?> EnsureCyclesApprovedAsync()
+    {
+        if (!PrototypeServices.HasCycle(_selectedActions, GetManualLinkLabels())) return false;
+        if (_cycleApprovals.Contains(PrototypeServices.CurrentWorkflowId)) return true;
+        if (!await ConfirmCycleAsync()) return null;
+        _cycleApprovals.Add(PrototypeServices.CurrentWorkflowId);
+        return true;
+    }
+
+    private async Task<bool> ConfirmCycleAsync()
+    {
+        var dialog = new Window
+        {
+            Title = _english ? "Allow loop?" : "Autoriser la boucle ?",
+            Width = 460, Height = 220, CanResize = false,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner
+        };
+        var reject = new Button { Content = _english ? "No, cancel" : "Non, annuler" };
+        var accept = new Button { Content = _english ? "Yes, allow loop" : "Oui, autoriser la boucle", Classes = { "primary" } };
+        reject.Click += (_, _) => dialog.Close(false);
+        accept.Click += (_, _) => dialog.Close(true);
+        dialog.Content = new StackPanel
+        {
+            Margin = new Thickness(22), Spacing = 16,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = _english
+                        ? "This connection creates a loop. Allow it? Execution will stop automatically after 1,000 steps if the loop has no exit."
+                        : "Cette liaison crée une boucle. Veux-tu l’autoriser? L’exécution sera arrêtée automatiquement après 1 000 étapes si la boucle n’a aucune sortie.",
+                    TextWrapping = TextWrapping.Wrap
+                },
+                new StackPanel { Orientation = Avalonia.Layout.Orientation.Horizontal, HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right, Spacing = 8, Children = { reject, accept } }
+            }
+        };
+        return await dialog.ShowDialog<bool>(this);
     }
 
     private void OnLibraryActionPressed(object? sender, PointerPressedEventArgs eventArgs)
@@ -667,9 +904,12 @@ public sealed partial class MainWindow : Window
     {
         _obsCardRefresh.Clear();
         var savedLinks = GetManualLinkLabels().ToArray();
-        var positions = _dynamicNodes.ToDictionary(node => (string)node.Tag!, node => new Point(Canvas.GetLeft(node), Canvas.GetTop(node)));
+        var positions = CaptureNodePositions();
         foreach (var link in _dynamicLinks) WorkflowCanvas.Children.Remove(link);
+        foreach (var label in _dynamicLinkLabels) WorkflowCanvas.Children.Remove(label);
         _dynamicLinks.Clear();
+        _dynamicLinkLabels.Clear();
+        _linkLabelMap.Clear();
         _linkMap.Clear();
         _dynamicNodes.Clear();
         _manualLinks.Clear();
@@ -682,7 +922,7 @@ public sealed partial class MainWindow : Window
         AddTriggerNode();
         foreach (var trigger in PrototypeServices.CurrentTriggerTypes.Skip(1)) AddAdditionalTriggerNode(trigger);
         foreach (var action in _selectedActions) AddActionNode(action);
-        foreach (var node in _dynamicNodes)
+        foreach (var node in CanvasNodes())
             if (positions.TryGetValue((string)node.Tag!, out var position))
             {
                 Canvas.SetLeft(node, position.X);
@@ -698,9 +938,10 @@ public sealed partial class MainWindow : Window
     }
 
     private CanvasSnapshot CaptureCanvas() => new(_selectedActions.ToArray(),
-        _dynamicNodes.ToDictionary(node => (string)node.Tag!, node => new Point(Canvas.GetLeft(node), Canvas.GetTop(node))),
+        CaptureNodePositions(),
         GetManualLinkLabels().ToArray(),
         _selectedActions.Where(PrototypeServices.ActionOptions.ContainsKey).ToDictionary(key => key, key => (System.Text.Json.Nodes.JsonObject)PrototypeServices.ActionOptions[key].DeepClone()),
+        PrototypeServices.TriggerOptions.ToDictionary(pair => pair.Key, pair => (System.Text.Json.Nodes.JsonObject)pair.Value.DeepClone()),
         _selectedActions.ToDictionary(key => key, key => PrototypeServices.SourceVisibility.GetValueOrDefault(key, true)), PrototypeServices.CurrentTriggerTypes.ToArray());
 
     private void RememberCanvas()
@@ -713,13 +954,15 @@ public sealed partial class MainWindow : Window
     private void RestoreCanvas(CanvasSnapshot snapshot)
     {
         PrototypeServices.CurrentTriggerTypes.Clear(); PrototypeServices.CurrentTriggerTypes.AddRange(snapshot.Triggers);
-        PrototypeServices.CurrentTriggerType = snapshot.Triggers[0];
+        PrototypeServices.CurrentTriggerType = snapshot.Triggers.FirstOrDefault() ?? "";
         _selectedActions.Clear(); _selectedActions.AddRange(snapshot.Actions);
         _manualLinks.Clear();
         foreach (var (key, value) in snapshot.Options) PrototypeServices.ActionOptions[key] = (System.Text.Json.Nodes.JsonObject)value.DeepClone();
+        PrototypeServices.TriggerOptions.Clear();
+        foreach (var (key, value) in snapshot.TriggerOptions) PrototypeServices.TriggerOptions[key] = (System.Text.Json.Nodes.JsonObject)value.DeepClone();
         foreach (var (key, value) in snapshot.Visibility) PrototypeServices.SourceVisibility[key] = value;
         RebuildActionNodes();
-        foreach (var node in _dynamicNodes)
+        foreach (var node in CanvasNodes())
             if (snapshot.Positions.TryGetValue((string)node.Tag!, out var point))
             { Canvas.SetLeft(node, point.X); Canvas.SetTop(node, point.Y); }
         foreach (var (from, to) in snapshot.Links)
@@ -750,8 +993,20 @@ public sealed partial class MainWindow : Window
             ?? _dynamicNodes.FirstOrDefault(node => Equals(node.Tag, label));
     }
 
+    private IEnumerable<Border> CanvasNodes() => _dynamicNodes.Concat(_additionalTriggerNodes)
+        .Concat(_triggerNode is null ? Array.Empty<Border>() : new[] { _triggerNode });
+
+    private Dictionary<string, Point> CaptureNodePositions() => CanvasNodes()
+        .Where(node => node.Tag is string).ToDictionary(node => (string)node.Tag!, node => new Point(Canvas.GetLeft(node), Canvas.GetTop(node)));
+
     private void AddTriggerNode()
     {
+        if (PrototypeServices.CurrentTriggerTypes.Count == 0)
+        {
+            if (_triggerNode is not null) WorkflowCanvas.Children.Remove(_triggerNode);
+            _triggerNode = null;
+            return;
+        }
         if (_triggerNode is not null) { UpdateTriggerNode(); return; }
         _triggerNode = new Border
         {
@@ -767,10 +1022,13 @@ public sealed partial class MainWindow : Window
         _triggerNode.Tag = "__trigger__";
         _triggerNode.Focusable = true;
         _triggerNode.PointerPressed += OnActionNodePressed;
+        _triggerNode.PointerMoved += OnActionNodeMoved;
         _triggerNode.PointerReleased += OnActionNodeReleased;
         _triggerNode.IsHitTestVisible = true;
         Canvas.SetLeft(_triggerNode, 60); Canvas.SetTop(_triggerNode, 80);
         WorkflowCanvas.Children.Add(_triggerNode);
+        AddEventDeleteButton(_triggerNode);
+        _triggerNode.KeyDown += OnAdditionalTriggerKeyDown;
         UpdateTriggerNode();
     }
 
@@ -778,19 +1036,144 @@ public sealed partial class MainWindow : Window
     {
         if (_triggerNode is null) return;
         var title = TwitchTriggerCatalog.Title(PrototypeServices.CurrentTriggerTypes.FirstOrDefault() ?? "manual.run", _english);
-        if (_triggerNode.Child is Grid grid && grid.Children[0] is Border { Child: TextBlock header }) header.Text = $"⚡  {title}";
-        ConfigureManualRunButton(_triggerNode, PrototypeServices.CurrentTriggerTypes.FirstOrDefault() ?? "manual.run");
+        if (_triggerNode.Child is Grid grid && grid.Children[0] is Border headerBorder)
+        {
+            var header = headerBorder.Child as TextBlock ?? (headerBorder.Child as Grid)?.Children.OfType<TextBlock>().FirstOrDefault();
+            if (header is not null) header.Text = $"⚡  {title}";
+        }
+        ConfigureTriggerBody(_triggerNode, PrototypeServices.CurrentTriggerTypes.FirstOrDefault() ?? "manual.run");
     }
 
-    private void ConfigureManualRunButton(Border node, string trigger)
+    private void ConfigureTriggerBody(Border node, string trigger)
     {
         if (node.Child is not Grid grid || grid.Children[1] is not StackPanel body) return;
         body.Children.Clear();
-        if (trigger != "manual.run") return;
-        var run = new Button { Content = _english ? "▶  Run once" : "▶  Exécuter", Classes = { "eventAdd" }, HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch, Tag = "manualRunButton" };
-        ToolTip.SetTip(run, _english ? "Execute the published manual branch with real effects" : "Exécuter la branche manuelle publiée avec des effets réels");
-        run.Click += OnRunOnceClick;
-        body.Children.Add(run);
+        if (trigger == "manual.run")
+        {
+            var run = new Button { Content = _english ? "▶  Run once" : "▶  Exécuter", Classes = { "eventAdd" }, HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch, Tag = "manualRunButton" };
+            ToolTip.SetTip(run, _english ? "Execute the published manual branch with real effects" : "Exécuter la branche manuelle publiée avec des effets réels");
+            run.Click += OnRunOnceClick;
+            body.Children.Add(run);
+            node.Height = 112;
+            return;
+        }
+        if (trigger == "core.timer")
+        {
+            node.Height = 142;
+            var key = (string)node.Tag!;
+            var options = PrototypeServices.GetOrCreateTriggerOptions(key,
+                () => new System.Text.Json.Nodes.JsonObject { ["seconds"] = "60" });
+            body.Children.Add(new TextBlock { Text = _english ? "Interval (seconds)" : "Intervalle (secondes)", FontSize = 11, FontWeight = FontWeight.SemiBold });
+            var seconds = new TextBox { Text = options["seconds"]?.ToString() ?? "60", PlaceholderText = "60", Tag = "timerSeconds" };
+            seconds.TextChanged += (_, _) =>
+            {
+                options["seconds"] = seconds.Text?.Trim() ?? "";
+                TestStatus.Text = _english ? "Timer changed — save to apply" : "Minuteur modifié — enregistre pour appliquer";
+            };
+            body.Children.Add(seconds);
+            return;
+        }
+        if (trigger == "twitch.channel.chat.message.received")
+        {
+            node.Width = 280;
+            node.Height = 342;
+            var key = (string)node.Tag!;
+            var options = PrototypeServices.GetOrCreateTriggerOptions(key, () => new System.Text.Json.Nodes.JsonObject { ["command"] = "!test", ["cooldownSeconds"] = "0", ["cooldownScope"] = "global", ["permission"] = "everyone", ["allowedUser"] = "" });
+            body.Children.Add(new TextBlock { Text = _english ? "Command" : "Commande", FontSize = 11, FontWeight = FontWeight.SemiBold });
+            var command = new TextBox { Text = options["command"]?.ToString() ?? "!test", PlaceholderText = "!test" };
+            command.TextChanged += (_, _) => { options["command"] = command.Text?.Trim() ?? ""; TestStatus.Text = _english ? "Command changed — save to apply" : "Commande modifiée — enregistre pour appliquer"; };
+            body.Children.Add(command);
+            var cooldown = new TextBox { Text = options["cooldownSeconds"]?.ToString() ?? "0", PlaceholderText = "0", Width = 72, Margin = new Thickness(0, 9, 0, 0), HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left };
+            cooldown.TextChanged += (_, _) => options["cooldownSeconds"] = cooldown.Text?.Trim() ?? "0";
+            var viewerScope = new RadioButton { Content = "Viewer", GroupName = $"cooldown-{key}", IsChecked = options["cooldownScope"]?.ToString() == "viewer" };
+            var globalScope = new RadioButton { Content = "Global", GroupName = $"cooldown-{key}", IsChecked = options["cooldownScope"]?.ToString() != "viewer" };
+            viewerScope.IsCheckedChanged += (_, _) => { if (viewerScope.IsChecked == true) options["cooldownScope"] = "viewer"; };
+            globalScope.IsCheckedChanged += (_, _) => { if (globalScope.IsChecked == true) options["cooldownScope"] = "global"; };
+            var cooldownScope = new StackPanel { Orientation = Avalonia.Layout.Orientation.Vertical, Spacing = 2, Children = { globalScope, viewerScope } };
+            var cooldownGrid = new Grid { ColumnDefinitions = new ColumnDefinitions("92,*"), ColumnSpacing = 12 };
+            var timeColumn = new StackPanel { Spacing = 4, Children = { new TextBlock { Text = _english ? "Cooldown (s)" : "Cooldown (s)", FontSize = 11, FontWeight = FontWeight.SemiBold }, cooldown } };
+            var scopeColumn = new StackPanel { Spacing = 4, Children = { new TextBlock { Text = _english ? "Scope" : "Portée", FontSize = 11, FontWeight = FontWeight.SemiBold }, cooldownScope } };
+            cooldownGrid.Children.Add(timeColumn);
+            Grid.SetColumn(scopeColumn, 1);
+            cooldownGrid.Children.Add(scopeColumn);
+            body.Children.Add(cooldownGrid);
+            body.Children.Add(new TextBlock { Text = _english ? "Who can use it" : "Qui peut l’utiliser", FontSize = 11, FontWeight = FontWeight.SemiBold });
+            var permission = new ComboBox { ItemsSource = _english ? new[] { "Everyone", "Moderators", "VIPs", "Viewer" } : new[] { "Tout le monde", "Modérateurs", "VIP", "Viewer" }, SelectedIndex = options["permission"]?.ToString() switch { "moderator" => 1, "vip" => 2, "viewer" => 3, _ => 0 } };
+            var allowedLabel = new TextBlock { Text = _english ? "Allowed viewer" : "Viewer autorisé", FontSize = 11, FontWeight = FontWeight.SemiBold };
+            var allowedUser = new TextBox { Text = options["allowedUser"]?.ToString() ?? "", PlaceholderText = _english ? "Twitch username" : "Pseudo Twitch", IsVisible = permission.SelectedIndex == 3 };
+            allowedLabel.IsVisible = allowedUser.IsVisible;
+            permission.SelectionChanged += (_, _) =>
+            {
+                options["permission"] = permission.SelectedIndex switch { 1 => "moderator", 2 => "vip", 3 => "viewer", _ => "everyone" };
+                if (permission.SelectedIndex != 3)
+                {
+                    options["allowedUser"] = "";
+                    allowedUser.Text = "";
+                }
+                allowedLabel.IsVisible = allowedUser.IsVisible = permission.SelectedIndex == 3;
+            };
+            body.Children.Add(permission);
+            body.Children.Add(allowedLabel);
+            allowedUser.TextChanged += (_, _) => options["allowedUser"] = allowedUser.Text?.Trim().TrimStart('@') ?? "";
+            body.Children.Add(allowedUser);
+            return;
+        }
+        if (trigger == "twitch.channel.channel_points_custom_reward_redemption.add.received")
+        {
+            node.Height = 142;
+            var key = (string)node.Tag!;
+            var options = PrototypeServices.GetOrCreateTriggerOptions(key, () => new System.Text.Json.Nodes.JsonObject { ["reward"] = "" });
+            body.Children.Add(new TextBlock { Text = _english ? "Reward (optional)" : "Récompense (facultatif)", FontSize = 11, FontWeight = FontWeight.SemiBold });
+            var savedReward = options["reward"]?.ToString() ?? "";
+            var rewardItems = string.IsNullOrWhiteSpace(savedReward)
+                ? new[] { _english ? "All rewards" : "Toutes les récompenses" }
+                : new[] { _english ? "All rewards" : "Toutes les récompenses", savedReward };
+            var reward = new ComboBox { HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch, ItemsSource = rewardItems, SelectedIndex = string.IsNullOrWhiteSpace(savedReward) ? 0 : 1 };
+            var refreshRewards = new Button { Content = "↻", Width = 34 };
+            ToolTip.SetTip(refreshRewards, _english ? "Load Twitch rewards" : "Charger les récompenses Twitch");
+            refreshRewards.Click += async (_, _) =>
+            {
+                try
+                {
+                    var rewards = await PrototypeServices.GetTwitchRewardsAsync();
+                    reward.ItemsSource = new[] { _english ? "All rewards" : "Toutes les récompenses" }.Concat(rewards.Select(item => item.Title)).ToArray();
+                    var selected = options["reward"]?.ToString();
+                    reward.SelectedIndex = string.IsNullOrWhiteSpace(selected) ? 0 : Math.Max(0, Array.IndexOf(((IEnumerable<string>)reward.ItemsSource).ToArray(), selected));
+                }
+                catch (Exception ex) { TestStatus.Text = ex.Message; }
+            };
+            reward.SelectionChanged += (_, _) => options["reward"] = reward.SelectedIndex <= 0 ? "" : reward.SelectedItem?.ToString() ?? "";
+            var rewardRow = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto"), ColumnSpacing = 6 };
+            rewardRow.ColumnDefinitions = new ColumnDefinitions("*,Auto,Auto");
+            rewardRow.Children.Add(reward); Grid.SetColumn(refreshRewards, 1); rewardRow.Children.Add(refreshRewards);
+            var createReward = new Button { Content = "+", Width = 34 };
+            ToolTip.SetTip(createReward, _english ? "Create a Twitch reward" : "Créer une récompense Twitch");
+            createReward.Click += async (_, _) =>
+            {
+                var titleBox = new TextBox { PlaceholderText = _english ? "Reward name" : "Nom de la récompense" };
+                var costBox = new TextBox { Text = "100", PlaceholderText = _english ? "Cost" : "Coût" };
+                var ok = new Button { Content = _english ? "Create" : "Créer", Classes = { "primary" } };
+                var createDialog = new Window { Title = _english ? "Create reward" : "Créer une récompense", Width = 320, Height = 220, WindowStartupLocation = WindowStartupLocation.CenterOwner, Content = new StackPanel { Margin = new Thickness(18), Spacing = 10, Children = { new TextBlock { Text = _english ? "Reward name" : "Nom" }, titleBox, new TextBlock { Text = _english ? "Cost" : "Coût" }, costBox, ok } } };
+                ok.Click += (_, _) => createDialog.Close(true);
+                if (await createDialog.ShowDialog<bool>(this) && int.TryParse(costBox.Text, out var cost) && !string.IsNullOrWhiteSpace(titleBox.Text))
+                {
+                    try
+                    {
+                        var createdTitle = titleBox.Text.Trim();
+                        await PrototypeServices.CreateTwitchRewardAsync(createdTitle, cost);
+                        reward.ItemsSource = new[] { _english ? "All rewards" : "Toutes les récompenses", createdTitle };
+                        reward.SelectedIndex = 1;
+                        options["reward"] = createdTitle;
+                        TestStatus.Text = _english ? "Reward created and selected" : "Récompense créée et sélectionnée";
+                    }
+                    catch (Exception ex) { TestStatus.Text = ex.Message; }
+                }
+            };
+            Grid.SetColumn(createReward, 2); rewardRow.Children.Add(createReward);
+            body.Children.Add(rewardRow);
+            return;
+        }
+        node.Height = 100;
     }
 
     private void AddAdditionalTriggerNode(string trigger)
@@ -808,16 +1191,58 @@ public sealed partial class MainWindow : Window
             }
         };
         node.PointerPressed += OnActionNodePressed; node.PointerReleased += OnActionNodeReleased;
-        ConfigureManualRunButton(node, trigger);
+        node.PointerMoved += OnActionNodeMoved;
+        ConfigureTriggerBody(node, trigger);
+        AddEventDeleteButton(node);
         node.Focusable = true;
         node.KeyDown += OnAdditionalTriggerKeyDown;
         Canvas.SetLeft(node, 60); Canvas.SetTop(node, 210 + _additionalTriggerNodes.Count * 105);
         WorkflowCanvas.Children.Add(node); _additionalTriggerNodes.Add(node);
     }
 
+    private void AddEventDeleteButton(Border node)
+    {
+        if (node.Child is Grid layout && layout.Children[0] is Border header)
+        {
+            var titleControl = header.Child!;
+            header.Child = null;
+            var remove = new Button { Content = "×", Background = Brushes.Transparent, BorderBrush = Brushes.Transparent, Padding = new Thickness(4, 0), FontSize = 15, HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right };
+            ToolTip.SetTip(remove, _english ? "Delete event" : "Supprimer l’événement");
+            remove.Tag = "deleteEventButton";
+            remove.Click += (_, _) => DeleteAdditionalTrigger(node);
+            header.Child = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto"), Children = { titleControl, remove } };
+            Grid.SetColumn(remove, 1);
+        }
+    }
+
     private void OnAdditionalTriggerKeyDown(object? sender, KeyEventArgs eventArgs)
     {
-        if (eventArgs.Key != Key.Delete || sender is not Border node || node.Tag is not string tag || !tag.StartsWith("__trigger__:", StringComparison.Ordinal)) return;
+        if (eventArgs.Key != Key.Delete || sender is not Border node) return;
+        DeleteAdditionalTrigger(node);
+        eventArgs.Handled = true;
+    }
+
+    internal void DeleteAdditionalTrigger(Border node)
+    {
+        if (node == _triggerNode)
+        {
+            var snapshot = CaptureCanvas();
+            RememberCanvas();
+            var remaining = snapshot.Triggers.Skip(1).ToArray();
+            var promotedKey = remaining.Length > 0 ? $"__trigger__:{remaining[0]}" : null;
+            var links = snapshot.Links.Where(edge => edge.From != "__trigger__" && edge.To != "__trigger__")
+                .Select(edge => (edge.From == promotedKey ? "__trigger__" : edge.From, edge.To == promotedKey ? "__trigger__" : edge.To)).ToArray();
+            var positions = new Dictionary<string, Point>(snapshot.Positions);
+            positions.Remove("__trigger__");
+            if (promotedKey is not null && positions.Remove(promotedKey, out var promotedPosition)) positions["__trigger__"] = promotedPosition;
+            WorkflowCanvas.Children.Remove(node); _triggerNode = null;
+            RestoreCanvas(snapshot with { Triggers = remaining, Links = links, Positions = positions });
+            ClearSelectionVisuals();
+            TestStatus.Text = _english ? "Event removed" : "Événement supprimé";
+            UpdateHistoryButtons();
+            return;
+        }
+        if (!_additionalTriggerNodes.Contains(node) || node.Tag is not string tag || !tag.StartsWith("__trigger__:", StringComparison.Ordinal)) return;
         var trigger = tag[12..];
         RememberCanvas();
         _additionalTriggerNodes.Remove(node);
@@ -825,10 +1250,9 @@ public sealed partial class MainWindow : Window
         PrototypeServices.CurrentTriggerTypes.Remove(trigger);
         _manualLinks.RemoveAll(edge => edge.From == node || edge.To == node);
         UpdateDynamicLinks();
-        if (PrototypeServices.CurrentTriggerTypes.Count == 0) PrototypeServices.CurrentTriggerTypes.Add("manual.run");
         ClearSelectionVisuals();
         TestStatus.Text = _english ? "Additional event removed" : "Événement supplémentaire supprimé";
-        eventArgs.Handled = true;
+        UpdateHistoryButtons();
     }
 
     private void AddActionNode(string label)
@@ -837,8 +1261,8 @@ public sealed partial class MainWindow : Window
         var title = LocalizedActionTitle(label);
         var node = new Border
         {
-            Width = 210,
-            Height = 100,
+            Width = 240,
+            MinHeight = PrototypeServices.ActionTypeFor(label) == "core.condition" ? 230 : 72,
             Background = new SolidColorBrush(Color.Parse("#151A32")),
             BorderBrush = new SolidColorBrush(Color.Parse(palette.Border)),
             BorderThickness = new Avalonia.Thickness(2),
@@ -871,35 +1295,23 @@ public sealed partial class MainWindow : Window
             Padding = new Avalonia.Thickness(10, 0),
             Child = new Grid
             {
+                ColumnDefinitions = new ColumnDefinitions("*,Auto"),
                 Children =
                 {
-                            new TextBlock { Text = $"◆  {(PrototypeServices.ActionTypeFor(label).StartsWith("core.", StringComparison.Ordinal) || PrototypeServices.ActionTypeFor(label).StartsWith("variables.", StringComparison.Ordinal) || PrototypeServices.ActionTypeFor(label).StartsWith("audio.", StringComparison.Ordinal) ? "CORE" : PrototypeServices.ActionTypeFor(label).StartsWith("obs.", StringComparison.Ordinal) ? "OBS" : "Twitch")} · {(_english ? title.English : title.French)}", Foreground = new SolidColorBrush(Color.Parse(palette.Text)), FontSize = 11, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center },
+                    new TextBlock { Text = $"◆  {ActionCategoryLabel(label)} · {(_english ? title.English : title.French)}", Foreground = new SolidColorBrush(Color.Parse(palette.Text)), FontSize = 11, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(0,0,6,0) },
                     deleteButton
                 }
             }
         };
+        Grid.SetColumn(deleteButton, 1);
         node.Child = new Grid
         {
-            RowDefinitions = new RowDefinitions("Auto,*"),
-            Children =
-            {
-                header,
-                new StackPanel
-                {
-                    [Grid.RowProperty] = 1,
-                    Orientation = Avalonia.Layout.Orientation.Horizontal,
-                    Spacing = 10,
-                    VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
-                    Margin = new Avalonia.Thickness(12, 0),
-                    Children = { }
-                }
-            }
+            RowDefinitions = new RowDefinitions("32"),
+            Children = { header }
         };
         if (label.Contains("source", StringComparison.OrdinalIgnoreCase))
         {
-            node.Height = 167;
             var layout = (Grid)node.Child;
-            layout.RowDefinitions = new RowDefinitions("32,*,Auto");
             var visibility = new ComboBox
             {
                 Tag = "visibilityOptions",
@@ -911,14 +1323,13 @@ public sealed partial class MainWindow : Window
             var visibilityField = new StackPanel { Spacing = 4, Margin = new Thickness(12, 0, 12, 10) };
             visibilityField.Children.Add(CreateFieldLabel("Visibilité", "Visibility"));
             visibilityField.Children.Add(visibility);
-            Grid.SetRow(visibilityField, 2);
             visibility.SelectionChanged += (_, _) =>
             {
                 if (visibility.SelectedIndex < 0) return;
                 PrototypeServices.SourceVisibility[label] = visibility.SelectedIndex == 0;
                 TestStatus.Text = _english ? "Draft modified" : "Brouillon modifié";
             };
-            layout.Children.Add(visibilityField);
+            AppendNodeSection(layout, visibilityField);
         }
         Canvas.SetLeft(node, 70 + (_addedActionCount % 3) * 230);
         AddInlineActionOptions(node, label);
@@ -928,8 +1339,43 @@ public sealed partial class MainWindow : Window
         _addedActionCount++;
     }
 
+    private string ActionCategoryLabel(string label)
+    {
+        var kind = PrototypeServices.ActionTypeFor(label);
+        if (kind.StartsWith("core.", StringComparison.Ordinal) || kind.StartsWith("variables.", StringComparison.Ordinal) || kind.StartsWith("audio.", StringComparison.Ordinal))
+            return _english ? "SYSTEM" : "SYSTÈME";
+        return kind.StartsWith("obs.", StringComparison.Ordinal) ? "OBS" : "Twitch";
+    }
+
+    private static void AppendNodeSection(Grid layout, Control section)
+    {
+        layout.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+        Grid.SetRow(section, layout.RowDefinitions.Count - 1);
+        layout.Children.Add(section);
+    }
+
+    private static string[] ObsOperationCaptions(IEnumerable<string> operations, bool english) => operations.Select(value => value switch
+    {
+        "start" => english ? "Start" : "Démarrer", "stop" => english ? "Stop" : "Arrêter", "pause" => english ? "Pause" : "Mettre en pause", "resume" => english ? "Resume" : "Reprendre", "save" => english ? "Save replay" : "Enregistrer le replay", _ => value
+    }).ToArray();
+
     private void AddInlineActionOptions(Border node, string label)
     {
+        var type = PrototypeServices.ActionTypeFor(label);
+        if (type.StartsWith("obs.output.", StringComparison.Ordinal))
+        {
+            if (!PrototypeServices.ActionOptions.TryGetValue(label, out var outputOptions)) PrototypeServices.ActionOptions[label] = outputOptions = new System.Text.Json.Nodes.JsonObject();
+            var values = type == "obs.output.record" ? new[] { "start", "stop", "pause", "resume" } : type == "obs.output.replay" ? new[] { "start", "stop", "save" } : new[] { "start", "stop" };
+            var picker = new ComboBox { Tag = "obsOperations:" + type, HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch };
+            picker.ItemsSource = ObsOperationCaptions(values, _english);
+            picker.SelectedIndex = Math.Max(0, Array.IndexOf(values, outputOptions["operation"]?.ToString() ?? "start"));
+            outputOptions["operation"] = values[picker.SelectedIndex];
+            picker.SelectionChanged += (_, _) => { if (picker.SelectedIndex >= 0) outputOptions["operation"] = values[picker.SelectedIndex]; };
+            var outputForm = new StackPanel { Spacing = 6, Margin = new Thickness(12, 0, 12, 10), Children = { CreateFieldLabel("Opération", "Operation"), picker } };
+            var layout = (Grid)node.Child!;
+            AppendNodeSection(layout, outputForm);
+            return;
+        }
         var name = label.Split('\u001f')[0].ToLowerInvariant();
         var fields = new List<(string Key, string Fr, string En)>();
         if (name.Contains("source"))
@@ -940,11 +1386,12 @@ public sealed partial class MainWindow : Window
         else if (name.Contains("scene") || name.Contains("scène") || name.Contains("capture") || name.Contains("screenshot")) fields.Add(("scene", "Scène OBS", "OBS scene"));
         else if (name.Contains("wait") || name.Contains("attendre")) fields.Add(("seconds", "Durée en secondes", "Duration in seconds"));
         else if (name.Contains("title") || name.Contains("titre")) fields.Add(("title", "Nouveau titre", "New title"));
-        else if (name.Contains("message")) fields.Add(("message", "Message à envoyer", "Message to send"));
+        else if (name.Contains("récompense") || name.Contains("reward")) { fields.Add(("title", "Nom de la récompense", "Reward title")); fields.Add(("cost", "Coût en points", "Cost in points")); }
+        else if (name.Contains("message")) fields.Add(("message", "Message à envoyer (ex. Bonjour %visites%)", "Message to send (e.g. Hello %visits%)"));
         else if (name.Contains("variable"))
         {
             fields.Add(("name", "Nom de la variable", "Variable name"));
-            fields.Add(("value", "Valeur", "Value"));
+            fields.Add(("value", "Valeur ou calcul (+ − × /)", "Value or calculation (+ − × /)"));
         }
         else if (name.Contains("condition"))
         {
@@ -952,7 +1399,7 @@ public sealed partial class MainWindow : Window
             fields.Add(("value", "Valeur attendue", "Expected value"));
         }
         else if (name.Contains("sound") || name.Contains("son")) fields.Add(("file", "Fichier audio", "Audio file"));
-        else if (name.Contains("utilisateur") || name.Contains("user")) fields.Add(("login", "Identifiant Twitch", "Twitch login"));
+        else if (name.Contains("utilisateur") || name.Contains("user")) fields.Add(("outputVariable", "Variable de sortie", "Output variable"));
         if (fields.Count == 0) return;
         if (!PrototypeServices.ActionOptions.TryGetValue(label, out var options))
             PrototypeServices.ActionOptions[label] = options = new System.Text.Json.Nodes.JsonObject();
@@ -963,42 +1410,55 @@ public sealed partial class MainWindow : Window
             var comparison = new ComboBox
             {
                 Tag = "conditionComparisons",
-                ItemsSource = _english ? new[] { "Equals", "Greater than", "Less than" } : new[] { "Égal à", "Supérieur à", "Inférieur à" },
-                SelectedIndex = options["comparison"]?.ToString() switch { "greater" => 1, "less" => 2, _ => 0 },
+                ItemsSource = _english ? new[] { "Equal to", "Greater than", "Greater than or equal", "Less than", "Less than or equal" } : new[] { "Égal à", "Supérieur à", "Supérieur ou égal", "Inférieur à", "Inférieur ou égal" },
+                SelectedIndex = options["comparison"]?.ToString() switch { "greater" => 1, "greaterOrEqual" => 2, "less" => 3, "lessOrEqual" => 4, _ => 0 },
                 HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch
             };
-            comparison.SelectionChanged += (_, _) => { if (comparison.SelectedIndex >= 0) options["comparison"] = comparison.SelectedIndex switch { 1 => "greater", 2 => "less", _ => "equals" }; };
+            comparison.SelectionChanged += (_, _) => { if (comparison.SelectedIndex >= 0) options["comparison"] = comparison.SelectedIndex switch { 1 => "greater", 2 => "greaterOrEqual", 3 => "less", 4 => "lessOrEqual", _ => "equals" }; };
             form.Children.Add(comparison);
-            form.Children.Add(CreateFieldLabel("Branche à relier", "Branch to connect"));
-            var branch = new ComboBox
-            {
-                Tag = "conditionBranches",
-                ItemsSource = _english ? new[] { "Yes", "No" } : new[] { "Oui", "Non" },
-                SelectedIndex = options["linkOutput"]?.ToString() == "no" ? 1 : 0,
-                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch
-            };
-            branch.SelectionChanged += (_, _) => { if (branch.SelectedIndex >= 0) options["linkOutput"] = branch.SelectedIndex == 1 ? "no" : "yes"; };
-            form.Children.Add(branch);
-            node.Height += 128;
+            form.Children.Add(CreateFieldLabel("Portée de la variable", "Variable scope"));
+            var conditionScope = new ComboBox { ItemsSource = _english ? new[] { "System", "Viewer" } : new[] { "Système", "Viewer" }, SelectedIndex = options["scope"]?.ToString() == "viewer" ? 1 : 0, HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch };
+            conditionScope.SelectionChanged += (_, _) => options["scope"] = conditionScope.SelectedIndex == 1 ? "viewer" : "system";
+            form.Children.Add(conditionScope); options["scope"] ??= "system";
         }
         if (name.Contains("variable"))
         {
-            form.Children.Add(CreateFieldLabel("Opération", "Operation"));
-            var operation = new ComboBox
+            if (options["operation"]?.ToString() is { } legacyOperation && options["value"]?.ToString() is { Length: > 0 } legacyValue)
             {
-                Tag = "variableOperations",
-                ItemsSource = _english ? new[] { "Set", "Add" } : new[] { "Définir", "Ajouter" },
-                SelectedIndex = options["operation"]?.ToString() == "increment" ? 1 : 0,
+                options["value"] = legacyOperation == "increment"
+                    ? (legacyValue.StartsWith('+') || legacyValue.StartsWith('-') ? legacyValue : "+" + legacyValue)
+                    : "=" + legacyValue;
+                options.Remove("operation");
+            }
+            form.Children.Add(CreateFieldLabel("Type de variable", "Variable type"));
+            var valueType = new ComboBox
+            {
+                Tag = "variableTypes",
+                ItemsSource = _english ? new[] { "Number", "Text" } : new[] { "Nombre", "Texte" },
+                SelectedIndex = options["valueType"]?.ToString() == "text" ? 1 : 0,
                 HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch
             };
-            operation.SelectionChanged += (_, _) =>
+            form.Children.Add(valueType);
+            void ApplyVariableType()
             {
-                if (operation.SelectedIndex < 0) return;
-                options["operation"] = operation.SelectedIndex == 1 ? "increment" : "set";
+                var isText = valueType.SelectedIndex == 1;
+                options["valueType"] = isText ? "text" : "integer";
+            }
+            valueType.SelectionChanged += (_, _) =>
+            {
+                ApplyVariableType();
                 TestStatus.Text = _english ? "Draft modified" : "Brouillon modifié";
             };
-            form.Children.Add(operation);
-            node.Height += 64;
+            ApplyVariableType();
+            form.Children.Add(CreateFieldLabel("Portée de la variable", "Variable scope"));
+            var scope = new ComboBox { ItemsSource = _english ? new[] { "System", "Viewer" } : new[] { "Système", "Viewer" }, SelectedIndex = options["scope"]?.ToString() == "viewer" ? 1 : 0, HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch };
+            scope.SelectionChanged += (_, _) => options["scope"] = scope.SelectedIndex == 1 ? "viewer" : "system";
+            form.Children.Add(scope);
+            form.Children.Add(CreateFieldLabel("Durée", "Lifetime"));
+            var lifetime = new ComboBox { ItemsSource = _english ? new[] { "Temporary", "Permanent" } : new[] { "Temporaire", "Permanente" }, SelectedIndex = options["lifetime"]?.ToString() == "temporary" ? 0 : 1, HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch };
+            lifetime.SelectionChanged += (_, _) => options["lifetime"] = lifetime.SelectedIndex == 0 ? "temporary" : "permanent";
+            form.Children.Add(lifetime);
+            options["scope"] ??= "system"; options["lifetime"] ??= "permanent";
         }
         StackPanel? sourcePicker = null;
         ComboBox? scenePicker = null;
@@ -1078,7 +1538,6 @@ public sealed partial class MainWindow : Window
             {
                 sourcePicker = new StackPanel { Spacing = 3 };
                 form.Children.Add(new ScrollViewer { Content = sourcePicker, Height = 110, HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled });
-                node.Height += 80;
                 _ = LoadSources();
                 continue;
             }
@@ -1114,22 +1573,66 @@ public sealed partial class MainWindow : Window
                 Tag = (fr, en),
                 PlaceholderText = _english ? en : fr,
                 Text = options[key]?.ToString() ?? (key == "seconds" ? "1" : ""),
-                FontSize = 12
+                FontSize = 12,
+                IsReadOnly = key == "file",
+                IsHitTestVisible = key != "file",
+                Focusable = key != "file",
+                AcceptsReturn = key == "message",
+                TextWrapping = key == "message" ? TextWrapping.Wrap : TextWrapping.NoWrap,
+                MaxLength = key == "message" ? 500 : int.MaxValue,
+                MinHeight = key == "message" ? 54 : 0,
+                MaxHeight = key == "message" ? 150 : double.PositiveInfinity
             };
+            if (key == "message")
+            {
+                input.Height = 54;
+                ToolTip.SetTip(input, _english ? "Maximum 500 characters (Twitch limit)" : "Maximum 500 caractères (limite Twitch)");
+            }
             if (key == "seconds" && options[key] is null) options[key] = "1";
             ToolTip.SetTip(input, _english ? en : fr);
             input.TextChanged += (_, _) =>
             {
                 options[key] = input.Text ?? "";
+                if (key == "message")
+                {
+                    var value = input.Text ?? "";
+                    var visualLines = value.Split('\n').Sum(line => Math.Max(1, (int)Math.Ceiling(Math.Max(1, line.Length) / 34d)));
+                    input.Height = Math.Clamp(34 + visualLines * 20, 54, 150);
+                    TestStatus.Text = value.Length >= 500
+                        ? (_english ? "Twitch message limit reached (500 characters)" : "Limite Twitch atteinte (500 caractères)")
+                        : (_english ? "Draft modified" : "Brouillon modifié");
+                    return;
+                }
                 TestStatus.Text = _english ? "Draft modified" : "Brouillon modifié";
             };
-            form.Children.Add(input);
+            if (key == "file")
+            {
+                var browse = new Button { Content = "📁", Width = 42, Padding = new Thickness(6), Classes = { "primary" }, HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right, VerticalContentAlignment = Avalonia.Layout.VerticalAlignment.Center };
+                ToolTip.SetTip(browse, _english ? "Browse for an MP3 or WAV file" : "Parcourir un fichier MP3 ou WAV");
+                browse.Click += async (_, _) =>
+                {
+                    var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+                    {
+                        Title = _english ? "Choose an audio file" : "Choisir un fichier audio",
+                        AllowMultiple = false,
+                        FileTypeFilter = [new FilePickerFileType("MP3 / WAV") { Patterns = ["*.mp3", "*.wav"] }]
+                    });
+                    if (files.Count == 0) return;
+                    var path = files[0].TryGetLocalPath();
+                    if (string.IsNullOrWhiteSpace(path)) return;
+                    input.Text = path;
+                };
+                input.HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch;
+                var fileRow = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto"), ColumnSpacing = 6 };
+                fileRow.Children.Add(input);
+                Grid.SetColumn(browse, 1);
+                fileRow.Children.Add(browse);
+                form.Children.Add(fileRow);
+            }
+            else form.Children.Add(input);
         }
         var grid = (Grid)node.Child!;
-        grid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
-        Grid.SetRow(form, grid.RowDefinitions.Count - 1);
-        grid.Children.Add(form);
-        node.Height += fields.Count * 64 + 10;
+        AppendNodeSection(grid, form);
         if (scenePicker is not null)
             _obsCardRefresh[node] = async () => { await LoadChoices(scenePicker, "scene"); await LoadSources(); };
     }
@@ -1143,12 +1646,16 @@ public sealed partial class MainWindow : Window
             FontSize = 11,
             FontWeight = FontWeight.SemiBold,
             Foreground = new SolidColorBrush(Color.Parse("#CDD0E3"))
+            ,TextWrapping = TextWrapping.Wrap
         };
         return text;
     }
 
     private static (string French, string English) LocalizedActionTitle(string key) => PrototypeServices.ActionTypeFor(key) switch
     {
+        "obs.output.record" => ("Enregistrement OBS", "OBS recording"),
+        "obs.output.replay" => ("Tampon replay", "Replay buffer"),
+        "obs.output.virtual-camera" => ("Caméra virtuelle", "Virtual camera"),
         "obs.set-source-visible" => ("Visibilité d’une source", "Source visibility"),
         "obs.scene.set-current" => ("Changer de scène", "Change scene"),
         "obs.replay.start" => ("Démarrer un replay", "Start replay"),
@@ -1157,11 +1664,14 @@ public sealed partial class MainWindow : Window
         "twitch.send-message" => ("Envoyer un message", "Send a message"),
         "twitch.create-clip" => ("Créer un clip", "Create a clip"),
         "twitch.get-user" => ("Récupérer un utilisateur", "Get a user"),
+        "twitch.create-reward" => ("Créer une récompense de points", "Create channel points reward"),
         "core.delay" => ("Attendre", "Wait"),
         "core.condition" => ("Condition", "Condition"),
         "variables.set-integer" => ("Modifier une variable", "Edit a variable"),
+        "variables.set-text" => ("Modifier une variable", "Edit a variable"),
+        "variables.number-expression" => ("Modifier une variable", "Edit a variable"),
         "audio.play" => ("Jouer un son", "Play a sound"),
-        _ => ("Gérer les points de chaîne", "Manage channel points")
+        _ => ("Action", "Action")
     };
 
     private static (string Header, string Border, string Icon, string Text) GetActionPalette(string label)
@@ -1169,6 +1679,7 @@ public sealed partial class MainWindow : Window
         if (label.StartsWith("__trigger__", StringComparison.Ordinal))
             return ("#145A43", "#26C281", "#20865F", "#62E6AE");
         var value = label.ToLowerInvariant();
+        if (PrototypeServices.ActionTypeFor(label).StartsWith("obs.", StringComparison.Ordinal)) return ("#20242C", "#737B8A", "#343A4D", "#DCE2EE");
         if (value.Contains("obs") || value.Contains("scène") || value.Contains("scene") || value.Contains("source") || value.Contains("replay") || value.Contains("capture"))
             return ("#20242C", "#737B8A", "#343A4D", "#DCE2EE");
         if (value.Contains("condition") || value.Contains("attendre") || value.Contains("wait") || value.Contains("variable") || value.Contains("compteur") || value.Contains("sound") || value.Contains("son"))
@@ -1239,7 +1750,6 @@ public sealed partial class MainWindow : Window
 
     private void OnActionNodeMoved(object? sender, PointerEventArgs eventArgs)
     {
-        if (sender == _triggerNode || sender is Border trigger && _additionalTriggerNodes.Contains(trigger)) return;
         if (_draggedNode != sender || eventArgs.Pointer.Captured != _draggedNode) return;
         var point = eventArgs.GetCurrentPoint(WorkflowCanvas).Position;
         var left = Math.Max(8, _dragNodeLeft + point.X - _dragPointerStart.X);
@@ -1252,7 +1762,12 @@ public sealed partial class MainWindow : Window
     private void UpdateDynamicLinks()
     {
         foreach (var link in _dynamicLinks) WorkflowCanvas.Children.Remove(link);
+        foreach (var label in _dynamicLinkLabels) WorkflowCanvas.Children.Remove(label);
+        foreach (var staleLabel in WorkflowCanvas.Children.OfType<Border>().Where(border => Equals(border.Tag, "branchLabel")).ToArray())
+            WorkflowCanvas.Children.Remove(staleLabel);
         _dynamicLinks.Clear();
+        _dynamicLinkLabels.Clear();
+        _linkLabelMap.Clear();
         _linkMap.Clear();
         var targetGroups = _manualLinks.GroupBy(link => link.To).ToDictionary(
             group => group.Key,
@@ -1263,18 +1778,25 @@ public sealed partial class MainWindow : Window
             var fromTop = Canvas.GetTop(from);
             var toLeft = Canvas.GetLeft(to);
             var toTop = Canvas.GetTop(to);
-            var fromCenter = new Point(fromLeft + from.Width / 2, fromTop + from.Height / 2);
-            var toCenter = new Point(toLeft + to.Width / 2, toTop + to.Height / 2);
+            var fromWidth = NodeWidth(from);
+            var fromHeight = NodeHeight(from);
+            var toWidth = NodeWidth(to);
+            var toHeight = NodeHeight(to);
+            var fromCenter = new Point(fromLeft + fromWidth / 2, fromTop + fromHeight / 2);
+            var toCenter = new Point(toLeft + toWidth / 2, toTop + toHeight / 2);
+            var branchOutput = from.Tag is string branchSourceKey && to.Tag is string branchTargetKey
+                ? PrototypeServices.ActionOptions.GetValueOrDefault(branchSourceKey)?["branches"]?[branchTargetKey]?.ToString() : null;
             var horizontal = Math.Abs(toCenter.X - fromCenter.X) >= Math.Abs(toCenter.Y - fromCenter.Y);
             var targetIndex = targetGroups[to].IndexOf((from, to));
             var targetCount = targetGroups[to].Count;
             var spread = (targetIndex - (targetCount - 1) / 2d) * 26;
+            var branchOffset = branchOutput == "yes" ? -24 : branchOutput == "no" ? 24 : 0;
             var start = horizontal
-                ? new Point(toCenter.X >= fromCenter.X ? fromLeft + from.Width : fromLeft, fromCenter.Y)
-                : new Point(fromCenter.X, toCenter.Y >= fromCenter.Y ? fromTop + from.Height : fromTop);
+                ? new Point(toCenter.X >= fromCenter.X ? fromLeft + fromWidth : fromLeft, fromCenter.Y + branchOffset)
+                : new Point(fromCenter.X + branchOffset, toCenter.Y >= fromCenter.Y ? fromTop + fromHeight : fromTop);
             var end = horizontal
-                ? new Point(toCenter.X >= fromCenter.X ? toLeft - 2 : toLeft + to.Width + 2, toCenter.Y + spread)
-                : new Point(toCenter.X + spread, toCenter.Y >= fromCenter.Y ? toTop - 2 : toTop + to.Height + 2);
+                ? new Point(toCenter.X >= fromCenter.X ? toLeft - 2 : toLeft + toWidth + 2, toCenter.Y + spread)
+                : new Point(toCenter.X + spread, toCenter.Y >= fromCenter.Y ? toTop - 2 : toTop + toHeight + 2);
             var bend = horizontal
                 ? new Point((start.X + end.X) / 2, start.Y)
                 : new Point(start.X, (start.Y + end.Y) / 2);
@@ -1299,14 +1821,12 @@ public sealed partial class MainWindow : Window
                 context.LineTo(end);
                 context.LineTo(wingB);
             }
-            var branchOutput = from.Tag is string sourceKey && to.Tag is string targetKey
-                ? PrototypeServices.ActionOptions.GetValueOrDefault(sourceKey)?["branches"]?[targetKey]?.ToString() : null;
             var link = new Avalonia.Controls.Shapes.Path
             {
                 Data = geometry,
                 Stroke = new SolidColorBrush(Color.Parse(branchOutput switch
                 {
-                    "yes" => "#53D994", "no" => "#F1B85B", _ => GetActionPalette(from.Tag as string ?? "").Border
+                    "yes" => "#53D994", "no" => "#F05B68", _ => GetActionPalette(from.Tag as string ?? "").Border
                 })),
                 StrokeThickness = 3,
                 StrokeLineCap = PenLineCap.Round,
@@ -1316,8 +1836,32 @@ public sealed partial class MainWindow : Window
             WorkflowCanvas.Children.Insert(0, link);
             _dynamicLinks.Add(link);
             _linkMap[link] = (from, to);
+            if (branchOutput is "yes" or "no")
+            {
+                var branchLabel = new Border
+                {
+                    Tag = "branchLabel",
+                    Background = new SolidColorBrush(Color.Parse(branchOutput == "yes" ? "#145A43" : "#702735")),
+                    BorderBrush = new SolidColorBrush(Color.Parse(branchOutput == "yes" ? "#53D994" : "#F05B68")),
+                    BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(8), Padding = new Thickness(7, 2),
+                    Child = new TextBlock { Text = branchOutput == "yes" ? (_english ? "True" : "Vrai") : (_english ? "False" : "Faux"), Foreground = Brushes.White, FontSize = 10, FontWeight = FontWeight.SemiBold }
+                };
+                Canvas.SetLeft(branchLabel, (start.X + end.X) / 2 - 20);
+                Canvas.SetTop(branchLabel, (start.Y + end.Y) / 2 - 12);
+                branchLabel.ZIndex = 11;
+                branchLabel.PointerPressed += OnBranchLabelPressed;
+                WorkflowCanvas.Children.Add(branchLabel);
+                _dynamicLinkLabels.Add(branchLabel);
+                _linkLabelMap[branchLabel] = (from, to);
+            }
         }
     }
+
+    private static double NodeWidth(Control node) =>
+        double.IsFinite(node.Width) ? node.Width : Math.Max(node.MinWidth, node.Bounds.Width);
+
+    private static double NodeHeight(Control node) =>
+        double.IsFinite(node.Height) ? node.Height : Math.Max(node.MinHeight, node.Bounds.Height);
 
     private async void OnWorkflowLinkPressed(object? sender, PointerPressedEventArgs eventArgs)
     {
@@ -1333,6 +1877,11 @@ public sealed partial class MainWindow : Window
         }};
         var confirmed = await dialog.ShowDialog<bool>(this);
         if (!confirmed) { TestStatus.Text = _english ? "Link kept" : "Lien conservé"; return; }
+        if (!_manualLinks.Contains(link))
+        {
+            TestStatus.Text = _english ? "This link no longer exists" : "Ce lien n’existe plus";
+            return;
+        }
         TestStatus.Text = _english ? "Removing link…" : "Suppression du lien…";
         RememberCanvas();
         _manualLinks.Remove(link);
@@ -1341,7 +1890,24 @@ public sealed partial class MainWindow : Window
         eventArgs.Handled = true;
     }
 
-    private void OnActionNodeReleased(object? sender, PointerReleasedEventArgs eventArgs)
+    private void OnBranchLabelPressed(object? sender, PointerPressedEventArgs eventArgs)
+    {
+        if (sender is not Border label || !_linkLabelMap.TryGetValue(label, out var link)) return;
+        if (eventArgs.GetCurrentPoint(label).Properties.PointerUpdateKind != PointerUpdateKind.LeftButtonPressed) return;
+        if (link.From.Tag is not string sourceKey || link.To.Tag is not string targetKey ||
+            !PrototypeServices.ActionOptions.TryGetValue(sourceKey, out var options)) return;
+        if (options["branches"] is not System.Text.Json.Nodes.JsonObject branches)
+            options["branches"] = branches = new System.Text.Json.Nodes.JsonObject();
+        var next = branches[targetKey]?.ToString() == "yes" ? "no" : "yes";
+        branches[targetKey] = next;
+        TestStatus.Text = next == "yes"
+            ? (_english ? "Link changed to True" : "Liaison changée vers Vrai")
+            : (_english ? "Link changed to False" : "Liaison changée vers Faux");
+        UpdateDynamicLinks();
+        eventArgs.Handled = true;
+    }
+
+    private async void OnActionNodeReleased(object? sender, PointerReleasedEventArgs eventArgs)
     {
         if (_draggedNode == sender)
         {
@@ -1382,13 +1948,17 @@ public sealed partial class MainWindow : Window
                     }
                     if (reachable.Contains(_selectedNode))
                     {
-                        TestStatus.Text = _english ? "This link would create a loop" : "Cette liaison créerait une boucle";
-                        _draggedNode = null; _dragStartSnapshot = null;
-                        return;
+                        if (!await ConfirmCycleAsync())
+                        {
+                            TestStatus.Text = _english ? "Loop declined — link not created" : "Boucle refusée — liaison non créée";
+                            _draggedNode = null; _dragStartSnapshot = null;
+                            return;
+                        }
+                        _cycleApprovals.Add(PrototypeServices.CurrentWorkflowId);
                     }
                     RememberCanvas();
                     _manualLinks.Add((_selectedNode, node));
-                    if (_selectedNode.Tag is string sourceKey && node.Tag is string targetKey && sourceKey.Contains("condition", StringComparison.OrdinalIgnoreCase)
+                    if (_selectedNode.Tag is string sourceKey && node.Tag is string targetKey && PrototypeServices.ActionTypeFor(sourceKey) == "core.condition"
                         && PrototypeServices.ActionOptions.TryGetValue(sourceKey, out var sourceOptions))
                     {
                         if (sourceOptions["branches"] is not System.Text.Json.Nodes.JsonObject branches)
@@ -1552,7 +2122,6 @@ public sealed partial class MainWindow : Window
             {
                 var eventTitle = TwitchTriggerCatalog.Title(((string)node.Tag!)[12..], english);
                 if (labels[0] is { } header) header.Text = $"⚡  {eventTitle}";
-                if (labels.Length > 1) labels[1].Text = eventTitle;
             }
         var triggerIndex = WorkflowTriggerSelector.SelectedIndex;
         var switching = _switchingWorkflow;
@@ -1561,23 +2130,20 @@ public sealed partial class MainWindow : Window
         WorkflowTriggerSelector.SelectedIndex = triggerIndex;
         _switchingWorkflow = switching;
         RunOnceButton.Content = english ? "Run once" : "Exécuter";
-        ToolTip.SetTip(RunOnceButton, english ? "Run the published version with real effects" : "Exécuter la version publiée avec des effets réels");
+        ToolTip.SetTip(RunOnceButton, english
+            ? (RunOnceButton.IsEnabled ? "Run the active published manual branch with real effects" : "Activate this automation to run real actions")
+            : (RunOnceButton.IsEnabled ? "Exécuter la branche manuelle publiée avec des effets réels" : "Active cette automatisation pour exécuter des actions réelles"));
         UiLanguageState.IsEnglish = english;
         SaveWorkflowButton.Content = english ? "Save" : "Enregistrer";
-        if (StartWorkflowButton.Content?.ToString()?.Contains("Stop", StringComparison.Ordinal) == true || StartWorkflowButton.Content?.ToString()?.Contains("Arrêter", StringComparison.Ordinal) == true)
-        {
-            StartWorkflowButton.Content = english ? "■  Stop" : "■  Arrêter";
-        }
-        else
-        {
-            StartWorkflowButton.Content = english ? "▶  Start" : "▶  Démarrer";
-        }
+        StartWorkflowButton.OnContent = english ? "Active" : "Activée";
+        StartWorkflowButton.OffContent = english ? "Inactive" : "Désactivée";
+        ToolTip.SetTip(StartWorkflowButton, english ? "Enable or disable automatic triggers" : "Active ou désactive les déclencheurs automatiques");
         var translations = _english
             ? new Dictionary<string, string>
             {
                 ["Mon Live Automatisation"] = "My Live Automation", ["Accueil"] = "Home", ["Workflows"] = "Workflows",
                 ["Événements"] = "Events", ["Actions"] = "Actions", ["Intégrations"] = "Integrations",
-                ["Variables"] = "Variables", ["Pages"] = "Pages", ["Paramètres"] = "Settings",
+                ["Historique"] = "History", ["Variables"] = "Variables", ["Pages"] = "Pages", ["Paramètres"] = "Settings",
                 ["Tester"] = "Test", ["Enregistrer"] = "Save", ["Démarrer"] = "Start",
                 ["Bibliothèque de modèles"] = "Template library", ["Voir tout  ›"] = "View all  ›",
                 ["Twitch"] = "Twitch", ["OBS Studio"] = "OBS Studio", ["CORE"] = "CORE",
@@ -1594,7 +2160,7 @@ public sealed partial class MainWindow : Window
             }
             : new Dictionary<string, string>
             {
-                ["My Live Automation"] = "Mon Live Automatisation", ["Home"] = "Accueil", ["Events"] = "Événements",
+                ["My Live Automation"] = "Mon Live Automatisation", ["Home"] = "Accueil", ["Events"] = "Événements", ["History"] = "Historique",
                 ["Integrations"] = "Intégrations", ["Settings"] = "Paramètres", ["Test"] = "Tester",
                 ["Save"] = "Enregistrer", ["Start"] = "Démarrer", ["Template library"] = "Bibliothèque de modèles",
                 ["View all  ›"] = "Voir tout  ›", ["Search for an action…"] = "Rechercher une action…",
@@ -1628,6 +2194,10 @@ public sealed partial class MainWindow : Window
         translations["＋  Action"] = _english ? "＋  Action" : "＋  Action";
         translations["＋  Événement"] = _english ? "＋  Event" : "＋  Événement";
         translations["＋  Event"] = _english ? "＋  Event" : "＋  Événement";
+        translations["＋  Système"] = _english ? "＋  System" : "＋  Système";
+        translations["＋  System"] = _english ? "＋  System" : "＋  Système";
+
+        ToolTip.SetTip(AddCanvasSystemButton, _english ? "Add an internal function to the canvas" : "Ajouter une fonction interne au canevas");
 
         foreach (var control in this.GetVisualDescendants().OfType<TextBlock>())
         {
@@ -1645,6 +2215,12 @@ public sealed partial class MainWindow : Window
 
         foreach (var picker in this.GetVisualDescendants().OfType<ComboBox>())
         {
+            if (picker.Tag is string outputTag && outputTag.StartsWith("obsOperations:", StringComparison.Ordinal))
+            {
+                var index = picker.SelectedIndex;
+                var values = outputTag.EndsWith("record", StringComparison.Ordinal) ? new[] { "start", "stop", "pause", "resume" } : outputTag.EndsWith("replay", StringComparison.Ordinal) ? new[] { "start", "stop", "save" } : new[] { "start", "stop" };
+                picker.ItemsSource = ObsOperationCaptions(values, english); picker.SelectedIndex = index;
+            }
             if (picker.Tag is ValueTuple<string, string> captions)
                 picker.PlaceholderText = english ? captions.Item2 : captions.Item1;
             if (Equals(picker.Tag, "visibilityOptions"))
@@ -1657,6 +2233,12 @@ public sealed partial class MainWindow : Window
             {
                 var selected = picker.SelectedIndex;
                 picker.ItemsSource = english ? new[] { "Set", "Add" } : new[] { "Définir", "Ajouter" };
+                picker.SelectedIndex = selected;
+            }
+            if (Equals(picker.Tag, "variableTypes"))
+            {
+                var selected = picker.SelectedIndex;
+                picker.ItemsSource = english ? new[] { "Number", "Text" } : new[] { "Nombre", "Texte" };
                 picker.SelectedIndex = selected;
             }
             if (Equals(picker.Tag, "conditionComparisons") || Equals(picker.Tag, "conditionBranches"))
@@ -1678,6 +2260,7 @@ public sealed partial class MainWindow : Window
 
         foreach (var button in this.GetVisualDescendants().OfType<Button>())
         {
+            if (Equals(button.Tag, "deleteEventButton")) ToolTip.SetTip(button, english ? "Delete event" : "Supprimer l’événement");
             if (Equals(button.Tag, "manualRunButton"))
             {
                 button.Content = english ? "▶  Run once" : "▶  Exécuter";
@@ -1693,9 +2276,7 @@ public sealed partial class MainWindow : Window
             if (node.Tag is string key && node.GetVisualDescendants().OfType<TextBlock>().FirstOrDefault() is { } header)
             {
                 var actionTitle = LocalizedActionTitle(key);
-                var kind = PrototypeServices.ActionTypeFor(key);
-                var category = kind.StartsWith("core.", StringComparison.Ordinal) || kind.StartsWith("variables.", StringComparison.Ordinal) || kind.StartsWith("audio.", StringComparison.Ordinal) ? "CORE" : kind.StartsWith("obs.", StringComparison.Ordinal) ? "OBS" : "Twitch";
-                header.Text = $"◆  {category} · {(_english ? actionTitle.English : actionTitle.French)}";
+                header.Text = $"◆  {ActionCategoryLabel(key)} · {(_english ? actionTitle.English : actionTitle.French)}";
             }
     }
 

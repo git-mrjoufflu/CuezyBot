@@ -1,0 +1,25 @@
+<Window x:Class="Automation.Desktop.RewardsWindow" xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="Récompenses — CuezyBot" Width="900" Height="680" MinWidth="760" MinHeight="520" Background="#0B1024" WindowStartupLocation="CenterOwner">
+  <Window.Styles>
+    <Style Selector="TextBlock"><Setter Property="FontFamily" Value="Inter" /><Setter Property="Foreground" Value="#F4F3FF" /></Style>
+    <Style Selector="TextBlock.muted"><Setter Property="Foreground" Value="#9DA8CB" /></Style>
+    <Style Selector="Button"><Setter Property="FontFamily" Value="Inter" /><Setter Property="CornerRadius" Value="7" /><Setter Property="Padding" Value="12,8" /></Style>
+    <Style Selector="Button.primary"><Setter Property="Background" Value="#245A91" /><Setter Property="Foreground" Value="White" /></Style>
+    <Style Selector="TextBox"><Setter Property="FontFamily" Value="Inter" /><Setter Property="Height" Value="38" /><Setter Property="VerticalContentAlignment" Value="Center" /></Style>
+    <Style Selector="ComboBox"><Setter Property="Height" Value="38" /><Setter Property="VerticalContentAlignment" Value="Center" /></Style>
+  </Window.Styles>
+  <Grid Margin="28" RowDefinitions="Auto,Auto,Auto,Auto,*" RowSpacing="18">
+    <StackPanel><TextBlock x:Name="Heading" FontSize="25" FontWeight="Bold" /><TextBlock x:Name="Description" Classes="muted" TextWrapping="Wrap" /></StackPanel>
+    <TextBlock x:Name="StatusText" Grid.Row="1" Classes="muted" TextWrapping="Wrap" />
+    <Border Grid.Row="2" Background="#141A34" BorderBrush="#33406A" BorderThickness="1" CornerRadius="11" Padding="16">
+      <Grid ColumnDefinitions="1.5*,1*,1.2*,1*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="7">
+        <TextBlock x:Name="NameLabel" FontWeight="SemiBold" /><TextBlock x:Name="CostLabel" Grid.Column="1" FontWeight="SemiBold" /><TextBlock x:Name="CooldownLabel" Grid.Column="2" FontWeight="SemiBold" /><TextBlock x:Name="ScopeLabel" Grid.Column="3" FontWeight="SemiBold" />
+        <TextBox x:Name="NameInput" Grid.Row="1" MaxLength="45" /><TextBox x:Name="CostInput" Grid.Row="1" Grid.Column="1" Text="100" /><TextBox x:Name="CooldownInput" Grid.Row="1" Grid.Column="2" Text="0" />
+        <ComboBox x:Name="ScopeInput" Grid.Row="1" Grid.Column="3" HorizontalAlignment="Stretch" SelectedIndex="0"><ComboBoxItem Content="Global" /></ComboBox>
+        <Button x:Name="SaveButton" Grid.Row="1" Grid.Column="4" Classes="primary" Click="OnSaveClick" />
+      </Grid>
+    </Border>
+    <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="8"><Button x:Name="RefreshButton" Click="OnRefreshClick" /><Button x:Name="CancelButton" IsVisible="False" Click="OnCancelClick" /></StackPanel>
+    <ScrollViewer Grid.Row="4"><StackPanel x:Name="RewardRows" Spacing="8" /></ScrollViewer>
+  </Grid>
+</Window>

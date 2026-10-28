@@ -16,7 +16,7 @@ public sealed class ObsWebSocketClient : IObsController, IAsyncDisposable
     private readonly CancellationTokenSource lifetime = new();
     private Task? receiveTask;
 
-    public bool IsConnected => socket.State == WebSocketState.Open && receiveTask is not null;
+    public bool IsConnected => socket.State == WebSocketState.Open && receiveTask is { IsCompleted: false };
 
     public async Task ConnectAsync(
         Uri endpoint,
@@ -106,6 +106,20 @@ public sealed class ObsWebSocketClient : IObsController, IAsyncDisposable
 
     public async Task StartReplayBufferAsync(CancellationToken cancellationToken = default) =>
         await SendRequestAsync("StartReplayBuffer", new JsonObject(), TimeSpan.FromSeconds(10), cancellationToken);
+
+    public async Task ControlOutputAsync(string output, string operation, CancellationToken cancellationToken = default)
+    {
+        var request = (output, operation) switch
+        {
+            ("record", "start") => "StartRecord", ("record", "stop") => "StopRecord",
+            ("record", "pause") => "PauseRecord", ("record", "resume") => "ResumeRecord",
+            ("replay", "start") => "StartReplayBuffer", ("replay", "stop") => "StopReplayBuffer",
+            ("replay", "save") => "SaveReplayBuffer",
+            ("virtual-camera", "start") => "StartVirtualCam", ("virtual-camera", "stop") => "StopVirtualCam",
+            _ => throw new ArgumentException("Unsupported OBS output operation.", nameof(operation))
+        };
+        await SendRequestAsync(request, new JsonObject(), TimeSpan.FromSeconds(10), cancellationToken);
+    }
 
     public async Task<byte[]> GetScreenshotAsync(string sourceName, CancellationToken cancellationToken = default)
     {

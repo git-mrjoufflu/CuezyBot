@@ -1,0 +1,40 @@
+<Window x:Class="Automation.Desktop.VariablesWindow" xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="Variables — CuezyBot" Width="900" Height="680" MinWidth="760" MinHeight="520"
+    Background="#0B1024" WindowStartupLocation="CenterOwner">
+  <Window.Styles>
+    <Style Selector="TextBlock"><Setter Property="FontFamily" Value="Inter" /><Setter Property="Foreground" Value="#F4F3FF" /></Style>
+    <Style Selector="TextBlock.muted"><Setter Property="Foreground" Value="#9DA8CB" /></Style>
+    <Style Selector="Button"><Setter Property="FontFamily" Value="Inter" /><Setter Property="CornerRadius" Value="7" /><Setter Property="Padding" Value="12,8" /></Style>
+    <Style Selector="Button.primary"><Setter Property="Background" Value="#245A91" /><Setter Property="Foreground" Value="White" /></Style>
+    <Style Selector="TextBox"><Setter Property="FontFamily" Value="Inter" /><Setter Property="Height" Value="38" /><Setter Property="VerticalContentAlignment" Value="Center" /></Style>
+    <Style Selector="ComboBox"><Setter Property="Height" Value="38" /><Setter Property="VerticalContentAlignment" Value="Center" /></Style>
+  </Window.Styles>
+  <Grid Margin="28" RowDefinitions="Auto,Auto,Auto,Auto,Auto,*" RowSpacing="18">
+    <StackPanel>
+      <TextBlock x:Name="Heading" Text="Variables" FontSize="25" FontWeight="Bold" />
+      <TextBlock x:Name="Description" Classes="muted" Text="Crée des nombres persistants utilisables avec %nom% dans les actions." TextWrapping="Wrap" />
+    </StackPanel>
+    <TextBlock x:Name="StatusText" Grid.Row="1" Classes="muted" Text="Chargement…" />
+    <Border Grid.Row="2" Background="#141A34" BorderBrush="#33406A" BorderThickness="1" CornerRadius="11" Padding="16">
+      <Grid ColumnDefinitions="1.35*,1.05*,1.3*,1.15*,1.15*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="7">
+        <TextBlock x:Name="NameLabel" Text="Nom" FontWeight="SemiBold" />
+        <TextBlock x:Name="TypeLabel" Grid.Column="1" Text="Type" FontWeight="SemiBold" />
+        <TextBlock x:Name="ValueLabel" Grid.Column="2" Text="Valeur initiale" FontWeight="SemiBold" />
+        <TextBlock x:Name="ScopeLabel" Grid.Column="3" Text="Portée" FontWeight="SemiBold" />
+        <TextBlock x:Name="LifetimeLabel" Grid.Column="4" Text="Durée" FontWeight="SemiBold" />
+        <TextBox x:Name="NameInput" Grid.Row="1" PlaceholderText="ex. visites" />
+        <ComboBox x:Name="TypeInput" Grid.Row="1" Grid.Column="1" Width="130" HorizontalAlignment="Stretch" SelectedIndex="0" SelectionChanged="OnTypeChanged" />
+        <TextBox x:Name="ValueInput" Grid.Row="1" Grid.Column="2" Text="0" />
+        <ComboBox x:Name="ScopeInput" Grid.Row="1" Grid.Column="3" Width="140" HorizontalAlignment="Stretch" SelectedIndex="0" />
+        <ComboBox x:Name="LifetimeInput" Grid.Row="1" Grid.Column="4" Width="150" HorizontalAlignment="Stretch" SelectedIndex="1" />
+        <Button x:Name="SaveButton" Grid.Row="1" Grid.Column="5" Classes="primary" Content="Ajouter" Click="OnSaveClick" />
+      </Grid>
+    </Border>
+    <TabControl x:Name="ScopeTabs" Grid.Row="3" SelectionChanged="OnScopeChanged">
+      <TabItem x:Name="SystemTab" Header="Système" />
+      <TabItem x:Name="ViewerTab" Header="Viewer" />
+    </TabControl>
+    <ComboBox x:Name="ViewerFilter" Grid.Row="4" Width="280" HorizontalAlignment="Left" PlaceholderText="Tous les viewers" SelectionChanged="OnViewerChanged" IsVisible="False" />
+    <ScrollViewer Grid.Row="5"><StackPanel x:Name="VariableRows" Spacing="8" /></ScrollViewer>
+  </Grid>
+</Window>

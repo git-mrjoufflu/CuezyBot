@@ -9,6 +9,7 @@ public sealed record TwitchTrigger(string EventType, string Version, string Scop
     {
         "channel.follow" => new() { ["broadcaster_user_id"] = userId, ["moderator_user_id"] = userId },
         "channel.raid" => new() { ["to_broadcaster_user_id"] = userId },
+        "channel.chat.message" => new() { ["broadcaster_user_id"] = userId, ["user_id"] = userId },
         _ => new() { ["broadcaster_user_id"] = userId }
     };
 }
@@ -27,10 +28,12 @@ public static class TwitchTriggerCatalog
         new("stream.online", "1", "", "Début du live", "Stream online"),
         new("stream.offline", "1", "", "Fin du live", "Stream offline"),
         new("channel.update", "2", "", "Informations du live modifiées", "Channel updated")
+        ,new("channel.chat.message", "1", "user:read:chat", "Commande de chat", "Chat command")
     };
     public static TwitchTrigger? FindBlock(string type) => All.FirstOrDefault(item => item.BlockType == type);
     public static string Title(string type, bool english) => type == "manual.run"
         ? (english ? "Manual run" : "Exécution manuelle")
+        : type == "core.timer" ? (english ? "Timer" : "Minuteur")
         : FindBlock(type) is { } item ? (english ? item.English : item.French) : type;
 }
 
