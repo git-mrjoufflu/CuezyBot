@@ -41,6 +41,7 @@
                       <TextBlock Text="⚡" HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
                     <StackPanel Grid.Column="1" Margin="10,0" VerticalAlignment="Center">
+                      <TextBlock Text="{Binding QueueLabel}" Foreground="#7DBEFF" FontSize="11" />
                       <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="16" />
                       <TextBlock Text="{Binding Summary}" Classes="muted" FontSize="12" />
                     </StackPanel>

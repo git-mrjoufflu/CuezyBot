@@ -83,6 +83,14 @@ Ce plan précise et actualise cette référence : éditeur visuel dès la premi�
 - Animations courtes et désactivables ; aucune information essentielle accessible uniquement au survol.
 - Même vocabulaire et mêmes gestes sur Windows et Linux.
 
+#### Convention des boutons d’action
+
+- Les actions répétitives d’administration utilisent des icônes plutôt que des libellés longs : `+` pour ajouter, crayon vert pour modifier, corbeille rouge pour supprimer et disquette claire pour enregistrer.
+- Les icônes doivent être des formes vectorielles centrées, avec une taille et une hauteur identiques aux champs de la ligne ; éviter les caractères Unicode dont l’alignement varie selon la police.
+- Chaque bouton iconographique conserve une infobulle et un nom d’accessibilité localisés en français et en anglais.
+- Undo/Redo suivent la même dimension et le même traitement visuel que la disquette.
+- Cette convention s’applique de façon uniforme aux Variables, Récompenses, Commandes, Files d’alertes, Automatisations et à toute nouvelle fenêtre de gestion.
+
 ### 2.3 Confiance et contrôle
 
 - Sauvegarder automatiquement les brouillons et afficher « Enregistrement… », « Enregistré » ou une erreur explicite.

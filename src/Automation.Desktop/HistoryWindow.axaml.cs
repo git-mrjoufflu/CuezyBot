@@ -35,14 +35,19 @@ public sealed partial class HistoryWindow : Window
             var database = new SqliteDatabase(new AppDataPaths());
             await database.InitializeAsync();
             var entries = await new SqliteExecutionHistoryReader(database).GetRecentAsync(50);
-            var rows = entries.Reverse().Select(ToRow).ToArray();
+            var rows = new List<HistoryRow>();
+            foreach (var entry in entries.Reverse())
+            {
+                var queue = await AutomationQueues.ForWorkflowAsync(entry.WorkflowId);
+                rows.Add(ToRow(entry, queue));
+            }
             HistoryItems.ItemsSource = rows;
             ApplyStaticLanguage();
-            HistoryStatus.Text = rows.Length == 0
+            HistoryStatus.Text = rows.Count == 0
                 ? (UiLanguageState.IsEnglish ? "No events recorded yet." : "Aucun événement enregistré pour le moment.")
                 : (UiLanguageState.IsEnglish
-                    ? $"{rows.Length} recent event(s). Click an alert to open it."
-                    : $"{rows.Length} événement(s) récent(s). Clique sur une alerte pour l’ouvrir.");
+                    ? $"{rows.Count} recent event(s). Click an alert to open it."
+                    : $"{rows.Count} événement(s) récent(s). Clique sur une alerte pour l’ouvrir.");
         }
         catch (Exception exception)
         {
@@ -75,7 +80,7 @@ public sealed partial class HistoryWindow : Window
         }
     }
 
-    private static HistoryRow ToRow(ExecutionHistoryEntry entry)
+    private static HistoryRow ToRow(ExecutionHistoryEntry entry, string queue)
     {
         var payload = JsonNode.Parse(entry.EventPayloadJson)?.AsObject();
         var userName = payload?["userName"]?.GetValue<string>() ?? "Follower inconnu";
@@ -87,6 +92,7 @@ public sealed partial class HistoryWindow : Window
 
         var english = UiLanguageState.IsEnglish;
         return new HistoryRow(
+            $"▤  {queue}",
             entry.EventType == "manual.run"
                 ? (english ? $"Manual run: {userName}" : $"Exécution manuelle : {userName}")
                 : $"{(Automation.Connectors.Twitch.TwitchTriggerCatalog.All.FirstOrDefault(item => item.EventType == entry.EventType) is { } trigger ? (english ? trigger.English : trigger.French) : entry.EventType)}: {userName}",
@@ -170,6 +176,7 @@ public sealed partial class HistoryWindow : Window
     };
 
     private sealed record HistoryRow(
+        string QueueLabel,
         string Title,
         string Summary,
         string StatusLabel,

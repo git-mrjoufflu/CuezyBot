@@ -76,10 +76,14 @@ public static class ExecutableWorkflowValidator
                     break;
                 case "variables.set-integer":
                 case "variables.increment":
-                case "core.condition":
                     Required("name", "Indique le nom de la variable.", "Enter a variable name.");
                     if (!long.TryParse(block.Parameters["value"]?.ToString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out _))
                         Error("variable.value.invalid", "La valeur doit être un nombre entier.", "The value must be an integer.");
+                    break;
+                case "core.condition":
+                    Required("name", "Indique le nom de la variable.", "Enter a variable name.");
+                    if ((block.Parameters["comparison"]?.ToString() ?? "equals") != "equals" && !long.TryParse(block.Parameters["value"]?.ToString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out _))
+                        Error("condition.value.invalid", "Cette comparaison exige un nombre entier.", "This comparison requires an integer.");
                     break;
                 case "variables.set-text":
                     Required("name", "Indique le nom de la variable.", "Enter a variable name.");

@@ -140,12 +140,25 @@ public sealed class SqlitePersistentVariableStore(SqliteDatabase database) : IPe
     }
 
     public async Task DeleteAsync(string name, CancellationToken cancellationToken = default)
+        => await DeleteAsync(name, "system", null, cancellationToken);
+
+    public async Task DeleteAsync(string name, string scope, string? viewerId, CancellationToken cancellationToken = default)
     {
         ValidateName(name);
         await using var connection = database.OpenConnection();
         await using var command = connection.CreateCommand();
         command.CommandText = "DELETE FROM persistent_variables WHERE name = $name;";
-        command.Parameters.AddWithValue("$name", name);
+        command.Parameters.AddWithValue("$name", StorageName(name, scope, viewerId));
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    public async Task DeleteForAllViewersAsync(string name, CancellationToken cancellationToken = default)
+    {
+        ValidateName(name);
+        await using var connection = database.OpenConnection();
+        await using var command = connection.CreateCommand();
+        command.CommandText = "DELETE FROM persistent_variables WHERE name LIKE $prefix;";
+        command.Parameters.AddWithValue("$prefix", "viewer:%:" + name);
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 

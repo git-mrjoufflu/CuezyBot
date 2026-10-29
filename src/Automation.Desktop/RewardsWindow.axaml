@@ -1,5 +1,5 @@
 <Window x:Class="Automation.Desktop.RewardsWindow" xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    Title="Récompenses — CuezyBot" Width="900" Height="680" MinWidth="760" MinHeight="520" Background="#0B1024" WindowStartupLocation="CenterOwner">
+    Title="Récompenses — CuezyBot" Width="1040" Height="680" MinWidth="900" MinHeight="520" Background="#0B1024" WindowStartupLocation="CenterOwner">
   <Window.Styles>
     <Style Selector="TextBlock"><Setter Property="FontFamily" Value="Inter" /><Setter Property="Foreground" Value="#F4F3FF" /></Style>
     <Style Selector="TextBlock.muted"><Setter Property="Foreground" Value="#9DA8CB" /></Style>
@@ -15,11 +15,16 @@
       <Grid ColumnDefinitions="1.5*,1*,1.2*,1*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="7">
         <TextBlock x:Name="NameLabel" FontWeight="SemiBold" /><TextBlock x:Name="CostLabel" Grid.Column="1" FontWeight="SemiBold" /><TextBlock x:Name="CooldownLabel" Grid.Column="2" FontWeight="SemiBold" /><TextBlock x:Name="ScopeLabel" Grid.Column="3" FontWeight="SemiBold" />
         <TextBox x:Name="NameInput" Grid.Row="1" MaxLength="45" /><TextBox x:Name="CostInput" Grid.Row="1" Grid.Column="1" Text="100" /><TextBox x:Name="CooldownInput" Grid.Row="1" Grid.Column="2" Text="0" />
-        <ComboBox x:Name="ScopeInput" Grid.Row="1" Grid.Column="3" HorizontalAlignment="Stretch" SelectedIndex="0"><ComboBoxItem Content="Global" /></ComboBox>
+        <ComboBox x:Name="ScopeInput" Grid.Row="1" Grid.Column="3" HorizontalAlignment="Stretch" SelectedIndex="0"><ComboBoxItem Content="Global" /><ComboBoxItem Content="Viewer" /></ComboBox>
         <Button x:Name="SaveButton" Grid.Row="1" Grid.Column="4" Classes="primary" Click="OnSaveClick" />
       </Grid>
     </Border>
-    <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="8"><Button x:Name="RefreshButton" Click="OnRefreshClick" /><Button x:Name="CancelButton" IsVisible="False" Click="OnCancelClick" /></StackPanel>
-    <ScrollViewer Grid.Row="4"><StackPanel x:Name="RewardRows" Spacing="8" /></ScrollViewer>
+    <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="8"><Button x:Name="CancelButton" IsVisible="False" Click="OnCancelClick" /></StackPanel>
+    <Grid Grid.Row="4" RowDefinitions="Auto,*" RowSpacing="8">
+      <Grid Margin="14,0" ColumnDefinitions="1.6*,1.2*,1*,1.2*,1.3*,40,40" ColumnSpacing="8">
+        <TextBlock x:Name="ColumnName" FontWeight="SemiBold" /><TextBlock x:Name="ColumnCost" Grid.Column="1" FontWeight="SemiBold" /><TextBlock x:Name="ColumnCooldown" Grid.Column="2" FontWeight="SemiBold" /><TextBlock x:Name="ColumnScope" Grid.Column="3" FontWeight="SemiBold" /><TextBlock x:Name="ColumnCategory" Grid.Column="4" FontWeight="SemiBold" /><TextBlock x:Name="ColumnActions" Grid.Column="5" Grid.ColumnSpan="2" FontWeight="SemiBold" />
+      </Grid>
+      <ScrollViewer Grid.Row="1"><StackPanel x:Name="RewardRows" Spacing="8" /></ScrollViewer>
+    </Grid>
   </Grid>
 </Window>

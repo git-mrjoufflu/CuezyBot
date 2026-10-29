@@ -104,7 +104,7 @@ public sealed class TwitchChannelClient(HttpClient http)
         using var response = await http.SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();
         var result = await response.Content.ReadFromJsonAsync<JsonObject>(cancellationToken);
-        return result?["data"]?.AsArray().Select(item => (item?["id"]?.ToString() ?? "", item?["title"]?.ToString() ?? "", item?["cost"]?.GetValue<int>() ?? 0, item?["global_cooldown_seconds"]?.GetValue<int>() ?? 0))
+        return result?["data"]?.AsArray().Select(item => (item?["id"]?.ToString() ?? "", item?["title"]?.ToString() ?? "", item?["cost"]?.GetValue<int>() ?? 0, item?["global_cooldown_setting"]?["is_enabled"]?.GetValue<bool>() == true ? item?["global_cooldown_setting"]?["global_cooldown_seconds"]?.GetValue<int>() ?? 0 : 0))
             .Where(item => item.Item1.Length > 0 && item.Item2.Length > 0).ToArray() ?? [];
     }
 
@@ -112,7 +112,7 @@ public sealed class TwitchChannelClient(HttpClient http)
     {
         if (!identity.Scopes.Contains("channel:manage:redemptions")) throw new InvalidOperationException("Twitch reward management permission required. Reconnect Twitch.");
         using var request = Request(HttpMethod.Patch, $"channel_points/custom_rewards?broadcaster_id={Uri.EscapeDataString(identity.UserId)}&id={Uri.EscapeDataString(id)}", identity, token);
-        request.Content = JsonContent.Create(new { title, cost, global_cooldown_seconds = Math.Max(0, cooldownSeconds) });
+        request.Content = JsonContent.Create(new { title, cost, is_global_cooldown_enabled = cooldownSeconds > 0, global_cooldown_seconds = Math.Max(1, cooldownSeconds) });
         using var response = await http.SendAsync(request, cancellationToken); response.EnsureSuccessStatusCode();
     }
 

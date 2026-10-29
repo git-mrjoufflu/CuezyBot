@@ -3,10 +3,12 @@
     xmlns="https://github.com/avaloniaui"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     Title="CuezyBot"
+    Icon="/Assets/cuezybot-mascot.png"
     Width="1500"
     Height="900"
     MinWidth="1180"
     MinHeight="720"
+    WindowStartupLocation="CenterScreen"
     Background="#070A18">
   <Window.Styles>
     <Style Selector="TextBlock">
@@ -105,28 +107,11 @@
     <Border Grid.Row="0" Grid.ColumnSpan="3" Background="#0B0F22" BorderBrush="#292D49" BorderThickness="0,0,0,1">
       <Grid Margin="18,0" ColumnDefinitions="200,*,Auto">
         <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="9" VerticalAlignment="Center">
-          <Border Width="34" Height="34" CornerRadius="11">
-            <Border.Background>
-              <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
-                <GradientStop Color="#42BFFF" Offset="0" />
-                <GradientStop Color="#9B35FF" Offset="1" />
-              </LinearGradientBrush>
-            </Border.Background>
-            <TextBlock Text="◉" FontSize="20" HorizontalAlignment="Center" VerticalAlignment="Center" />
-          </Border>
-          <TextBlock FontSize="20" FontWeight="Bold" VerticalAlignment="Center">
-            <Run Text="Cuezy" /><Run Text="Bot" Foreground="#B14AFF" />
-          </TextBlock>
+          <Image Source="/Assets/cuezybot-mascot.png" Width="48" Height="48" Stretch="Uniform" />
+          <Image Source="/Assets/cuezybot-wordmark.png" Width="140" Height="48" Stretch="Uniform" VerticalAlignment="Center" AutomationProperties.Name="CuezyBot" />
         </StackPanel>
 
-        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-          <ComboBox x:Name="WorkflowSelector" Width="210" SelectedIndex="0" SelectionChanged="OnWorkflowSelected">
-          </ComboBox>
-          <Button Classes="surface" Content="＋" ToolTip.Tip="Nouvelle automatisation" Click="OnNewWorkflowClick" Padding="8,5" />
-          <Button Classes="surface" Content="✎" ToolTip.Tip="Renommer" Click="OnRenameWorkflowClick" Padding="8,5" />
-          <Button Classes="surface" Content="🗑" ToolTip.Tip="Supprimer" Click="OnDeleteWorkflowClick" Padding="8,5" />
-          <ComboBox x:Name="WorkflowTriggerSelector" Width="180" IsVisible="False" SelectionChanged="OnTriggerKindChanged" />
-        </StackPanel>
+
 
         <Border Grid.Column="2" />
       </Grid>
@@ -136,10 +121,12 @@
       <Grid RowDefinitions="*,Auto">
         <StackPanel Spacing="4">
           <Button Classes="nav" Content="⌂   Accueil" />
-          <Button Classes="nav active" Content="⌘   Workflows" />
+          <Button Classes="nav active" Content="⌘   Workflows" Click="OnWorkflowLibraryClick" />
           <Button x:Name="HistoryButton" Classes="nav" Content="◷   Historique" Click="OnHistoryClick" />
           <Button x:Name="VariablesButton" Classes="nav" Content="𝑥   Variables" Click="OnVariablesClick" />
           <Button x:Name="RewardsButton" Classes="nav" Content="◎   Récompenses" Click="OnRewardsClick" />
+          <Button x:Name="CommandsButton" Classes="nav" Content="⌨   Commandes" Click="OnCommandsClick" />
+          <Button x:Name="QueuesButton" Classes="nav" Content="☷   Files d’alertes" Click="OnQueuesClick" />
         </StackPanel>
 
         <Border x:Name="CreatorCard" Grid.Row="1" Padding="13" CornerRadius="12" BorderBrush="#39466F" BorderThickness="1" IsVisible="False">
@@ -194,20 +181,30 @@
         </Canvas.Background>
 
         <Border x:Name="WorkflowToolbar" Canvas.Right="18" Canvas.Top="18" Background="#11162B" BorderBrush="#2C3353" BorderThickness="1" CornerRadius="10" Padding="6,5">
-          <StackPanel Orientation="Horizontal" Spacing="5">
-            <TextBlock x:Name="TestStatus" Text="Brouillon enregistré" Classes="muted" FontSize="11" VerticalAlignment="Center" Margin="3,0,4,0" MaxWidth="300" TextWrapping="Wrap" />
-            <Button x:Name="AddCanvasEventButton" Classes="eventAdd" Content="＋  Événement" Click="OnAddCanvasEventClick" Padding="9,7" ToolTip.Tip="Ajouter un événement au canevas" />
-            <Button x:Name="AddCanvasItemButton" Classes="primary" Content="＋  Action" Click="OnAddCanvasItemClick" Padding="9,7" ToolTip.Tip="Ajouter une action au canevas" />
-            <Button x:Name="AddCanvasSystemButton" Classes="systemAdd" Content="＋  Système" Click="OnAddCanvasSystemClick" Padding="9,7" ToolTip.Tip="Ajouter une fonction interne au canevas" />
-            <Button Classes="surface" Content="▷  Tester" Click="OnTestClick" Padding="9,7" IsVisible="False" />
-            <Button x:Name="RunOnceButton" Classes="surface" Content="Exécuter" Click="OnRunOnceClick" Padding="9,7" ToolTip.Tip="Exécuter la version publiée avec des effets réels" IsVisible="False" />
-            <Button x:Name="UndoButton" Classes="surface" Content="↶" ToolTip.Tip="Annuler" Click="OnUndoClick" Padding="8,7" IsEnabled="False" />
-            <Button x:Name="RedoButton" Classes="surface" Content="↷" ToolTip.Tip="Rétablir" Click="OnRedoClick" Padding="8,7" IsEnabled="False" />
-            <Button x:Name="SaveWorkflowButton" Classes="surface" Content="Enregistrer" Click="OnSaveWorkflowClick" Padding="9,7" />
+          <StackPanel Orientation="Horizontal" Spacing="10">
+        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+          <ComboBox x:Name="WorkflowSelector" IsVisible="False" Width="210" SelectedIndex="0" SelectionChanged="OnWorkflowSelected">
+          </ComboBox>
+          <Button Classes="surface" Content="{Binding SelectedItem, ElementName=WorkflowSelector}" MinWidth="160" MaxWidth="230" Click="OnWorkflowLibraryClick" Padding="12,5" />
+            <Button x:Name="WorkflowQueueButton" Classes="surface" Content="▤  Default" Click="OnWorkflowQueueClick" Padding="10,6" FontSize="16" />
             <ToggleSwitch x:Name="StartWorkflowButton" Classes="activation" IsChecked="False"
                           OnContent="Activée" OffContent="Désactivée"
                           IsCheckedChanged="OnWorkflowActivationChanged"
                           ToolTip.Tip="Active ou désactive les déclencheurs automatiques" />
+          <ComboBox x:Name="WorkflowTriggerSelector" Width="180" IsVisible="False" SelectionChanged="OnTriggerKindChanged" />
+        </StackPanel>
+          <Border Width="1" Background="#39415F" Margin="3,4" />
+          <StackPanel Orientation="Horizontal" Spacing="5">
+            <Button x:Name="AddCanvasEventButton" Classes="eventAdd" Content="＋  Événement" Click="OnAddCanvasEventClick" Padding="9,7" ToolTip.Tip="Ajouter un événement au canevas" />
+            <Button x:Name="AddCanvasItemButton" Classes="primary" Content="＋  Action" Click="OnAddCanvasItemClick" Padding="9,7" ToolTip.Tip="Ajouter une action au canevas" />
+            <Button x:Name="AddCanvasSystemButton" Classes="systemAdd" Content="＋  Système" Click="OnAddCanvasSystemClick" Padding="9,7" ToolTip.Tip="Ajouter une fonction interne au canevas" />
+            <Border Width="1" Background="#39415F" Margin="6,4" />
+            <Button x:Name="UndoButton" Classes="surface" Content="↶" ToolTip.Tip="Annuler" Click="OnUndoClick" Padding="8,7" IsEnabled="False" />
+            <Button x:Name="RedoButton" Classes="surface" Content="↷" ToolTip.Tip="Rétablir" Click="OnRedoClick" Padding="8,7" IsEnabled="False" />
+            <Button Classes="surface" Content="▷  Tester" Click="OnTestClick" Padding="9,7" IsVisible="False" />
+            <Button x:Name="RunOnceButton" Classes="surface" Content="Exécuter" Click="OnRunOnceClick" Padding="9,7" ToolTip.Tip="Exécuter la version publiée avec des effets réels" IsVisible="False" />
+            <Button x:Name="SaveWorkflowButton" Classes="surface" Content="Enregistrer" Click="OnSaveWorkflowClick" Padding="9,7" />
+          </StackPanel>
           </StackPanel>
         </Border>
 
@@ -428,7 +425,8 @@
           </Border>
         </StackPanel>
 
-        <Border Grid.Column="1" />
+        <TextBlock x:Name="TestStatus" Grid.Column="1" Text="Brouillon enregistré" Classes="muted" FontSize="11" HorizontalAlignment="Center" VerticalAlignment="Center" TextWrapping="Wrap" />
+
 
         <StackPanel x:Name="IntegrationStatusArea" Grid.Column="2" Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
           <ToolTip.Tip>

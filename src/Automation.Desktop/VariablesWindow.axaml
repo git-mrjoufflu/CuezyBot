@@ -1,5 +1,5 @@
 <Window x:Class="Automation.Desktop.VariablesWindow" xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    Title="Variables — CuezyBot" Width="900" Height="680" MinWidth="760" MinHeight="520"
+    Title="Variables — CuezyBot" Width="1040" Height="680" MinWidth="900" MinHeight="520"
     Background="#0B1024" WindowStartupLocation="CenterOwner">
   <Window.Styles>
     <Style Selector="TextBlock"><Setter Property="FontFamily" Value="Inter" /><Setter Property="Foreground" Value="#F4F3FF" /></Style>
@@ -16,7 +16,7 @@
     </StackPanel>
     <TextBlock x:Name="StatusText" Grid.Row="1" Classes="muted" Text="Chargement…" />
     <Border Grid.Row="2" Background="#141A34" BorderBrush="#33406A" BorderThickness="1" CornerRadius="11" Padding="16">
-      <Grid ColumnDefinitions="1.35*,1.05*,1.3*,1.15*,1.15*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="7">
+      <Grid ColumnDefinitions="1.35*,1.05*,1.3*,1.15*,1.15*,Auto" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="7">
         <TextBlock x:Name="NameLabel" Text="Nom" FontWeight="SemiBold" />
         <TextBlock x:Name="TypeLabel" Grid.Column="1" Text="Type" FontWeight="SemiBold" />
         <TextBlock x:Name="ValueLabel" Grid.Column="2" Text="Valeur initiale" FontWeight="SemiBold" />
@@ -25,16 +25,26 @@
         <TextBox x:Name="NameInput" Grid.Row="1" PlaceholderText="ex. visites" />
         <ComboBox x:Name="TypeInput" Grid.Row="1" Grid.Column="1" Width="130" HorizontalAlignment="Stretch" SelectedIndex="0" SelectionChanged="OnTypeChanged" />
         <TextBox x:Name="ValueInput" Grid.Row="1" Grid.Column="2" Text="0" />
-        <ComboBox x:Name="ScopeInput" Grid.Row="1" Grid.Column="3" Width="140" HorizontalAlignment="Stretch" SelectedIndex="0" />
+        <ComboBox x:Name="ScopeInput" Grid.Row="1" Grid.Column="3" Width="140" HorizontalAlignment="Stretch" SelectedIndex="0" SelectionChanged="OnCreationScopeChanged" />
         <ComboBox x:Name="LifetimeInput" Grid.Row="1" Grid.Column="4" Width="150" HorizontalAlignment="Stretch" SelectedIndex="1" />
-        <Button x:Name="SaveButton" Grid.Row="1" Grid.Column="5" Classes="primary" Content="Ajouter" Click="OnSaveClick" />
+        <Button x:Name="SaveButton" Grid.Row="1" Grid.Column="5" Classes="primary" Content="＋" Click="OnSaveClick" />
+        <TextBlock x:Name="ViewerLabel" Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Text="Viewer" FontWeight="SemiBold" IsVisible="False" />
+        <TextBox x:Name="ViewerInput" Grid.Row="2" Grid.Column="2" Grid.ColumnSpan="3" PlaceholderText="Nom d’utilisateur Twitch" IsVisible="False" />
       </Grid>
     </Border>
     <TabControl x:Name="ScopeTabs" Grid.Row="3" SelectionChanged="OnScopeChanged">
       <TabItem x:Name="SystemTab" Header="Système" />
       <TabItem x:Name="ViewerTab" Header="Viewer" />
     </TabControl>
-    <ComboBox x:Name="ViewerFilter" Grid.Row="4" Width="280" HorizontalAlignment="Left" PlaceholderText="Tous les viewers" SelectionChanged="OnViewerChanged" IsVisible="False" />
-    <ScrollViewer Grid.Row="5"><StackPanel x:Name="VariableRows" Spacing="8" /></ScrollViewer>
+    <StackPanel Grid.Row="4" Orientation="Horizontal" Spacing="14">
+      <ComboBox x:Name="ViewerFilter" Width="280" PlaceholderText="Tous les viewers" SelectionChanged="OnViewerChanged" IsVisible="False" />
+      <CheckBox x:Name="AllViewersOption" Content="Tous les viewers" IsVisible="False" VerticalAlignment="Center" />
+    </StackPanel>
+    <Grid Grid.Row="5" RowDefinitions="Auto,*" RowSpacing="8">
+      <Grid Margin="14,0" ColumnDefinitions="1.6*,1.2*,1*,1.2*,1.3*,40,40" ColumnSpacing="8">
+        <TextBlock x:Name="ColumnName" FontWeight="SemiBold" /><TextBlock x:Name="ColumnValue" Grid.Column="1" FontWeight="SemiBold" /><TextBlock x:Name="ColumnType" Grid.Column="2" FontWeight="SemiBold" /><TextBlock x:Name="ColumnLifetime" Grid.Column="3" FontWeight="SemiBold" /><TextBlock x:Name="ColumnCategory" Grid.Column="4" FontWeight="SemiBold" /><TextBlock x:Name="ColumnActions" Grid.Column="5" Grid.ColumnSpan="2" FontWeight="SemiBold" />
+      </Grid>
+      <ScrollViewer Grid.Row="1"><StackPanel x:Name="VariableRows" Spacing="8" /></ScrollViewer>
+    </Grid>
   </Grid>
 </Window>

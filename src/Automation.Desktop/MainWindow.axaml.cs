@@ -17,6 +17,7 @@ namespace Automation.Desktop;
 public sealed partial class MainWindow : Window
 {
     private bool _english;
+    private string _selectedQueueName = "Default";
     private int _addedActionCount;
     private readonly List<string> _selectedActions = new();
     private readonly Stack<CanvasSnapshot> _undoActions = new();
@@ -61,6 +62,8 @@ public sealed partial class MainWindow : Window
     internal MainWindow(bool restoreSession)
     {
         InitializeComponent();
+        ManagementButtons.History(UndoButton, _english, false);
+        ManagementButtons.History(RedoButton, _english, true);
         var viewport = (Grid)WorkflowCanvas.Parent!;
         viewport.Background = WorkflowCanvas.Background;
         WorkflowCanvas.Background = Brushes.Transparent;
@@ -69,7 +72,7 @@ public sealed partial class MainWindow : Window
         WorkflowCanvas.Children.Remove(CanvasControls);
         viewport.Children.Add(WorkflowToolbar);
         viewport.Children.Add(CanvasControls);
-        WorkflowToolbar.HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right;
+        WorkflowToolbar.HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center;
         WorkflowToolbar.VerticalAlignment = Avalonia.Layout.VerticalAlignment.Top;
         WorkflowToolbar.Margin = new Thickness(18);
         WorkflowToolbar.ZIndex = 20;
@@ -303,12 +306,61 @@ public sealed partial class MainWindow : Window
 
     private async void OnVariablesClick(object? sender, RoutedEventArgs eventArgs)
     {
-        await new VariablesWindow(_english).ShowDialog(this);
+        try { await new VariablesWindow(_english).ShowDialog(this); }
+        catch (Exception exception)
+        {
+            SetConnectionStatus(_english ? $"Variables could not be opened: {exception.Message}" : $"Impossible d’ouvrir les variables : {exception.Message}");
+        }
     }
 
     private async void OnRewardsClick(object? sender, RoutedEventArgs eventArgs)
     {
         await new RewardsWindow(_english).ShowDialog(this);
+    }
+
+    private async void OnCommandsClick(object? sender, RoutedEventArgs eventArgs) => await new CommandsWindow(_english).ShowDialog(this);
+    private async void OnQueuesClick(object? sender, RoutedEventArgs eventArgs)
+    {
+        await new QueuesWindow(_english, _workflowIds).ShowDialog(this);
+        await RefreshWorkflowQueueAsync();
+    }
+
+    private async void OnWorkflowQueueClick(object? sender, RoutedEventArgs args)
+    {
+        var workflowId = PrototypeServices.CurrentWorkflowId;
+        try
+        {
+            var config = await AutomationQueues.LoadAsync();
+            var names = config["names"]!.AsArray().Select(item => item!.ToString()).ToArray();
+            var picker = new ListBox { ItemsSource = names.OrderBy(name => name, StringComparer.OrdinalIgnoreCase).ToArray(), SelectedItem = config["workflows"]?[workflowId.ToString()]?.ToString() ?? "Default", HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch };
+            var search = new TextBox { PlaceholderText = _english ? "Search queues…" : "Rechercher une file…" };
+            search.TextChanged += (_, _) => { var selected = picker.SelectedItem; picker.ItemsSource = names.Where(name => name.Contains(search.Text?.Trim() ?? "", StringComparison.OrdinalIgnoreCase)).OrderBy(name => name, StringComparer.OrdinalIgnoreCase).ToArray(); picker.SelectedItem = selected; };
+            var save = new Button(); ManagementButtons.Save(save, _english);
+            var dialog = new Window { Title = _english ? "Automation queue" : "File de l’automatisation", Width = 500, Height = 520, WindowStartupLocation = WindowStartupLocation.CenterOwner, Background = Background };
+            var layout = new Grid { Margin = new Thickness(24), RowDefinitions = new RowDefinitions("Auto,Auto,*,Auto"), RowSpacing = 14 };
+            layout.Children.Add(new TextBlock { Text = _english ? "Alert queue" : "File d’alertes" }); Grid.SetRow(search, 1); layout.Children.Add(search); Grid.SetRow(picker, 2); layout.Children.Add(picker); Grid.SetRow(save, 3); layout.Children.Add(save); dialog.Content = layout;
+            save.Click += (_, _) => dialog.Close(true);
+            if (await dialog.ShowDialog<bool>(this) && picker.SelectedItem is string selected)
+            {
+                await AutomationQueues.ChangeAsync(settings => settings["workflows"]![workflowId.ToString()] = selected);
+                if (PrototypeServices.CurrentWorkflowId == workflowId) { _selectedQueueName = selected; UpdateWorkflowQueueLabel(); }
+            }
+        }
+        catch (Exception ex) { TestStatus.Text = ex.Message; }
+    }
+
+    private async Task RefreshWorkflowQueueAsync()
+    {
+        var id = PrototypeServices.CurrentWorkflowId;
+        try { var name = await AutomationQueues.ForWorkflowAsync(id); if (PrototypeServices.CurrentWorkflowId == id) { _selectedQueueName = name; UpdateWorkflowQueueLabel(); } }
+        catch (Exception ex) { TestStatus.Text = ex.Message; }
+    }
+
+    private void UpdateWorkflowQueueLabel()
+    {
+        WorkflowQueueButton.Content = "▤  " + _selectedQueueName;
+        WorkflowQueueButton.FontSize = 16;
+        ToolTip.SetTip(WorkflowQueueButton, _english ? "Choose this automation’s alert queue" : "Choisir la file d’alertes de cette automatisation");
     }
 
     internal void AddCanvasEvent(string trigger)
@@ -402,22 +454,48 @@ public sealed partial class MainWindow : Window
 
     private async void OnAddCanvasSystemClick(object? sender, RoutedEventArgs eventArgs)
     {
-        var dialog = new Window { Title = _english ? "Add a system function" : "Ajouter une fonction système", Width = 420, Height = 410, CanResize = false, WindowStartupLocation = WindowStartupLocation.CenterOwner };
+        var dialog = new Window { Title = _english ? "Add a system function" : "Ajouter une fonction système", Width = 560, Height = 700, CanResize = false, WindowStartupLocation = WindowStartupLocation.CenterOwner, Background = new SolidColorBrush(Color.Parse("#0B1024")) };
         var stack = new StackPanel { Margin = new Thickness(18), Spacing = 7 };
-        stack.Children.Add(new TextBlock
+        foreach (var group in new[]
         {
-            Text = _english ? "SYSTEM" : "SYSTÈME",
-            FontWeight = FontWeight.Bold,
-            Foreground = new SolidColorBrush(Color.Parse("#7DBEFF")),
-            Margin = new Thickness(0, 4, 0, 6)
-        });
-        foreach (var item in new[] { ("Ajouter une condition", "Add a condition"), ("Attendre", "Wait"), ("Modifier une variable", "Edit a variable"), ("Jouer un son", "Play a sound") })
+            ("⚙", "Logique", "Logic", new[] { ("⤨", "Ajouter une condition", "Add a condition"), ("◷", "Attendre", "Wait") }),
+            ("ƒ", "Variables", "Variables", new[] { ("ƒ", "Modifier une variable", "Edit a variable") }),
+            ("♫", "Audio", "Audio", new[] { ("♫", "Jouer un son", "Play a sound") })
+        })
         {
-            var button = new Button { Content = _english ? item.Item2 : item.Item1, HorizontalContentAlignment = Avalonia.Layout.HorizontalAlignment.Left };
-            button.Click += (_, _) => dialog.Close(item.Item1);
-            stack.Children.Add(button);
+            var items = new StackPanel { Spacing = 6 };
+            foreach (var item in group.Item4)
+            {
+                var button = new Button
+                {
+                    Content = item.Item1 + "  " + (_english ? item.Item3 : item.Item2),
+                    HorizontalContentAlignment = Avalonia.Layout.HorizontalAlignment.Left,
+                    HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch,
+                    Background = Brushes.Transparent,
+                    Foreground = new SolidColorBrush(Color.Parse("#E8E9F4")),
+                    BorderBrush = Brushes.Transparent,
+                    BorderThickness = new Thickness(0),
+                    Padding = new Thickness(10, 8)
+                };
+                button.Click += (_, _) => dialog.Close(item.Item2);
+                items.Children.Add(button);
+            }
+            stack.Children.Add(new Expander
+            {
+                Header = CategoryHeader(group.Item1, _english ? group.Item3 : group.Item2, "#2563A5", "#DCE8FF"),
+                Content = items,
+                IsExpanded = true,
+                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch,
+                HorizontalContentAlignment = Avalonia.Layout.HorizontalAlignment.Stretch,
+                Background = new SolidColorBrush(Color.Parse("#0F1530")),
+                BorderBrush = new SolidColorBrush(Color.Parse("#33406A")),
+                BorderThickness = new Thickness(1),
+                Padding = new Thickness(6),
+                CornerRadius = new CornerRadius(10),
+                Margin = new Thickness(0, 6, 0, 0)
+            });
         }
-        dialog.Content = stack;
+        dialog.Content = new ScrollViewer { Content = stack };
         var result = await dialog.ShowDialog<string?>(this);
         if (result is null) return;
         AddCanvasAction(result);
@@ -632,6 +710,7 @@ public sealed partial class MainWindow : Window
         var point = args.GetCurrentPoint((Visual)WorkflowCanvas.Parent!);
         var background = ReferenceEquals(args.Source, WorkflowCanvas) || ReferenceEquals(args.Source, WorkflowCanvas.Parent);
         if (!point.Properties.IsMiddleButtonPressed && !(point.Properties.IsLeftButtonPressed && background)) return;
+        if (point.Properties.IsLeftButtonPressed && background) ClearSelectionVisuals();
         _panStart = args.GetPosition((Visual)WorkflowCanvas.Parent!);
         _panOffset = _canvasOffset;
         args.Pointer.Capture((Grid)WorkflowCanvas.Parent!);
@@ -792,6 +871,7 @@ public sealed partial class MainWindow : Window
 
     private void SetActivationSwitch(bool active)
     {
+        _ = RefreshWorkflowQueueAsync();
         _switchingActivation = true;
         StartWorkflowButton.IsChecked = active;
         RunOnceButton.IsEnabled = active;
@@ -1075,47 +1155,41 @@ public sealed partial class MainWindow : Window
         }
         if (trigger == "twitch.channel.chat.message.received")
         {
-            node.Width = 280;
-            node.Height = 342;
-            var key = (string)node.Tag!;
-            var options = PrototypeServices.GetOrCreateTriggerOptions(key, () => new System.Text.Json.Nodes.JsonObject { ["command"] = "!test", ["cooldownSeconds"] = "0", ["cooldownScope"] = "global", ["permission"] = "everyone", ["allowedUser"] = "" });
-            body.Children.Add(new TextBlock { Text = _english ? "Command" : "Commande", FontSize = 11, FontWeight = FontWeight.SemiBold });
-            var command = new TextBox { Text = options["command"]?.ToString() ?? "!test", PlaceholderText = "!test" };
-            command.TextChanged += (_, _) => { options["command"] = command.Text?.Trim() ?? ""; TestStatus.Text = _english ? "Command changed — save to apply" : "Commande modifiée — enregistre pour appliquer"; };
-            body.Children.Add(command);
-            var cooldown = new TextBox { Text = options["cooldownSeconds"]?.ToString() ?? "0", PlaceholderText = "0", Width = 72, Margin = new Thickness(0, 9, 0, 0), HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left };
-            cooldown.TextChanged += (_, _) => options["cooldownSeconds"] = cooldown.Text?.Trim() ?? "0";
-            var viewerScope = new RadioButton { Content = "Viewer", GroupName = $"cooldown-{key}", IsChecked = options["cooldownScope"]?.ToString() == "viewer" };
-            var globalScope = new RadioButton { Content = "Global", GroupName = $"cooldown-{key}", IsChecked = options["cooldownScope"]?.ToString() != "viewer" };
-            viewerScope.IsCheckedChanged += (_, _) => { if (viewerScope.IsChecked == true) options["cooldownScope"] = "viewer"; };
-            globalScope.IsCheckedChanged += (_, _) => { if (globalScope.IsChecked == true) options["cooldownScope"] = "global"; };
-            var cooldownScope = new StackPanel { Orientation = Avalonia.Layout.Orientation.Vertical, Spacing = 2, Children = { globalScope, viewerScope } };
-            var cooldownGrid = new Grid { ColumnDefinitions = new ColumnDefinitions("92,*"), ColumnSpacing = 12 };
-            var timeColumn = new StackPanel { Spacing = 4, Children = { new TextBlock { Text = _english ? "Cooldown (s)" : "Cooldown (s)", FontSize = 11, FontWeight = FontWeight.SemiBold }, cooldown } };
-            var scopeColumn = new StackPanel { Spacing = 4, Children = { new TextBlock { Text = _english ? "Scope" : "Portée", FontSize = 11, FontWeight = FontWeight.SemiBold }, cooldownScope } };
-            cooldownGrid.Children.Add(timeColumn);
-            Grid.SetColumn(scopeColumn, 1);
-            cooldownGrid.Children.Add(scopeColumn);
-            body.Children.Add(cooldownGrid);
-            body.Children.Add(new TextBlock { Text = _english ? "Who can use it" : "Qui peut l’utiliser", FontSize = 11, FontWeight = FontWeight.SemiBold });
-            var permission = new ComboBox { ItemsSource = _english ? new[] { "Everyone", "Moderators", "VIPs", "Viewer" } : new[] { "Tout le monde", "Modérateurs", "VIP", "Viewer" }, SelectedIndex = options["permission"]?.ToString() switch { "moderator" => 1, "vip" => 2, "viewer" => 3, _ => 0 } };
-            var allowedLabel = new TextBlock { Text = _english ? "Allowed viewer" : "Viewer autorisé", FontSize = 11, FontWeight = FontWeight.SemiBold };
-            var allowedUser = new TextBox { Text = options["allowedUser"]?.ToString() ?? "", PlaceholderText = _english ? "Twitch username" : "Pseudo Twitch", IsVisible = permission.SelectedIndex == 3 };
-            allowedLabel.IsVisible = allowedUser.IsVisible;
-            permission.SelectionChanged += (_, _) =>
+            node.Width = 280; node.Height = 142;
+            var options = PrototypeServices.GetOrCreateTriggerOptions((string)node.Tag!);
+            body.Children.Add(CreateFieldLabel("Commande", "Command"));
+            var picker = new ComboBox { HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch };
+            EventHandler<SelectionChangedEventArgs>? selectionHandler = null;
+            var manage = new Button { Content = "⚙", Width = 38 };
+            ToolTip.SetTip(manage, _english ? "Manage commands" : "Gérer les commandes");
+            var row = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto"), ColumnSpacing = 6 };
+            row.Children.Add(picker); Grid.SetColumn(manage, 1); row.Children.Add(manage); body.Children.Add(row);
+            async Task Load()
             {
-                options["permission"] = permission.SelectedIndex switch { 1 => "moderator", 2 => "vip", 3 => "viewer", _ => "everyone" };
-                if (permission.SelectedIndex != 3)
+                try
                 {
-                    options["allowedUser"] = "";
-                    allowedUser.Text = "";
+                    var commands = await ChatCommands.ListAsync();
+                    if (selectionHandler is not null) picker.SelectionChanged -= selectionHandler;
+                    if (options["commandId"] is null && options["command"] is { } legacy)
+                    {
+                        var existing = commands.FirstOrDefault(item => string.Equals(item["command"]?.ToString(), legacy.ToString(), StringComparison.OrdinalIgnoreCase));
+                        if (existing is null) { existing = (System.Text.Json.Nodes.JsonObject)options.DeepClone(); existing["id"] = Guid.NewGuid().ToString(); await ChatCommands.SaveAsync(existing); commands.Add(existing); }
+                        options["commandId"] = existing["id"]?.ToString();
+                    }
+                    picker.ItemsSource = commands.Select(item => item["command"]?.ToString()).ToArray();
+                    picker.SelectedIndex = commands.FindIndex(item => item["id"]?.ToString() == options["commandId"]?.ToString());
+                    selectionHandler = (_, _) =>
+                    {
+                        if (picker.SelectedIndex < 0 || picker.SelectedIndex >= commands.Count) return;
+                        foreach (var pair in commands[picker.SelectedIndex]) options[pair.Key] = pair.Value?.DeepClone();
+                        options["commandId"] = commands[picker.SelectedIndex]["id"]?.ToString();
+                    };
+                    picker.SelectionChanged += selectionHandler;
                 }
-                allowedLabel.IsVisible = allowedUser.IsVisible = permission.SelectedIndex == 3;
-            };
-            body.Children.Add(permission);
-            body.Children.Add(allowedLabel);
-            allowedUser.TextChanged += (_, _) => options["allowedUser"] = allowedUser.Text?.Trim().TrimStart('@') ?? "";
-            body.Children.Add(allowedUser);
+                catch (Exception ex) { TestStatus.Text = ex.Message; }
+            }
+            manage.Click += async (_, _) => { await new CommandsWindow(_english).ShowDialog(this); await Load(); };
+            _ = Load();
             return;
         }
         if (trigger == "twitch.channel.channel_points_custom_reward_redemption.add.received")
@@ -1395,7 +1469,7 @@ public sealed partial class MainWindow : Window
         }
         else if (name.Contains("condition"))
         {
-            fields.Add(("name", "Variable entière à comparer", "Integer variable to compare"));
+            fields.Add(("name", "Variable à comparer", "Variable to compare"));
             fields.Add(("value", "Valeur attendue", "Expected value"));
         }
         else if (name.Contains("sound") || name.Contains("son")) fields.Add(("file", "Fichier audio", "Audio file"));
@@ -1452,8 +1526,10 @@ public sealed partial class MainWindow : Window
             ApplyVariableType();
             form.Children.Add(CreateFieldLabel("Portée de la variable", "Variable scope"));
             var scope = new ComboBox { ItemsSource = _english ? new[] { "System", "Viewer" } : new[] { "Système", "Viewer" }, SelectedIndex = options["scope"]?.ToString() == "viewer" ? 1 : 0, HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch };
-            scope.SelectionChanged += (_, _) => options["scope"] = scope.SelectedIndex == 1 ? "viewer" : "system";
+            var viewerInfo = new TextBlock { Text = _english ? "Uses the viewer who triggered this workflow." : "Utilise le viewer qui a déclenché cette automatisation.", Foreground = Brush.Parse("#9DA8CB"), FontSize = 11, TextWrapping = TextWrapping.Wrap, IsVisible = scope.SelectedIndex == 1 };
+            scope.SelectionChanged += (_, _) => { options["scope"] = scope.SelectedIndex == 1 ? "viewer" : "system"; viewerInfo.IsVisible = scope.SelectedIndex == 1; };
             form.Children.Add(scope);
+            form.Children.Add(viewerInfo);
             form.Children.Add(CreateFieldLabel("Durée", "Lifetime"));
             var lifetime = new ComboBox { ItemsSource = _english ? new[] { "Temporary", "Permanent" } : new[] { "Temporaire", "Permanente" }, SelectedIndex = options["lifetime"]?.ToString() == "temporary" ? 0 : 1, HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch };
             lifetime.SelectionChanged += (_, _) => options["lifetime"] = lifetime.SelectedIndex == 0 ? "temporary" : "permanent";
@@ -2134,7 +2210,13 @@ public sealed partial class MainWindow : Window
             ? (RunOnceButton.IsEnabled ? "Run the active published manual branch with real effects" : "Activate this automation to run real actions")
             : (RunOnceButton.IsEnabled ? "Exécuter la branche manuelle publiée avec des effets réels" : "Active cette automatisation pour exécuter des actions réelles"));
         UiLanguageState.IsEnglish = english;
-        SaveWorkflowButton.Content = english ? "Save" : "Enregistrer";
+        ManagementButtons.Save(SaveWorkflowButton, english);
+        ManagementButtons.History(UndoButton, english, false);
+        ManagementButtons.History(RedoButton, english, true);
+        UpdateWorkflowQueueLabel();
+        CommandsButton.Content = english ? "⌨   Commands" : "⌨   Commandes";
+        QueuesButton.Content = english ? "☷   Alert queues" : "☷   Files d’alertes";
+        RewardsButton.Content = english ? "◎   Rewards" : "◎   Récompenses";
         StartWorkflowButton.OnContent = english ? "Active" : "Activée";
         StartWorkflowButton.OffContent = english ? "Inactive" : "Désactivée";
         ToolTip.SetTip(StartWorkflowButton, english ? "Enable or disable automatic triggers" : "Active ou désactive les déclencheurs automatiques");

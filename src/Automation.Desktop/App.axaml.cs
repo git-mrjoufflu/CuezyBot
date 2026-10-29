@@ -4,6 +4,10 @@ using Avalonia.Markup.Xaml;
 using Avalonia.Controls;
 using Automation.Persistence.Sqlite.Storage;
 using Avalonia.Threading;
+using Avalonia.Media;
+using Avalonia.Media.Imaging;
+using Avalonia.Platform;
+using System.Reflection;
 
 namespace Automation.Desktop;
 
@@ -14,10 +18,15 @@ public sealed partial class App : global::Avalonia.Application
     private DispatcherTimer? automationTimer;
     public override void Initialize() => AvaloniaXamlLoader.Load(this);
 
-    public override void OnFrameworkInitializationCompleted()
+    public override async void OnFrameworkInitializationCompleted()
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
+            var splash = new SplashWindow();
+            desktop.MainWindow = splash;
+            splash.Show();
+            base.OnFrameworkInitializationCompleted();
+            await Task.Delay(1800);
             try
             {
                 runtimeLease = RuntimeDataLease.Acquire(new AppDataPaths());
@@ -32,12 +41,15 @@ public sealed partial class App : global::Avalonia.Application
                 {
                     new TextBlock { Text = exception.Message, TextWrapping = Avalonia.Media.TextWrapping.Wrap }, close
                 } };
+                splash.Close();
                 desktop.MainWindow = errorWindow;
                 base.OnFrameworkInitializationCompleted();
                 return;
             }
             var mainWindow = new MainWindow();
             desktop.MainWindow = mainWindow;
+            mainWindow.Show();
+            splash.Close();
             _ = RestoreLanguageAsync(mainWindow);
             _ = RestoreConnectionsAsync(mainWindow);
             reconnectTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(15) };
@@ -59,7 +71,25 @@ public sealed partial class App : global::Avalonia.Application
             desktop.Exit += (_, _) => { reconnectTimer.Stop(); automationTimer.Stop(); };
         }
 
-        base.OnFrameworkInitializationCompleted();
+    }
+
+    private sealed class SplashWindow : Window
+    {
+        public SplashWindow()
+        {
+            Width = 460; Height = 500; CanResize = false; WindowDecorations = Avalonia.Controls.WindowDecorations.None; ShowInTaskbar = false; WindowStartupLocation = WindowStartupLocation.CenterScreen;
+            Background = new SolidColorBrush(Color.Parse("#080B16"));
+            var image = new Image { Width = 330, Height = 330, Stretch = Stretch.Uniform };
+            image.Source = new Bitmap(AssetLoader.Open(new Uri("avares://Automation.Desktop/Assets/cuezybot-logo.png")));
+            var version = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.0.0";
+            Content = new StackPanel { HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center, Spacing = 12, Children =
+            {
+                image,
+                new TextBlock { Text = "CuezyBot", FontSize = 28, FontWeight = FontWeight.Bold, Foreground = Brushes.White, HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center },
+                new TextBlock { Text = $"Version {version}", FontSize = 13, Foreground = Brush.Parse("#9DA8CB"), HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center },
+                new ProgressBar { Width = 180, Height = 4, IsIndeterminate = true }
+            }};
+        }
     }
 
     private static async Task RestoreLanguageAsync(MainWindow mainWindow)

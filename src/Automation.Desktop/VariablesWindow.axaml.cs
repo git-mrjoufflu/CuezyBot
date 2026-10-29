@@ -11,6 +11,11 @@ public sealed partial class VariablesWindow : Window
     private static readonly Regex ValidName = new("^[A-Za-z_][A-Za-z0-9_.-]{0,63}$", RegexOptions.CultureInvariant);
     private readonly bool english;
     private string? editingName;
+    private string editingScope = "system";
+    private string? editingViewerId;
+    private readonly HashSet<string> collapsedGroups = new(StringComparer.OrdinalIgnoreCase);
+    private bool refreshing;
+    private static string CategoryKey(Automation.Contracts.Persistence.PersistentVariable variable) => System.Text.Json.JsonSerializer.Serialize(new[] { variable.Scope, variable.ViewerId ?? "", variable.Name });
     private IReadOnlyList<Automation.Contracts.Persistence.PersistentVariable> allVariables = Array.Empty<Automation.Contracts.Persistence.PersistentVariable>();
 
     public VariablesWindow() : this(UiLanguageState.IsEnglish) { }
@@ -26,6 +31,12 @@ public sealed partial class VariablesWindow : Window
     private void ApplyLanguage()
     {
         Heading.Text = "Variables";
+        ColumnName.Text = english ? "Name" : "Nom";
+        ColumnValue.Text = english ? "Value" : "Valeur";
+        ColumnType.Text = "Type";
+        ColumnLifetime.Text = english ? "Lifetime" : "Durée";
+        ColumnActions.Text = "Actions";
+        ColumnCategory.Text = english ? "Category" : "Catégorie";
         Description.Text = english
             ? "Create system or viewer variables, temporary or permanent. Use them in action text with %name%."
             : "Crée des variables système ou viewer, temporaires ou permanentes. Utilise-les dans les actions avec %nom%.";
@@ -34,15 +45,19 @@ public sealed partial class VariablesWindow : Window
         ValueLabel.Text = english ? "Initial value" : "Valeur initiale";
         ScopeLabel.Text = english ? "Scope" : "Portée";
         LifetimeLabel.Text = english ? "Lifetime" : "Durée";
+        ViewerLabel.Text = english ? "Viewer username" : "Nom du viewer";
+        ViewerInput.PlaceholderText = english ? "Twitch username" : "Nom d’utilisateur Twitch";
         TypeInput.ItemsSource = english ? new[] { "Number", "Text" } : new[] { "Nombre", "Texte" };
         ScopeInput.ItemsSource = english ? new[] { "System", "Viewer" } : new[] { "Système", "Viewer" };
         LifetimeInput.ItemsSource = english ? new[] { "Temporary", "Permanent" } : new[] { "Temporaire", "Permanente" };
         SystemTab.Header = english ? "System" : "Système";
         ViewerTab.Header = english ? "Viewer" : "Viewer";
         ViewerFilter.PlaceholderText = english ? "All viewers" : "Tous les viewers";
+        AllViewersOption.Content = english ? "All viewers" : "Tous les viewers";
         if (TypeInput.SelectedIndex < 0) TypeInput.SelectedIndex = 0;
         NameInput.PlaceholderText = english ? "e.g. visits" : "ex. visites";
-        SaveButton.Content = english ? "Add" : "Ajouter";
+        ManagementButtons.Add(SaveButton, english);
+        UpdateCreationViewerVisibility();
     }
 
     private async void OnSaveClick(object? sender, RoutedEventArgs eventArgs)
@@ -59,11 +74,30 @@ public sealed partial class VariablesWindow : Window
         try
         {
             var scope = ScopeInput.SelectedIndex == 1 ? "viewer" : "system";
+            var viewerId = scope == "viewer" ? ViewerInput.Text?.Trim() : null;
+            if (scope == "viewer" && string.IsNullOrWhiteSpace(viewerId))
+            {
+                StatusText.Text = english ? "Enter the Twitch viewer name." : "Entre le nom du viewer Twitch.";
+                StatusText.Foreground = new SolidColorBrush(Color.Parse("#FF9B72"));
+                return;
+            }
             var lifetime = LifetimeInput.SelectedIndex == 0 ? "temporary" : "permanent";
+            if (AllViewersOption.IsChecked == true && editingName is not null && editingScope == "viewer" && !string.Equals(editingName, name, StringComparison.OrdinalIgnoreCase))
+            {
+                foreach (var viewerVariable in allVariables.Where(item => item.Scope == "viewer" && string.Equals(item.Name, editingName, StringComparison.OrdinalIgnoreCase)))
+                {
+                    if (viewerVariable.Type == "text") await PrototypeServices.SetTextVariableAsync(name, viewerVariable.Value, "viewer", viewerVariable.Lifetime, viewerVariable.ViewerId);
+                    else if (long.TryParse(viewerVariable.Value, out var viewerValue)) await PrototypeServices.SetVariableAsync(name, viewerValue, "viewer", viewerVariable.Lifetime, viewerVariable.ViewerId);
+                }
+                await PrototypeServices.DeleteVariablesForAllViewersAsync(editingName);
+                editingName = null; editingScope = "system"; editingViewerId = null; ViewerInput.Text = "";
+                await RefreshAsync(english ? "Variables renamed for all viewers." : "Variables renommées pour tous les viewers.");
+                return;
+            }
             if (TypeInput.SelectedIndex == 1)
-                await PrototypeServices.SetTextVariableAsync(name, ValueInput.Text ?? "", scope, lifetime);
+                await PrototypeServices.SetTextVariableAsync(name, ValueInput.Text ?? "", scope, lifetime, viewerId);
             else if (long.TryParse(ValueInput.Text, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var number))
-                await PrototypeServices.SetVariableAsync(name, number, scope, lifetime);
+                await PrototypeServices.SetVariableAsync(name, number, scope, lifetime, viewerId);
             else
             {
                 StatusText.Text = english ? "Enter a valid whole number." : "Entre un nombre entier valide.";
@@ -71,12 +105,14 @@ public sealed partial class VariablesWindow : Window
                 return;
             }
             if (editingName is not null && !string.Equals(editingName, name, StringComparison.OrdinalIgnoreCase))
-                await PrototypeServices.DeleteVariableAsync(editingName);
+                await PrototypeServices.DeleteVariableAsync(editingName, editingScope, editingViewerId);
             editingName = null;
+            editingScope = "system"; editingViewerId = null;
             NameInput.Text = "";
             ValueInput.Text = "0";
+            ViewerInput.Text = "";
             TypeInput.SelectedIndex = 0;
-            SaveButton.Content = english ? "Add" : "Ajouter";
+            ManagementButtons.Add(SaveButton, english);
             await RefreshAsync(english ? "Variable saved." : "Variable enregistrée.");
         }
         catch (Exception exception)
@@ -88,6 +124,8 @@ public sealed partial class VariablesWindow : Window
 
     private async Task RefreshAsync(string? message = null)
     {
+        if (refreshing) return;
+        refreshing = true;
         try
         {
             allVariables = await PrototypeServices.GetVariablesAsync();
@@ -95,23 +133,34 @@ public sealed partial class VariablesWindow : Window
             ViewerFilter.ItemsSource = viewerIds;
             var viewerMode = ScopeTabs.SelectedIndex == 1;
             ViewerFilter.IsVisible = viewerMode;
+            AllViewersOption.IsVisible = viewerMode;
             var selectedViewer = ViewerFilter.SelectedItem as string;
-            var variables = allVariables.Where(variable => (viewerMode ? variable.Scope == "viewer" : variable.Scope != "viewer") && (!viewerMode || selectedViewer is null || variable.ViewerId == selectedViewer)).ToArray();
+            var variables = allVariables.Where(variable =>
+                viewerMode
+                    ? selectedViewer is not null && variable.Scope == "viewer" && variable.ViewerId == selectedViewer
+                    : variable.Scope != "viewer").ToArray();
             VariableRows.Children.Clear();
-            foreach (var variable in variables)
+            var categories = await AutomationQueues.LoadAsync();
+            var groups = new CategoryGroups(VariableRows, collapsedGroups, english ? "Uncategorized" : "Sans catégorie");
+            foreach (var variable in variables.OrderBy(variable => ManagementCategories.Get(categories, "variableCategories", CategoryKey(variable)), StringComparer.OrdinalIgnoreCase).ThenBy(variable => variable.Name, StringComparer.OrdinalIgnoreCase))
             {
-                var edit = new Button { Content = english ? "Edit" : "Modifier" };
+                var categoryKey = CategoryKey(variable);
+                var categoryName = ManagementCategories.Get(categories, "variableCategories", categoryKey);
+                var edit = ManagementButtons.Edit(english);
                 edit.Click += (_, _) =>
                 {
                     editingName = variable.Name;
+                    editingScope = variable.Scope; editingViewerId = variable.ViewerId;
                     NameInput.Text = variable.Name;
                     TypeInput.SelectedIndex = variable.Type == "text" ? 1 : 0;
                     ValueInput.Text = variable.Value;
                     ScopeInput.SelectedIndex = variable.Scope == "viewer" ? 1 : 0;
+                    ViewerInput.Text = variable.ViewerId ?? "";
+                    UpdateCreationViewerVisibility();
                     LifetimeInput.SelectedIndex = variable.Lifetime == "temporary" ? 0 : 1;
-                    SaveButton.Content = english ? "Save" : "Enregistrer";
+                    ManagementButtons.Save(SaveButton, english);
                 };
-                var delete = new Button { Content = english ? "Delete" : "Supprimer" };
+                var delete = ManagementButtons.Delete(english);
                 delete.Click += async (_, _) =>
                 {
                     var confirmation = new Window { Title = english ? "Delete variable" : "Supprimer la variable", Width = 390, Height = 180, CanResize = false, WindowStartupLocation = WindowStartupLocation.CenterOwner };
@@ -129,7 +178,10 @@ public sealed partial class VariablesWindow : Window
                         }
                     };
                     if (!await confirmation.ShowDialog<bool>(this)) return;
-                    await PrototypeServices.DeleteVariableAsync(variable.Name);
+                    if (AllViewersOption.IsChecked == true && variable.Scope == "viewer")
+                        await PrototypeServices.DeleteVariablesForAllViewersAsync(variable.Name);
+                    else
+                        await PrototypeServices.DeleteVariableAsync(variable.Name, variable.Scope, variable.ViewerId);
                     if (editingName == variable.Name) editingName = null;
                     await RefreshAsync(english ? "Variable deleted." : "Variable supprimée.");
                 };
@@ -137,14 +189,18 @@ public sealed partial class VariablesWindow : Window
                 var value = new TextBlock { Text = variable.Value, Foreground = new SolidColorBrush(Color.Parse("#7DBEFF")), FontSize = 15, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center };
                 var type = new TextBlock { Text = variable.Type == "text" ? (english ? "Text" : "Texte") : (english ? "Number" : "Nombre"), Foreground = new SolidColorBrush(Color.Parse("#CDD0E3")), VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center };
                 var lifetime = new TextBlock { Text = variable.Lifetime == "temporary" ? (english ? "Temporary" : "Temporaire") : (english ? "Permanent" : "Permanente"), Foreground = new SolidColorBrush(Color.Parse("#CDD0E3")), VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center };
-                var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("1.6*,1.2*,1*,1.2*,Auto,Auto"), ColumnSpacing = 8 };
+                var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("1.6*,1.2*,1*,1.2*,1.3*,40,40"), ColumnSpacing = 8 };
                 grid.Children.Add(token);
                 Grid.SetColumn(value, 1); grid.Children.Add(value);
                 Grid.SetColumn(type, 2); grid.Children.Add(type);
                 Grid.SetColumn(lifetime, 3); grid.Children.Add(lifetime);
-                Grid.SetColumn(edit, 4); grid.Children.Add(edit);
-                Grid.SetColumn(delete, 5); grid.Children.Add(delete);
-                VariableRows.Children.Add(new Border { Background = new SolidColorBrush(Color.Parse("#141A34")), BorderBrush = new SolidColorBrush(Color.Parse("#33406A")), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(9), Padding = new Thickness(14, 10), Child = grid });
+                var category = new Button { Content = categoryName.Length > 0 ? categoryName : english ? "Uncategorized" : "Sans catégorie" };
+                ToolTip.SetTip(category, english ? "Change category" : "Changer la catégorie");
+                category.Click += async (_, _) => { try { if (await ManagementCategories.EditAsync(this, english, "variableCategories", categoryKey)) await RefreshAsync(); } catch (Exception ex) { StatusText.Text = ex.Message; } };
+                Grid.SetColumn(category, 4); grid.Children.Add(category);
+                Grid.SetColumn(edit, 5); grid.Children.Add(edit);
+                Grid.SetColumn(delete, 6); grid.Children.Add(delete);
+                groups.Add(categoryName, new Border { Background = new SolidColorBrush(Color.Parse("#141A34")), BorderBrush = new SolidColorBrush(Color.Parse("#33406A")), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(9), Padding = new Thickness(14, 10), Child = grid });
             }
             StatusText.Foreground = new SolidColorBrush(Color.Parse("#9DA8CB"));
             StatusText.Text = message ?? (variables.Length == 0 ? (english ? "No variables in this category." : "Aucune variable dans cette catégorie.") : $"{variables.Length} variable(s).");
@@ -154,6 +210,7 @@ public sealed partial class VariablesWindow : Window
             StatusText.Text = exception.Message;
             StatusText.Foreground = new SolidColorBrush(Color.Parse("#FF7777"));
         }
+        finally { refreshing = false; }
     }
 
     private void OnTypeChanged(object? sender, SelectionChangedEventArgs eventArgs)
@@ -172,8 +229,17 @@ public sealed partial class VariablesWindow : Window
         await RefreshAsync();
     }
 
+    private void OnCreationScopeChanged(object? sender, SelectionChangedEventArgs eventArgs) => UpdateCreationViewerVisibility();
+
+    private void UpdateCreationViewerVisibility()
+    {
+        if (ScopeInput is null || ViewerLabel is null || ViewerInput is null) return;
+        var visible = ScopeInput.SelectedIndex == 1;
+        ViewerLabel.IsVisible = ViewerInput.IsVisible = visible;
+    }
+
     private async void OnViewerChanged(object? sender, SelectionChangedEventArgs eventArgs)
     {
-        if (ScopeTabs?.SelectedIndex == 1) await RefreshAsync();
+        if (!refreshing && ScopeTabs?.SelectedIndex == 1) await RefreshAsync();
     }
 }
